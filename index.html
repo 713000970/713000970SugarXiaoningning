@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>教辅生产规则看板</title>
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/element-plus"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background-color: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
+    #app { min-height: 100vh; }
+    .dashboard-container { padding: 24px; max-width: 1400px; margin: 0 auto; }
+    .header { margin-bottom: 24px; text-align: center; }
+    .header h1 { font-size: 28px; color: #1a1a2e; margin-bottom: 20px; }
+    .tab-buttons { display: flex; justify-content: center; gap: 20px; margin-bottom: 28px; }
+    .tab-btn { padding: 12px 40px; font-size: 16px; border-radius: 8px; cursor: pointer; border: 2px solid #409EFF; background: white; color: #409EFF; transition: all 0.3s; }
+    .tab-btn:hover { background: #ecf5ff; }
+    .tab-btn.active { background: #409EFF; color: white; }
+    .content-section { background: transparent; }
+    .search-section { margin-bottom: 20px; }
+
+    /* 通用规则卡片布局 */
+    .rules-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+    .rule-card { background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
+    .rule-card-header { padding: 16px 20px; display: flex; align-items: center; gap: 10px; }
+    .rule-card-header .icon { font-size: 22px; }
+    .rule-card-header .title { font-size: 17px; font-weight: 700; color: white; }
+    .rule-card-body { padding: 18px 20px; }
+    .rule-card.material .rule-card-header { background: linear-gradient(135deg, #667eea, #764ba2); }
+    .rule-card.album .rule-card-header { background: linear-gradient(135deg, #f093fb, #f5576c); }
+    .rule-card.special .rule-card-header { background: linear-gradient(135deg, #4facfe, #00f2fe); }
+    .rule-card.special2 .rule-card-header { background: linear-gradient(135deg, #43e97b, #38f9d7); }
+    .rule-card.special3 .rule-card-header { background: linear-gradient(135deg, #fa709a, #fee140); }
+
+    .rule-block { margin-bottom: 16px; }
+    .rule-block:last-child { margin-bottom: 0; }
+    .rule-block-title { font-size: 13px; font-weight: 700; color: #909399; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .rule-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; font-size: 14px; color: #303133; line-height: 1.7; }
+    .rule-row:last-child { margin-bottom: 0; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+    .badge-pdf { background: #fef0f0; color: #f56c6c; }
+    .badge-ppt { background: #fdf6ec; color: #e6a23c; }
+    .badge-word { background: #f0f9eb; color: #67c23a; }
+    .badge-blue { background: #ecf5ff; color: #409EFF; }
+    .badge-warn { background: #fff3cd; color: #856404; }
+    .badge-red { background: #fef0f0; color: #f56c6c; }
+    .tag-pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-right: 6px; }
+    .tag-green { background: #f0f9eb; color: #67c23a; border: 1px solid #b3e19d; }
+    .tag-orange { background: #fdf6ec; color: #e6a23c; border: 1px solid #f5dab1; }
+    .tag-red { background: #fef0f0; color: #f56c6c; border: 1px solid #fbc4c4; }
+    .tag-blue { background: #ecf5ff; color: #409EFF; border: 1px solid #b3d8ff; }
+    .tag-purple { background: #f3e8ff; color: #7c3aed; border: 1px solid #d8b4fe; }
+    .divider { border: none; border-top: 1px solid #f0f0f0; margin: 12px 0; }
+    .rule-link { color: #409EFF; text-decoration: none; font-weight: 600; }
+    .rule-link:hover { text-decoration: underline; }
+    .special-item { background: #f8f9fa; border-left: 3px solid #409EFF; border-radius: 0 6px 6px 0; padding: 10px 14px; margin-bottom: 10px; font-size: 14px; color: #303133; line-height: 1.7; }
+    .special-item:last-child { margin-bottom: 0; }
+    .special-item.warn { border-left-color: #e6a23c; }
+    .special-item.danger { border-left-color: #f56c6c; }
+    .special-item.success { border-left-color: #67c23a; }
+    .special-item.purple { border-left-color: #7c3aed; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="dashboard-container">
+      <div class="header">
+        <h1>📚 教辅生产规则看板</h1>
+      </div>
+
+      <div class="tab-buttons">
+        <button class="tab-btn" :class="{ active: activeTab === 'general' }" @click="activeTab = 'general'">
+          📋 通用规则
+        </button>
+        <button class="tab-btn" :class="{ active: activeTab === 'provider' }" @click="activeTab = 'provider'">
+          🔍 提供者搜索
+        </button>
+      </div>
+
+      <!-- 通用规则内容 -->
+      <div v-show="activeTab === 'general'" class="content-section">
+        <div class="rules-grid">
+
+          <!-- 卡片1：拆分维度 -->
+          <div class="rule-card material">
+            <div class="rule-card-header">
+              <span class="icon">✂️</span>
+              <span class="title">拆分维度</span>
+            </div>
+            <div class="rule-card-body">
+              <div class="rule-row"><span class="badge badge-pdf">PDF</span>按目录，若无则按标题，<strong>杜绝单页</strong></div>
+              <div class="rule-row"><span class="badge badge-ppt">PPT</span>删除敏感信息（联系方式、二维码等），直接上传</div>
+              <div class="rule-row"><span class="badge badge-word">WORD</span>删除敏感信息（联系方式、二维码等），直接上传</div>
+              <hr class="divider">
+              <div style="margin-top:10px;background:#fff7e6;border:1px solid #ffd591;border-radius:6px;padding:8px 12px;font-size:13px;color:#d46b08;">
+                ⚠️ <strong>备注：</strong>以上三种格式有存在主书+小册子的情况，小册子拆分后，需<strong>单独建立专辑上传</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片2：命名规则（合并） -->
+          <div class="rule-card material">
+            <div class="rule-card-header">
+              <span class="icon">🏷️</span>
+              <span class="title">命名规则</span>
+            </div>
+            <div class="rule-card-body">
+              <div class="rule-block">
+                <div class="rule-block-title">专辑命名</div>
+                <div class="rule-row">① 【品牌】学年 + 年级 + 学科 + 对应封面名称（版本）</div>
+                <div class="rule-row">② 【品牌】学年 + 年级 + 学科 + 对应文件名称（版本）</div>
+              </div>
+              <hr class="divider">
+              <div class="rule-block">
+                <div class="rule-block-title">资料命名</div>
+                <div class="rule-row">① 具体标题（第X章+第X节+标题名）<strong>-专辑名</strong></div>
+                <div class="rule-row">② 若资料名与书籍名重复，则<strong>无需后缀</strong></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片3：定价 -->
+          <div class="rule-card material">
+            <div class="rule-card-header">
+              <span class="icon">💰</span>
+              <span class="title">定价</span>
+            </div>
+            <div class="rule-card-body">
+              <div class="rule-row">参考定价文档：</div>
+              <div class="rule-row">
+                <a href="https://docs.qq.com/doc/DUVNLeVZ0TXl5S1VT?u=f5968bd1179c4d9290cbda4d25c81049" target="_blank" class="rule-link">📄 点击查看定价文档 →</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片4：专辑规则 -->
+          <div class="rule-card album">
+            <div class="rule-card-header">
+              <span class="icon">📁</span>
+              <span class="title">专辑规则</span>
+            </div>
+            <div class="rule-card-body">
+              <div class="rule-block">
+                <div class="rule-block-title">专辑目录</div>
+                <div class="rule-row">① 有目录书籍 → 1:1 还原，资料按顺序排序</div>
+                <div class="rule-row">② 同步书籍 → 获取主数据目录，资料放对应目录下</div>
+              </div>
+              <hr class="divider">
+              <div class="rule-block">
+                <div class="rule-block-title">专辑简介模板</div>
+                <div class="rule-row" style="background:#f8f9fa;padding:8px 10px;border-radius:6px;font-size:13px;color:#555;">
+                  XXXX（书籍名称）系列资料由 XXXX（提供者）提供，并授权学科网在互联网进行发布，侵权必究！
+                </div>
+              </div>
+              <hr class="divider">
+              <div class="rule-block">
+                <div class="rule-block-title">专辑封面</div>
+                <div class="rule-row">① 无封面 → 使用去年同期产品封面</div>
+                <div class="rule-row">② 去年无 → 智能平台生成，要求最下标必须写 <span class="badge badge-warn">学科网书城</span>，<a href="https://bar.xkw.com/cover/size" target="_blank" class="rule-link">点击制作封面 →</a></div>
+              </div>
+              <hr class="divider">
+              <div class="rule-block">
+                <div class="rule-block-title">其他</div>
+                <div class="rule-row">专辑"热点""推荐"等该栏标签 <span class="badge badge-red">不做任何勾选</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片5：特例（试卷/中职/音视频） -->
+          <div class="rule-card special">
+            <div class="rule-card-header">
+              <span class="icon">⚠️</span>
+              <span class="title">特例 · 试卷 / 中职 / 音视频</span>
+            </div>
+            <div class="rule-card-body">
+              <div class="special-item">
+                <span class="tag-pill tag-red">真题试卷</span>非教辅版权试卷<br>
+                • <strong>高考：</strong>不处理，直接上传<br>
+                • <strong>中考 / 小升初：</strong>发布后在 XMP 后台加入网校通
+              </div>
+              <div class="special-item warn">
+                <span class="tag-pill tag-orange">普通真题卷</span>校考 / 省市区县统考卷<br>
+                资料打标作者 <strong>"教辅精选"</strong>，发布后在 XMP 后台加入网校通
+              </div>
+              <div class="special-item">
+                <span class="tag-pill tag-blue">中职产品</span>
+                发布后在 XMP 后台加入网校通
+              </div>
+              <div class="special-item success">
+                <span class="tag-pill tag-green">音视频</span>
+                勾选 <strong>禁止下载</strong> 标签
+              </div>
+            </div>
+          </div>
+
+          <!-- 卡片6：特例（电子样书） -->
+          <div class="rule-card special3">
+            <div class="rule-card-header">
+              <span class="icon">📖</span>
+              <span class="title">特例 · 电子样书</span>
+            </div>
+            <div class="rule-card-body">
+              <div class="special-item purple">
+                <span class="tag-pill tag-purple">命名</span>
+                专辑名 & 资料名末尾补充 <strong>"-电子样书"</strong>
+              </div>
+              <div class="special-item purple">
+                <span class="tag-pill tag-purple">标签</span>
+                资料和专辑额外勾选 <strong>"样书"</strong>
+              </div>
+              <div class="special-item purple">
+                <span class="tag-pill tag-purple">下载</span>
+                资料额外勾选 <strong>"禁止下载"</strong>
+              </div>
+              <div class="special-item purple">
+                <span class="tag-pill tag-purple">定价</span>
+                <strong>0元</strong>
+              </div>
+              <div class="special-item purple">
+                <span class="tag-pill tag-purple">发布</span>
+                立即发布
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 提供者搜索内容 -->
+      <div v-show="activeTab === 'provider'" class="content-section">
+        <div class="search-section">
+          <el-card>
+            <el-form label-width="100px">
+              <el-row :gutter="20">
+                <el-col :span="8">
+                  <el-form-item label="提供者">
+                    <el-select 
+                      v-model="selectedProvider" 
+                      placeholder="请选择提供者"
+                      filterable
+                      clearable
+                      @change="handleProviderChange"
+                      style="width: 100%;"
+                    >
+                      <el-option 
+                        v-for="provider in providerList" 
+                        :key="provider" 
+                        :label="provider" 
+                        :value="provider" 
+                      />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="品牌">
+                    <el-select 
+                      v-model="selectedBrand" 
+                      placeholder="请先选择提供者"
+                      filterable
+                      clearable
+                      @change="handleBrandChange"
+                      :disabled="!selectedProvider"
+                      style="width: 100%;"
+                    >
+                      <el-option 
+                        v-for="brand in brandList" 
+                        :key="brand" 
+                        :label="brand" 
+                        :value="brand" 
+                      />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="8">
+                  <el-form-item label="系列">
+                    <el-select 
+                      v-model="selectedSeries" 
+                      placeholder="请先选择品牌"
+                      filterable
+                      clearable
+                      @change="handleSeriesChange"
+                      :disabled="!selectedBrand"
+                      style="width: 100%;"
+                    >
+                      <el-option 
+                        v-for="series in seriesList" 
+                        :key="series" 
+                        :label="series" 
+                        :value="series" 
+                      />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+            </el-form>
+          </el-card>
+        </div>
+
+        <!-- 显示个性化规则 -->
+        <el-card v-if="currentRule" v-loading="loading">
+          <template #header>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="font-size: 18px; font-weight: bold;">📋 个性化生产规则</span>
+              <el-button type="primary" size="small" @click="showDialog = true; isEdit = false;">✏️ 编辑规则</el-button>
+            </div>
+          </template>
+          
+          <el-descriptions :column="2" border size="large">
+            <el-descriptions-item label="提供者">
+              <span style="font-weight: 600;">{{ currentRule.provider }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="品牌名称">
+              <span style="font-weight: 600;">{{ currentRule.brand }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="系列名称" :span="2">
+              <span style="font-weight: 600;">{{ currentRule.series }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="拆分" v-if="currentRule.splitDimension" :span="2">
+              {{ currentRule.splitDimension }}
+            </el-descriptions-item>
+            <el-descriptions-item label="定价" v-if="currentRule.pricing">
+              {{ currentRule.pricing }}
+            </el-descriptions-item>
+            <el-descriptions-item label="发布时间" v-if="currentRule.publishTime">
+              {{ currentRule.publishTime }}
+            </el-descriptions-item>
+            <el-descriptions-item label="特例" v-if="currentRule.specialCase" :span="2">
+              <div style="white-space: pre-wrap;">{{ currentRule.specialCase }}</div>
+            </el-descriptions-item>
+          </el-descriptions>
+        </el-card>
+
+        <!-- 未选择时的提示 -->
+        <el-card v-else>
+          <el-empty description="请选择提供者、品牌和系列查看个性化规则" />
+        </el-card>
+
+        <!-- 新增/编辑规则对话框 -->
+        <el-dialog v-model="showDialog" :title="isEdit ? '编辑规则' : '新增提供者规则'" width="800px">
+          <el-form :model="form" label-width="120px">
+            <el-form-item label="提供者" required>
+              <el-input v-model="form.provider" placeholder="请输入提供者名称" />
+            </el-form-item>
+            <el-form-item label="品牌" required>
+              <el-input v-model="form.brand" placeholder="请输入品牌" />
+            </el-form-item>
+            <el-form-item label="系列" required>
+              <el-input v-model="form.series" placeholder="请输入系列" />
+            </el-form-item>
+            <el-form-item label="拆分维度">
+              <el-input v-model="form.splitDimension" placeholder="例如：按年级、按章节等" />
+            </el-form-item>
+            <el-form-item label="专辑目录">
+              <el-input v-model="form.albumCatalog" placeholder="例如：资源上架清单中" />
+            </el-form-item>
+            <el-form-item label="标签">
+              <el-select v-model="form.tags" multiple placeholder="请选择或输入标签" allow-create filterable style="width: 100%;">
+                <el-option label="高中" value="高中" />
+                <el-option label="初中" value="初中" />
+                <el-option label="小学" value="小学" />
+                <el-option label="精品" value="精品" />
+                <el-option label="同步" value="同步" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="定价">
+              <el-input v-model="form.pricing" placeholder="例如：¥99.00" />
+            </el-form-item>
+            <el-form-item label="发布时间">
+              <el-date-picker v-model="form.publishTime" type="datetime" placeholder="选择发布时间" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%;" />
+            </el-form-item>
+            <el-form-item label="特例">
+              <el-input v-model="form.specialCase" type="textarea" :rows="3" placeholder="特殊处理规则说明" />
+            </el-form-item>
+            <el-form-item label="专辑简介">
+              <el-input v-model="form.albumIntro" type="textarea" :rows="4" placeholder="XXXX系列资料由XXXX提供，并授权学科网在互联网进行发布，侵权必究！" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="showDialog = false">取消</el-button>
+            <el-button type="primary" @click="handleSubmit">{{ isEdit ? '保存' : '提交' }}</el-button>
+          </template>
+        </el-dialog>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, reactive, computed } = Vue;
+    const { ElMessage } = ElementPlus;
+
+    createApp({
+      setup() {
+        const activeTab = ref('general');
+        const loading = ref(false);
+        const showDialog = ref(false);
+        const isEdit = ref(false);
+        
+        // 三级联动选择
+        const selectedProvider = ref('');
+        const selectedBrand = ref('');
+        const selectedSeries = ref('');
+        
+        const form = reactive({
+          provider: '', brand: '', series: '', splitDimension: '',
+          albumCatalog: '', tags: [], pricing: '', publishTime: '',
+          specialCase: '', albumIntro: ''
+        });
+
+        // 模拟数据库 - 存储所有规则
+        const rulesDatabase = ref([
+          // 安徽木牍教育图书有限公司
+          { id: 1, provider: '安徽木牍教育图书有限公司', brand: '木牍中考', series: '同步优质课件', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '3元', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+          { id: 2, provider: '安徽木牍教育图书有限公司', brand: '木牍中考•名师教案', series: '同步配套', splitDimension: '不换页眉页脚，直接上传', albumCatalog: '通用规则', tags: [], pricing: '', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+          { id: 3, provider: '安徽木牍教育图书有限公司', brand: '木牍中考•课时A计划', series: '同步配套', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '3元', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+          { id: 4, provider: '安徽木牍教育图书有限公司', brand: '木牍中考•课时A计划', series: '小册子', splitDimension: '不换页眉页脚，直接上传', albumCatalog: '通用规则', tags: [], pricing: '', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+          // 胶州市拾光树文化传媒中心
+          { id: 5, provider: '胶州市拾光树文化传媒中心', brand: '优学精讲', series: '高中同步', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          { id: 6, provider: '胶州市拾光树文化传媒中心', brand: '优学精研', series: '高考一轮总复习', splitDimension: '按资源类型建书上传', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          { id: 7, provider: '胶州市拾光树文化传媒中心', brand: '第一梯队', series: '高考二轮', splitDimension: '按资源类型建书上传', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          { id: 8, provider: '胶州市拾光树文化传媒中心', brand: '备考最优解', series: '高考二轮', splitDimension: '按资源类型建书上传', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          // 湖南书虫教育科技有限公司
+          { id: 9, provider: '湖南书虫教育科技有限公司', brand: '全效学习', series: '同步学练测', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          // 河北金卷教育科技有限公司
+          { id: 10, provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '周测卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '4元', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          { id: 11, provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '专题卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '4元', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          { id: 12, provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '专项分组练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '4元', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          { id: 13, provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '掌涵基础分自主小练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '4元', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          // 中学生数理化高中版编辑部
+          { id: 14, provider: '中学生数理化高中版编辑部', brand: '中学生数理化', series: '高中版', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '1元', publishTime: '按教学进度发布', specialCase: '如有，参考特例说明', albumIntro: '' },
+          // 山东中辰文化传媒有限公司
+          { id: 15, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈必刷卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          { id: 16, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈名卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          { id: 17, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈名师天练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
+          { id: 18, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈计算天练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按单元拆分', specialCase: '', albumIntro: '' },
+          { id: 19, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '小学毕业升学必备', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '参考特例试卷规则', albumIntro: '' },
+          { id: 20, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '期末真题汇编卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '参考特例试卷规则', albumIntro: '' },
+          // 郑州启明星书业有限公司
+          { id: 21, provider: '郑州启明星书业有限公司', brand: '优才书系', series: '英才同步单元卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+          { id: 22, provider: '郑州启明星书业有限公司', brand: '同步课课练', series: '小学同步课课练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+          // 梁山金大文化传媒有限公司
+          { id: 23, provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高考二轮复习', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+          { id: 24, provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '168优化重组卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+          { id: 25, provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高考一轮总复习', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+          { id: 26, provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高中同步辅导与测试', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
+        ]);
+
+        // 获取所有提供者列表（去重）
+        const providerList = computed(() => {
+          return [...new Set(rulesDatabase.value.map(r => r.provider))];
+        });
+
+        // 根据选择的提供者，获取品牌列表
+        const brandList = computed(() => {
+          if (!selectedProvider.value) return [];
+          return [...new Set(
+            rulesDatabase.value
+              .filter(r => r.provider === selectedProvider.value)
+              .map(r => r.brand)
+          )];
+        });
+
+        // 根据选择的提供者和品牌，获取系列列表
+        const seriesList = computed(() => {
+          if (!selectedProvider.value || !selectedBrand.value) return [];
+          return [...new Set(
+            rulesDatabase.value
+              .filter(r => r.provider === selectedProvider.value && r.brand === selectedBrand.value)
+              .map(r => r.series)
+          )];
+        });
+
+        // 当前显示的规则
+        const currentRule = computed(() => {
+          if (!selectedProvider.value || !selectedBrand.value || !selectedSeries.value) return null;
+          return rulesDatabase.value.find(r => 
+            r.provider === selectedProvider.value && 
+            r.brand === selectedBrand.value && 
+            r.series === selectedSeries.value
+          );
+        });
+
+        // 提供者改变时，清空品牌和系列
+        const handleProviderChange = () => {
+          selectedBrand.value = '';
+          selectedSeries.value = '';
+        };
+
+        // 品牌改变时，清空系列
+        const handleBrandChange = () => {
+          selectedSeries.value = '';
+        };
+
+        // 系列改变时，加载规则
+        const handleSeriesChange = () => {
+          if (currentRule.value) {
+            ElMessage.success('已加载该系列的个性化规则');
+          }
+        };
+
+        const handleSubmit = () => {
+          if (!form.provider || !form.brand || !form.series) {
+            ElMessage.warning('请填写提供者、品牌和系列');
+            return;
+          }
+
+          if (isEdit.value && currentRule.value) {
+            // 编辑模式
+            Object.assign(currentRule.value, form);
+            ElMessage.success('规则更新成功');
+          } else {
+            // 新增模式
+            rulesDatabase.value.push({
+              id: rulesDatabase.value.length + 1,
+              ...form
+            });
+            ElMessage.success('规则添加成功');
+          }
+          
+          showDialog.value = false;
+          Object.keys(form).forEach(key => {
+            form[key] = Array.isArray(form[key]) ? [] : '';
+          });
+          isEdit.value = false;
+        };
+
+        // 点击编辑按钮
+        const handleEdit = () => {
+          if (currentRule.value) {
+            isEdit.value = true;
+            Object.assign(form, currentRule.value);
+            showDialog.value = true;
+          }
+        };
+
+        return { 
+          activeTab, loading, showDialog, isEdit, form,
+          selectedProvider, selectedBrand, selectedSeries,
+          providerList, brandList, seriesList, currentRule,
+          handleProviderChange, handleBrandChange, handleSeriesChange,
+          handleSubmit, handleEdit
+        };
+      }
+    }).use(ElementPlus).mount('#app');
+  </script>
+</body>
+</html>
