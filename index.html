@@ -77,6 +77,9 @@
         <button class="tab-btn" :class="{ active: activeTab === 'provider' }" @click="activeTab = 'provider'">
           🔍 提供者搜索
         </button>
+        <button class="tab-btn" :class="{ active: activeTab === 'ai' }" @click="activeTab = 'ai'">
+          🤖 AI查询
+        </button>
       </div>
 
       <!-- 通用规则内容 -->
@@ -233,36 +236,39 @@
 
         <!-- 顶部：搜索 + 新增按钮 -->
         <el-card style="margin-bottom:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:16px;">
-            <el-form label-width="80px" style="flex:1;">
-              <el-row :gutter="20">
-                <el-col :span="8">
-                  <el-form-item label="提供者">
-                    <el-select v-model="selectedProvider" placeholder="请选择提供者" filterable clearable @change="handleProviderChange" style="width:100%;">
-                      <el-option v-for="p in providerList" :key="p" :label="p" :value="p" />
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="8">
-                  <el-form-item label="品牌">
-                    <el-select v-model="selectedBrand" placeholder="请先选择提供者" filterable clearable @change="handleBrandChange" :disabled="!selectedProvider" style="width:100%;">
-                      <el-option v-for="b in brandList" :key="b" :label="b" :value="b" />
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="8">
-                  <el-form-item label="系列">
-                    <el-select v-model="selectedSeries" placeholder="请先选择品牌" filterable clearable :disabled="!selectedBrand" style="width:100%;">
-                      <el-option v-for="s in seriesList" :key="s" :label="s" :value="s" />
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-form>
-            <div style="padding-bottom:18px;">
-              <el-button type="primary" @click="openAddProvider">＋ 新增提供者</el-button>
-            </div>
-          </div>
+          <el-form label-width="80px">
+            <el-row :gutter="20" align="middle">
+              <el-col :span="6">
+                <el-form-item label="提供者">
+                  <el-select v-model="selectedProvider" placeholder="请选择提供者" filterable clearable @change="handleProviderChange" style="width:100%;">
+                    <el-option v-for="p in providerList" :key="p" :label="p" :value="p" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="2" style="padding-bottom:18px;">
+                <el-button type="primary" @click="openAddProvider">＋ 新增</el-button>
+              </el-col>              <el-col :span="7">
+                <el-form-item label="品牌">
+                  <el-select v-model="selectedBrand" placeholder="请先选择提供者" filterable clearable @change="handleBrandChange" :disabled="!selectedProvider" style="width:100%;">
+                    <el-option v-for="b in brandList" :key="b" :label="b" :value="b" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="2" style="padding-bottom:18px;">
+                <el-button type="success" :disabled="!selectedProvider" @click="openAddSeries(selectedProvider)">＋ 新增</el-button>
+              </el-col>
+              <el-col :span="5">
+                <el-form-item label="系列">
+                  <el-select v-model="selectedSeries" placeholder="请先选择品牌" filterable clearable :disabled="!selectedBrand" style="width:100%;">
+                    <el-option v-for="s in seriesList" :key="s" :label="s" :value="s" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="2" style="padding-bottom:18px;">
+                <el-button type="success" :disabled="!selectedBrand" @click="openAddSeriesWithBrand(selectedProvider, selectedBrand)">＋ 新增</el-button>
+              </el-col>
+            </el-row>
+          </el-form>
         </el-card>
 
         <!-- 搜索结果：显示个性化规则 -->
@@ -271,7 +277,6 @@
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <span style="font-size:16px; font-weight:bold;">📋 个性化生产规则</span>
               <div style="display:flex;gap:8px;">
-                <el-button type="success" size="small" @click="openAddSeries(currentRule.provider)">＋ 添加品牌系列</el-button>
                 <el-button type="primary" size="small" @click="openEditRow(currentRule)">✏️ 编辑</el-button>
               </div>
             </div>
@@ -299,6 +304,9 @@
           <el-form :model="form" label-width="100px">
             <el-form-item label="提供者" required>
               <el-input v-model="form.provider" placeholder="请输入提供者名称" :disabled="dialogMode === 'addSeries' || dialogMode === 'edit'" />
+              <div v-if="dialogMode === 'add' && form.provider && providerList.some(p => p.includes(form.provider) || form.provider.includes(p.slice(0,4)))" style="color:#e6a23c;font-size:12px;margin-top:4px;">
+                ⚠️ 已存在相似提供者：{{ providerList.filter(p => p.includes(form.provider) || form.provider.includes(p.slice(0,4))).join('、') }}，请确认是否重复
+              </div>
             </el-form-item>
             <el-form-item label="品牌名称" required>
               <el-input v-model="form.brand" placeholder="请输入品牌名称" />
@@ -325,6 +333,30 @@
           </template>
         </el-dialog>
       </div>
+
+      <!-- AI查询内容 -->
+      <div v-show="activeTab === 'ai'" class="content-section">
+        <el-card style="margin-bottom:16px;">
+          <template #header>
+            <span style="font-size:16px;font-weight:bold;">🤖 AI智能查询</span>
+          </template>
+          <div style="margin-bottom:12px;color:#606266;font-size:14px;">
+            输入品牌名或提供者名称关键字，自动匹配对应的个性化生产规则
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input 
+              id="aiSearchInput"
+              type="text" 
+              placeholder="请输入品牌或提供者关键字，例如：木牍中考、安徽木牍..."
+              style="flex:1;padding:10px 14px;font-size:15px;border:1px solid #dcdfe6;border-radius:6px;outline:none;"
+            />
+            <button onclick="doAiSearch()" style="padding:10px 24px;background:#409EFF;color:white;border:none;border-radius:6px;font-size:15px;cursor:pointer;">查询</button>
+          </div>
+        </el-card>
+        <div id="aiResultArea">
+          <el-card><el-empty description="输入关键字开始查询" /></el-card>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -345,69 +377,7 @@
         const selectedBrand = ref('');
         const selectedSeries = ref('');
 
-        const form = reactive({
-          provider: '', brand: '', series: '', splitDimension: '',
-          albumCatalog: '', tags: [], pricing: '', publishTime: '',
-          specialCase: '', albumIntro: ''
-        });
-
-        const dialogTitle = computed(() => {
-          if (dialogMode.value === 'edit') return '编辑品牌系列';
-          if (dialogMode.value === 'addSeries') return '添加品牌系列';
-          return '新增提供者';
-        });
-
-        const resetForm = () => {
-          Object.keys(form).forEach(k => { form[k] = Array.isArray(form[k]) ? [] : ''; });
-          editingId.value = null;
-        };
-
-        const openAddProvider = () => {
-          resetForm();
-          dialogMode.value = 'add';
-          showDialog.value = true;
-        };
-
-        const openAddSeries = (provider) => {
-          resetForm();
-          form.provider = provider;
-          dialogMode.value = 'addSeries';
-          showDialog.value = true;
-        };
-
-        const openEditRow = (row) => {
-          Object.assign(form, { ...row });
-          editingId.value = row.id;
-          dialogMode.value = 'edit';
-          showDialog.value = true;
-        };
-
-        const handleSubmit = () => {
-          if (!form.provider || !form.brand || !form.series) {
-            ElMessage.warning('提供者、品牌名称、系列名称为必填项');
-            return;
-          }
-          if (dialogMode.value === 'edit') {
-            const idx = rulesDatabase.value.findIndex(r => r.id === editingId.value);
-            if (idx !== -1) Object.assign(rulesDatabase.value[idx], { ...form });
-            ElMessage.success('修改成功');
-          } else {
-            rulesDatabase.value.push({ id: Date.now(), ...form, tags: [] });
-            ElMessage.success('添加成功');
-          }
-          showDialog.value = false;
-        };
-
-        const handleProviderChange = () => {
-          selectedBrand.value = '';
-          selectedSeries.value = '';
-        };
-
-        const handleBrandChange = () => {
-          selectedSeries.value = '';
-        };
-
-        // 模拟数据库 - 存储所有规则
+        // 数据库 - 必须在所有 computed 之前声明
         const rulesDatabase = ref([
           // 安徽木牍教育图书有限公司
           { id: 1, provider: '安徽木牍教育图书有限公司', brand: '木牍中考', series: '同步优质课件', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '3元', publishTime: '立即发布', specialCase: '', albumIntro: '' },
@@ -445,6 +415,98 @@
           { id: 26, provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高中同步辅导与测试', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
         ]);
 
+        // AI查询
+        const aiQuery = ref('');
+        const aiResults = ref([]);
+        const aiProviderList = ref([]);
+
+        const handleAiQuery = () => {
+          const q = aiQuery.value.trim().toLowerCase();
+          if (!q) {
+            aiResults.value = [];
+            aiProviderList.value = [];
+            return;
+          }
+          const matched = rulesDatabase.value.filter(r =>
+            r.provider.toLowerCase().includes(q) ||
+            r.brand.toLowerCase().includes(q)
+          );
+          aiResults.value = matched;
+          aiProviderList.value = [...new Set(matched.map(r => r.provider))];
+        };
+
+        const duplicateWarning = ref('');
+
+        const form = reactive({
+          provider: '', brand: '', series: '', splitDimension: '',
+          albumCatalog: '', tags: [], pricing: '', publishTime: '',
+          specialCase: '', albumIntro: ''
+        });
+
+        const dialogTitle = computed(() => {
+          if (dialogMode.value === 'edit') return '编辑品牌系列';
+          if (dialogMode.value === 'addSeries') return '添加品牌系列';
+          return '新增提供者';
+        });
+
+        const resetForm = () => {
+          Object.keys(form).forEach(k => { form[k] = Array.isArray(form[k]) ? [] : ''; });
+          editingId.value = null;
+        };
+
+        const openAddProvider = () => {
+          resetForm();
+          dialogMode.value = 'add';
+          showDialog.value = true;
+        };
+
+        const openAddSeries = (provider) => {
+          resetForm();
+          form.provider = provider;
+          dialogMode.value = 'addSeries';
+          showDialog.value = true;
+        };
+
+        const openAddSeriesWithBrand = (provider, brand) => {
+          resetForm();
+          form.provider = provider;
+          form.brand = brand;
+          dialogMode.value = 'addSeries';
+          showDialog.value = true;
+        };
+
+        const openEditRow = (row) => {
+          Object.assign(form, { ...row });
+          editingId.value = row.id;
+          dialogMode.value = 'edit';
+          showDialog.value = true;
+        };
+
+        const handleSubmit = () => {
+          if (!form.provider || !form.brand || !form.series) {
+            ElMessage.warning('提供者、品牌名称、系列名称为必填项');
+            return;
+          }
+          if (dialogMode.value === 'edit') {
+            const idx = rulesDatabase.value.findIndex(r => r.id === editingId.value);
+            if (idx !== -1) Object.assign(rulesDatabase.value[idx], { ...form });
+            ElMessage.success('修改成功');
+          } else {
+            rulesDatabase.value.push({ id: Date.now(), ...form, tags: [] });
+            ElMessage.success('添加成功');
+          }
+          showDialog.value = false;
+        };
+
+        const handleProviderChange = () => {
+          selectedBrand.value = '';
+          selectedSeries.value = '';
+        };
+
+        const handleBrandChange = () => {
+          selectedSeries.value = '';
+        };
+
         // 获取所有提供者列表（去重）
         const providerList = computed(() => {
           return [...new Set(rulesDatabase.value.map(r => r.provider))];
@@ -469,11 +531,86 @@
           activeTab, loading, showDialog, dialogMode, dialogTitle, form,
           selectedProvider, selectedBrand, selectedSeries,
           providerList, brandList, seriesList, currentRule, rulesDatabase,
-          openAddProvider, openAddSeries, openEditRow,
+          aiQuery, aiResults, aiProviderList, duplicateWarning, handleAiQuery,
+          openAddProvider, openAddSeries, openAddSeriesWithBrand, openEditRow,
           handleSubmit, resetForm, handleProviderChange, handleBrandChange
         };
       }
     }).use(ElementPlus).mount('#app');
+
+    // AI查询 - 原生JS实现，读取Vue数据
+    function doAiSearch() {
+      const input = document.getElementById('aiSearchInput');
+      const q = (input ? input.value : '').trim().toLowerCase();
+      const area = document.getElementById('aiResultArea');
+      if (!area) return;
+
+      // 从Vue实例获取数据
+      const app = document.getElementById('app').__vue_app__;
+      const db = app ? app._context.provides : null;
+
+      // 直接硬编码数据源（与rulesDatabase同步）
+      const data = [
+        { provider: '安徽木牍教育图书有限公司', brand: '木牍中考', series: '同步优质课件', splitDimension: '通用规则', pricing: '3元', publishTime: '立即发布', specialCase: '' },
+        { provider: '安徽木牍教育图书有限公司', brand: '木牍中考•名师教案', series: '同步配套', splitDimension: '不换页眉页脚，直接上传', pricing: '', publishTime: '立即发布', specialCase: '' },
+        { provider: '安徽木牍教育图书有限公司', brand: '木牍中考•课时A计划', series: '同步配套', splitDimension: '通用规则', pricing: '3元', publishTime: '立即发布', specialCase: '' },
+        { provider: '安徽木牍教育图书有限公司', brand: '木牍中考•课时A计划', series: '小册子', splitDimension: '不换页眉页脚，直接上传', pricing: '', publishTime: '立即发布', specialCase: '' },
+        { provider: '胶州市拾光树文化传媒中心', brand: '优学精讲', series: '高中同步', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '胶州市拾光树文化传媒中心', brand: '优学精研', series: '高考一轮总复习', splitDimension: '按资源类型建书上传', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '胶州市拾光树文化传媒中心', brand: '第一梯队', series: '高考二轮', splitDimension: '按资源类型建书上传', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '胶州市拾光树文化传媒中心', brand: '备考最优解', series: '高考二轮', splitDimension: '按资源类型建书上传', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '湖南书虫教育科技有限公司', brand: '全效学习', series: '同步学练测', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '周测卷', splitDimension: '通用规则', pricing: '4元', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '专题卷', splitDimension: '通用规则', pricing: '4元', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '专项分组练', splitDimension: '通用规则', pricing: '4元', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '掌涵基础分自主小练', splitDimension: '通用规则', pricing: '4元', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '中学生数理化高中版编辑部', brand: '中学生数理化', series: '高中版', splitDimension: '通用规则', pricing: '1元', publishTime: '按教学进度发布', specialCase: '如有，参考特例说明' },
+        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈必刷卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈名卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈名师天练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
+        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈计算天练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按单元拆分', specialCase: '' },
+        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '小学毕业升学必备', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '参考特例试卷规则' },
+        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '期末真题汇编卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '参考特例试卷规则' },
+        { provider: '郑州启明星书业有限公司', brand: '优才书系', series: '英才同步单元卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
+        { provider: '郑州启明星书业有限公司', brand: '同步课课练', series: '小学同步课课练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
+        { provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高考二轮复习', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
+        { provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '168优化重组卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
+        { provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高考一轮总复习', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
+        { provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高中同步辅导与测试', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
+      ];
+
+      if (!q) { area.innerHTML = '<div style="background:white;border-radius:8px;padding:40px;text-align:center;color:#909399;">请输入关键字开始查询</div>'; return; }
+
+      const matched = data.filter(r => r.provider.toLowerCase().includes(q) || r.brand.toLowerCase().includes(q));
+      if (!matched.length) { area.innerHTML = '<div style="background:white;border-radius:8px;padding:40px;text-align:center;color:#909399;">未找到匹配结果，请尝试其他关键字</div>'; return; }
+
+      const providers = [...new Set(matched.map(r => r.provider))];
+      let html = `<div style="margin-bottom:12px;color:#909399;font-size:13px;">找到 ${matched.length} 条匹配结果</div>`;
+      providers.forEach(pv => {
+        const rows = matched.filter(r => r.provider === pv);
+        html += `<div style="background:white;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:16px;overflow:hidden;">
+          <div style="padding:14px 20px;border-bottom:1px solid #f0f0f0;font-size:15px;font-weight:700;color:#303133;">🏢 ${pv}</div>
+          <div style="padding:16px 20px;">`;
+        rows.forEach(r => {
+          html += `<div style="margin-bottom:14px;border:1px solid #f0f0f0;border-radius:8px;padding:14px;">
+            <div style="font-size:14px;font-weight:600;color:#409EFF;margin-bottom:10px;">${r.brand} · ${r.series}</div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;">`;
+          if (r.splitDimension) html += `<tr><td style="padding:6px 12px;background:#fafafa;border:1px solid #eee;width:80px;color:#606266;">拆分</td><td style="padding:6px 12px;border:1px solid #eee;">${r.splitDimension}</td></tr>`;
+          if (r.pricing) html += `<tr><td style="padding:6px 12px;background:#fafafa;border:1px solid #eee;color:#606266;">定价</td><td style="padding:6px 12px;border:1px solid #eee;">${r.pricing}</td></tr>`;
+          if (r.publishTime) html += `<tr><td style="padding:6px 12px;background:#fafafa;border:1px solid #eee;color:#606266;">发布时间</td><td style="padding:6px 12px;border:1px solid #eee;">${r.publishTime}</td></tr>`;
+          if (r.specialCase) html += `<tr><td style="padding:6px 12px;background:#fafafa;border:1px solid #eee;color:#606266;">特例</td><td style="padding:6px 12px;border:1px solid #eee;">${r.specialCase}</td></tr>`;
+          html += `</table></div>`;
+        });
+        html += `</div></div>`;
+      });
+      area.innerHTML = html;
+    }
+
+    // 支持回车触发
+    document.addEventListener('DOMContentLoaded', () => {
+      const input = document.getElementById('aiSearchInput');
+      if (input) input.addEventListener('keyup', e => { if (e.key === 'Enter') doAiSearch(); });
+    });
   </script>
 </body>
 </html>
