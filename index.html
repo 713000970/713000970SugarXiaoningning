@@ -3,1023 +3,581 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>教辅生产规则看板</title>
-  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
-  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <script src="https://unpkg.com/element-plus"></script>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background-color: #f0f2f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; }
-    #app { min-height: 100vh; }
-    .dashboard-container { padding: 24px; max-width: 1400px; margin: 0 auto; }
-    .header { margin-bottom: 24px; text-align: center; }
-    .header h1 { font-size: 28px; color: #1a1a2e; margin-bottom: 20px; }
-    .tab-buttons { display: flex; justify-content: center; gap: 20px; margin-bottom: 28px; }
-    .tab-btn { padding: 12px 40px; font-size: 16px; border-radius: 8px; cursor: pointer; border: 2px solid #409EFF; background: white; color: #409EFF; transition: all 0.3s; }
-    .tab-btn:hover { background: #ecf5ff; }
-    .tab-btn.active { background: #409EFF; color: white; }
-    .content-section { background: transparent; }
-    .search-section { margin-bottom: 20px; }
-
-    /* 通用规则卡片布局 */
-    .rules-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .rule-card { background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); overflow: hidden; }
-    .rule-card-header { padding: 16px 20px; display: flex; align-items: center; gap: 10px; }
-    .rule-card-header .icon { font-size: 22px; }
-    .rule-card-header .title { font-size: 17px; font-weight: 700; color: white; }
-    .rule-card-body { padding: 18px 20px; }
-    .rule-card.material .rule-card-header { background: linear-gradient(135deg, #667eea, #764ba2); }
-    .rule-card.album .rule-card-header { background: linear-gradient(135deg, #f093fb, #f5576c); }
-    .rule-card.special .rule-card-header { background: linear-gradient(135deg, #4facfe, #00f2fe); }
-    .rule-card.special2 .rule-card-header { background: linear-gradient(135deg, #43e97b, #38f9d7); }
-    .rule-card.special3 .rule-card-header { background: linear-gradient(135deg, #fa709a, #fee140); }
-
-    .rule-block { margin-bottom: 16px; }
-    .rule-block:last-child { margin-bottom: 0; }
-    .rule-block-title { font-size: 13px; font-weight: 700; color: #909399; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-    .rule-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; font-size: 14px; color: #303133; line-height: 1.7; }
-    .rule-row:last-child { margin-bottom: 0; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-    .badge-pdf { background: #fef0f0; color: #f56c6c; }
-    .badge-ppt { background: #fdf6ec; color: #e6a23c; }
-    .badge-word { background: #f0f9eb; color: #67c23a; }
-    .badge-blue { background: #ecf5ff; color: #409EFF; }
-    .badge-warn { background: #fff3cd; color: #856404; }
-    .badge-red { background: #fef0f0; color: #f56c6c; }
-    .tag-pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-right: 6px; }
-    .tag-green { background: #f0f9eb; color: #67c23a; border: 1px solid #b3e19d; }
-    .tag-orange { background: #fdf6ec; color: #e6a23c; border: 1px solid #f5dab1; }
-    .tag-red { background: #fef0f0; color: #f56c6c; border: 1px solid #fbc4c4; }
-    .tag-blue { background: #ecf5ff; color: #409EFF; border: 1px solid #b3d8ff; }
-    .tag-purple { background: #f3e8ff; color: #7c3aed; border: 1px solid #d8b4fe; }
-    .divider { border: none; border-top: 1px solid #f0f0f0; margin: 12px 0; }
-    .rule-link { color: #409EFF; text-decoration: none; font-weight: 600; }
-    .rule-link:hover { text-decoration: underline; }
-    .special-item { background: #f8f9fa; border-left: 3px solid #409EFF; border-radius: 0 6px 6px 0; padding: 10px 14px; margin-bottom: 10px; font-size: 14px; color: #303133; line-height: 1.7; }
-    .special-item:last-child { margin-bottom: 0; }
-    .special-item.warn { border-left-color: #e6a23c; }
-    .special-item.danger { border-left-color: #f56c6c; }
-    .special-item.success { border-left-color: #67c23a; }
-    .special-item.purple { border-left-color: #7c3aed; }
-  </style>
+  <title>教辅店铺个性化生产规则库</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
-    <div class="dashboard-container">
-      <div class="header">
-        <h1>📚 教辅生产规则看板</h1>
+
+  <!-- 顶部导航 -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="topbar-brand">
+        <span class="brand-icon">📚</span>
+        <span class="brand-text">教辅店铺生产规则库</span>
+      </div>
+      <div class="topbar-meta">
+        <span class="version-badge">V1.0</span>
+        <span class="status-indicator">
+          <span class="status-dot"></span>
+          <span class="status-text">实时更新</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 首页 -->
+  <main id="page-home" class="page active">
+    <div class="hero-section">
+      <div class="hero-bg"></div>
+      <div class="hero-content">
+        <h1 class="hero-title">教辅店铺个性化生产规则库</h1>
+        <p class="hero-subtitle">标准化 · 智能化 · 可视化</p>
+        <div class="hero-stats">
+          <div class="stat-item">
+            <span class="stat-num" id="stat-providers">0</span>
+            <span class="stat-label">提供者</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-num" id="stat-brands">0</span>
+            <span class="stat-label">品牌</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-num">12</span>
+            <span class="stat-label">规则项</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="cards-section">
+      <div class="cards-grid">
+        
+        <div class="feature-card" onclick="goPage('rules')" data-color="blue">
+          <div class="card-glow"></div>
+          <div class="card-header">
+            <div class="card-icon-wrap">
+              <span class="card-icon">📋</span>
+            </div>
+            <span class="card-tag">通用</span>
+          </div>
+          <h3 class="card-title">通用规则</h3>
+          <p class="card-desc">资料拆分、命名规范、专辑设置及特例处理的完整生产规范</p>
+          <ul class="card-features">
+            <li>PDF/PPT/WORD 拆分标准</li>
+            <li>专辑命名规范</li>
+            <li>定价参考指南</li>
+            <li>特例处理方案</li>
+          </ul>
+          <div class="card-footer">
+            <span class="card-link">查看详情 <span class="arrow">→</span></span>
+          </div>
+        </div>
+
+        <div class="feature-card" onclick="goPage('provider')" data-color="cyan">
+          <div class="card-glow"></div>
+          <div class="card-header">
+            <div class="card-icon-wrap">
+              <span class="card-icon">🔍</span>
+            </div>
+            <span class="card-tag">查询</span>
+          </div>
+          <h3 class="card-title">提供者查询</h3>
+          <p class="card-desc">三级联动筛选：提供者 → 品牌 → 系列，精准匹配个性化规则</p>
+          <ul class="card-features">
+            <li>提供者管理</li>
+            <li>品牌词筛选</li>
+            <li>系列联动</li>
+            <li>规则编辑</li>
+          </ul>
+          <div class="card-footer">
+            <span class="card-link">开始查询 <span class="arrow">→</span></span>
+          </div>
+        </div>
+
+        <div class="feature-card" onclick="goPage('ai')" data-color="purple">
+          <div class="card-glow"></div>
+          <div class="card-header">
+            <div class="card-icon-wrap">
+              <span class="card-icon">🤖</span>
+            </div>
+            <span class="card-tag">AI</span>
+          </div>
+          <h3 class="card-title">AI 智能查询</h3>
+          <p class="card-desc">输入关键词智能匹配，快速定位对应的生产规则</p>
+          <ul class="card-features">
+            <li>关键词匹配</li>
+            <li>智能推荐</li>
+            <li>快速定位</li>
+            <li>多维检索</li>
+          </ul>
+          <div class="card-footer">
+            <span class="card-link">立即体验 <span class="arrow">→</span></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <footer class="home-footer">
+      <p>最后更新：2026-04-13 · 教辅店铺运营系统</p>
+    </footer>
+  </main>
+
+  <!-- 通用规则页 -->
+  <main id="page-rules" class="page">
+    <div class="page-header">
+      <button class="back-btn" onclick="goHome()">
+        <span class="back-icon">←</span> 返回首页
+      </button>
+      <div class="page-title">
+        <span class="page-icon">📋</span>
+        <span>通用规则</span>
+      </div>
+    </div>
+
+    <div class="page-content">
+      
+      <!-- 通用规则卡片布局 -->
+      <div class="rules-grid">
+
+        <!-- 卡片1：拆分维度 -->
+        <div class="rule-card material">
+          <div class="rule-card-header">
+            <span class="icon">✂️</span>
+            <span class="title">拆分维度</span>
+          </div>
+          <div class="rule-card-body">
+            <div class="rule-row"><span class="badge badge-pdf">PDF</span>按目录，若无则按标题，<strong>杜绝单页</strong></div>
+            <div class="rule-row"><span class="badge badge-ppt">PPT</span>删除敏感信息（联系方式、二维码等），直接上传</div>
+            <div class="rule-row"><span class="badge badge-word">WORD</span>删除敏感信息（联系方式、二维码等），直接上传</div>
+            <hr class="divider">
+            <div class="rule-note-box">
+              ⚠️ <strong>备注：</strong>以上三种格式有存在主书+小册子的情况，小册子拆分后，需<strong>单独建立专辑上传</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- 卡片2：命名规则 -->
+        <div class="rule-card material">
+          <div class="rule-card-header">
+            <span class="icon">🏷️</span>
+            <span class="title">命名规则</span>
+          </div>
+          <div class="rule-card-body">
+            <div class="rule-block">
+              <div class="rule-block-title">专辑命名</div>
+              <div class="rule-row">① 【品牌】学年 + 年级 + 学科 + 对应封面名称（版本）</div>
+              <div class="rule-row">② 【品牌】学年 + 年级 + 学科 + 对应文件名称（版本）</div>
+            </div>
+            <hr class="divider">
+            <div class="rule-block">
+              <div class="rule-block-title">资料命名</div>
+              <div class="rule-row">① 具体标题（第X章+第X节+标题名）<strong>-专辑名</strong></div>
+              <div class="rule-row">② 若资料名与书籍名重复，则<strong>无需后缀</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 卡片3：定价 -->
+        <div class="rule-card material">
+          <div class="rule-card-header">
+            <span class="icon">💰</span>
+            <span class="title">定价</span>
+          </div>
+          <div class="rule-card-body">
+            <div class="rule-row">参考定价文档：</div>
+            <div class="rule-row">
+              <a href="https://docs.qq.com/doc/DUVNLeVZ0TXl5S1VT" target="_blank" class="rule-link">📄 点击查看定价文档 →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 卡片4：专辑规则 -->
+        <div class="rule-card album">
+          <div class="rule-card-header">
+            <span class="icon">📁</span>
+            <span class="title">专辑规则</span>
+          </div>
+          <div class="rule-card-body">
+            <div class="rule-block">
+              <div class="rule-block-title">专辑目录</div>
+              <div class="rule-row">① 有目录书籍 → 1:1 还原，资料按顺序排序</div>
+              <div class="rule-row">② 同步书籍 → 获取主数据目录，资料放对应目录下</div>
+            </div>
+            <hr class="divider">
+            <div class="rule-block">
+              <div class="rule-block-title">专辑简介模板</div>
+              <div class="rule-row rule-intro-tpl">
+                XXXX（书籍名称）系列资料由 XXXX（提供者）提供，并授权学科网在互联网进行发布，侵权必究！
+              </div>
+            </div>
+            <hr class="divider">
+            <div class="rule-block">
+              <div class="rule-block-title">专辑封面</div>
+              <div class="rule-row">① 无封面 → 使用去年同期产品封面</div>
+              <div class="rule-row">② 去年无 → 智能平台生成，要求最下标必须写 <span class="badge badge-warn">学科网书城</span>，<a href="https://bar.xkw.com/cover/size" target="_blank" class="rule-link">点击制作封面 →</a></div>
+            </div>
+            <hr class="divider">
+            <div class="rule-block">
+              <div class="rule-block-title">其他</div>
+              <div class="rule-row">专辑"热点""推荐"等该栏标签 <span class="badge badge-red">不做任何勾选</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 卡片5：特例（试卷/中职/音视频） -->
+        <div class="rule-card special">
+          <div class="rule-card-header">
+            <span class="icon">⚠️</span>
+            <span class="title">特例 · 试卷 / 中职 / 音视频</span>
+          </div>
+          <div class="rule-card-body">
+            <div class="special-item">
+              <span class="tag-pill tag-red">真题试卷</span>非教辅版权试卷<br>
+              • <strong>高考：</strong>不处理，直接上传<br>
+              • <strong>中考 / 小升初：</strong>发布后在 XMP 后台加入网校通
+            </div>
+            <div class="special-item warn">
+              <span class="tag-pill tag-orange">普通真题卷</span>校考 / 省市区县统考卷<br>
+              资料打标作者 <strong>"教辅精选"</strong>，发布后在 XMP 后台加入网校通
+            </div>
+            <div class="special-item">
+              <span class="tag-pill tag-blue">中职产品</span>
+              发布后在 XMP 后台加入网校通
+            </div>
+            <div class="special-item success">
+              <span class="tag-pill tag-green">音视频</span>
+              勾选 <strong>禁止下载</strong> 标签
+            </div>
+          </div>
+        </div>
+
+        <!-- 卡片6：特例（电子样书） -->
+        <div class="rule-card special3">
+          <div class="rule-card-header">
+            <span class="icon">📖</span>
+            <span class="title">特例 · 电子样书</span>
+          </div>
+          <div class="rule-card-body">
+            <div class="special-item purple">
+              <span class="tag-pill tag-purple">命名</span>
+              专辑名 & 资料名末尾补充 <strong>"-电子样书"</strong>
+            </div>
+            <div class="special-item purple">
+              <span class="tag-pill tag-purple">标签</span>
+              资料和专辑额外勾选 <strong>"样书"</strong>
+            </div>
+            <div class="special-item purple">
+              <span class="tag-pill tag-purple">下载</span>
+              资料额外勾选 <strong>"禁止下载"</strong>
+            </div>
+            <div class="special-item purple">
+              <span class="tag-pill tag-purple">定价</span>
+              <strong>0元</strong>
+            </div>
+            <div class="special-item purple">
+              <span class="tag-pill tag-purple">发布</span>
+              立即发布
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <div class="tab-buttons">
-        <button class="tab-btn" :class="{ active: activeTab === 'general' }" @click="activeTab = 'general'">
-          📋 通用规则
-        </button>
-        <button class="tab-btn" :class="{ active: activeTab === 'provider' }" @click="activeTab = 'provider'">
-          🔍 提供者搜索
-        </button>
-        <button class="tab-btn" :class="{ active: activeTab === 'ai' }" @click="activeTab = 'ai'">
-          🤖 AI查询
-        </button>
+    </div>
+  </main>
+
+  <!-- 提供者查询页 -->
+  <main id="page-provider" class="page">
+    <div class="page-header">
+      <button class="back-btn" onclick="goHome()">
+        <span class="back-icon">←</span> 返回首页
+      </button>
+      <div class="page-title">
+        <span class="page-icon">🔍</span>
+        <span>提供者查询</span>
+      </div>
+    </div>
+
+    <div class="page-content">
+      
+      <section class="rule-section">
+        <div class="section-header">
+          <div class="section-num">01</div>
+          <div class="section-title-wrap">
+            <h2 class="section-title">筛选条件</h2>
+          </div>
+        </div>
+        <div class="section-content">
+          
+          <!-- 已知信息 -->
+          <div class="filter-section-title">📋 已知信息</div>
+          <div class="query-filters">
+            <div class="filter-group">
+              <label class="filter-label">
+                <span class="fl-icon">👤</span>
+                提供者
+              </label>
+              <div class="filter-input-wrap">
+                <input type="text" id="provider-search-input" class="filter-input" placeholder="输入提供者名称搜索..." oninput="onProviderSearchInput()">
+                <button class="btn-search" onclick="searchProviderByInput()">搜索</button>
+                <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
+              </div>
+              <div id="provider-dropdown" class="search-dropdown" style="display:none;"></div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">
+                <span class="fl-icon">🏷️</span>
+                品牌词
+              </label>
+              <div class="filter-input-wrap">
+                <select id="brand-select" class="filter-select" onchange="onBrandChange()">
+                  <option value="">— 选择品牌 —</option>
+                </select>
+                <button class="btn-add-sm" onclick="openAddBrand()">＋ 新增</button>
+              </div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">
+                <span class="fl-icon">📚</span>
+                系列
+              </label>
+              <div class="filter-input-wrap">
+                <select id="series-select" class="filter-select" onchange="onSeriesChange()">
+                  <option value="">— 选择系列 —</option>
+                </select>
+                <button class="btn-add-sm" onclick="openAddSeries()">＋ 新增</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 手工录入信息 -->
+          <div id="manual-input-section" class="filter-section-title mt-20" style="display:none;">✏️ 手工录入信息</div>
+          <div id="manual-input-form" class="query-filters rule-inputs" style="display:none;">
+            <div class="filter-group">
+              <label class="filter-label">
+                <span class="fl-icon">✂️</span>
+                拆分
+              </label>
+              <div class="filter-input-wrap">
+                <input type="text" id="split-dimension" class="filter-input" placeholder="请输入拆分规则，如：通用规则、按章节等" onchange="saveRuleInput()">
+              </div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">
+                <span class="fl-icon">💰</span>
+                定价
+              </label>
+              <div class="filter-input-wrap">
+                <input type="text" id="pricing" class="filter-input" placeholder="请输入定价，如：3元、通用规则" onchange="saveRuleInput()">
+              </div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">
+                <span class="fl-icon">🚀</span>
+                发布时间
+              </label>
+              <div class="filter-input-wrap">
+                <input type="text" id="publish-time" class="filter-input" placeholder="如：立即发布、按教学进度发布" onchange="saveRuleInput()">
+              </div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">
+                <span class="fl-icon">⚠️</span>
+                特例
+              </label>
+              <div class="filter-input-wrap">
+                <input type="text" id="special-case" class="filter-input" placeholder="如有特殊说明请填写" onchange="saveRuleInput()">
+              </div>
+            </div>
+          </div>
+
+          
+
+        </div>
+      </section>
+
+      <!-- 个性化规则展示 -->
+      <div id="custom-rule-display" class="custom-rule-box" style="display:none;"></div>
+
+    </div>
+  </main>
+
+  <!-- AI 查询页 -->
+  <main id="page-ai" class="page">
+    <div class="page-header">
+      <button class="back-btn" onclick="goHome()">
+        <span class="back-icon">←</span> 返回首页
+      </button>
+      <div class="page-title">
+        <span class="page-icon">🤖</span>
+        <span>AI 智能查询</span>
+      </div>
+    </div>
+
+    <div class="page-content">
+      
+      <div class="ai-hero">
+        <div class="ai-icon-wrap">
+          <span class="ai-main-icon">🤖</span>
+          <span class="ai-pulse"></span>
+        </div>
+        <h2>智能规则匹配</h2>
+        <p>输入品牌名、提供者名称或规则关键词，快速获取对应生产规则</p>
       </div>
 
-      <!-- 通用规则内容 -->
-      <div v-show="activeTab === 'general'" class="content-section">
-        <div class="rules-grid">
-
-          <!-- 卡片1：拆分维度 -->
-          <div class="rule-card material">
-            <div class="rule-card-header">
-              <span class="icon">✂️</span>
-              <span class="title">拆分维度</span>
-            </div>
-            <div class="rule-card-body">
-              <div class="rule-row"><span class="badge badge-pdf">PDF</span>按目录，若无则按标题，<strong>杜绝单页</strong></div>
-              <div class="rule-row"><span class="badge badge-ppt">PPT</span>删除敏感信息（联系方式、二维码等），直接上传</div>
-              <div class="rule-row"><span class="badge badge-word">WORD</span>删除敏感信息（联系方式、二维码等），直接上传</div>
-              <hr class="divider">
-              <div style="margin-top:10px;background:#fff7e6;border:1px solid #ffd591;border-radius:6px;padding:8px 12px;font-size:13px;color:#d46b08;">
-                ⚠️ <strong>备注：</strong>以上三种格式有存在主书+小册子的情况，小册子拆分后，需<strong>单独建立专辑上传</strong>
-              </div>
-            </div>
-          </div>
-
-          <!-- 卡片2：命名规则（合并） -->
-          <div class="rule-card material">
-            <div class="rule-card-header">
-              <span class="icon">🏷️</span>
-              <span class="title">命名规则</span>
-            </div>
-            <div class="rule-card-body">
-              <div class="rule-block">
-                <div class="rule-block-title">专辑命名</div>
-                <div class="rule-row">① 【品牌】学年 + 年级 + 学科 + 对应封面名称（版本）</div>
-                <div class="rule-row">② 【品牌】学年 + 年级 + 学科 + 对应文件名称（版本）</div>
-              </div>
-              <hr class="divider">
-              <div class="rule-block">
-                <div class="rule-block-title">资料命名</div>
-                <div class="rule-row">① 具体标题（第X章+第X节+标题名）<strong>-专辑名</strong></div>
-                <div class="rule-row">② 若资料名与书籍名重复，则<strong>无需后缀</strong></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 卡片3：定价 -->
-          <div class="rule-card material">
-            <div class="rule-card-header">
-              <span class="icon">💰</span>
-              <span class="title">定价</span>
-            </div>
-            <div class="rule-card-body">
-              <div class="rule-row">参考定价文档：</div>
-              <div class="rule-row">
-                <a href="https://docs.qq.com/doc/DUVNLeVZ0TXl5S1VT?u=f5968bd1179c4d9290cbda4d25c81049" target="_blank" class="rule-link">📄 点击查看定价文档 →</a>
-              </div>
-            </div>
-          </div>
-
-          <!-- 卡片4：专辑规则 -->
-          <div class="rule-card album">
-            <div class="rule-card-header">
-              <span class="icon">📁</span>
-              <span class="title">专辑规则</span>
-            </div>
-            <div class="rule-card-body">
-              <div class="rule-block">
-                <div class="rule-block-title">专辑目录</div>
-                <div class="rule-row">① 有目录书籍 → 1:1 还原，资料按顺序排序</div>
-                <div class="rule-row">② 同步书籍 → 获取主数据目录，资料放对应目录下</div>
-              </div>
-              <hr class="divider">
-              <div class="rule-block">
-                <div class="rule-block-title">专辑简介模板</div>
-                <div class="rule-row" style="background:#f8f9fa;padding:8px 10px;border-radius:6px;font-size:13px;color:#555;">
-                  XXXX（书籍名称）系列资料由 XXXX（提供者）提供，并授权学科网在互联网进行发布，侵权必究！
-                </div>
-              </div>
-              <hr class="divider">
-              <div class="rule-block">
-                <div class="rule-block-title">专辑封面</div>
-                <div class="rule-row">① 无封面 → 使用去年同期产品封面</div>
-                <div class="rule-row">② 去年无 → 智能平台生成，要求最下标必须写 <span class="badge badge-warn">学科网书城</span>，<a href="https://bar.xkw.com/cover/size" target="_blank" class="rule-link">点击制作封面 →</a></div>
-              </div>
-              <hr class="divider">
-              <div class="rule-block">
-                <div class="rule-block-title">其他</div>
-                <div class="rule-row">专辑"热点""推荐"等该栏标签 <span class="badge badge-red">不做任何勾选</span></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 卡片5：特例（试卷/中职/音视频） -->
-          <div class="rule-card special">
-            <div class="rule-card-header">
-              <span class="icon">⚠️</span>
-              <span class="title">特例 · 试卷 / 中职 / 音视频</span>
-            </div>
-            <div class="rule-card-body">
-              <div class="special-item">
-                <span class="tag-pill tag-red">真题试卷</span>非教辅版权试卷<br>
-                • <strong>高考：</strong>不处理，直接上传<br>
-                • <strong>中考 / 小升初：</strong>发布后在 XMP 后台加入网校通
-              </div>
-              <div class="special-item warn">
-                <span class="tag-pill tag-orange">普通真题卷</span>校考 / 省市区县统考卷<br>
-                资料打标作者 <strong>"教辅精选"</strong>，发布后在 XMP 后台加入网校通
-              </div>
-              <div class="special-item">
-                <span class="tag-pill tag-blue">中职产品</span>
-                发布后在 XMP 后台加入网校通
-              </div>
-              <div class="special-item success">
-                <span class="tag-pill tag-green">音视频</span>
-                勾选 <strong>禁止下载</strong> 标签
-              </div>
-            </div>
-          </div>
-
-          <!-- 卡片6：特例（电子样书） -->
-          <div class="rule-card special3">
-            <div class="rule-card-header">
-              <span class="icon">📖</span>
-              <span class="title">特例 · 电子样书</span>
-            </div>
-            <div class="rule-card-body">
-              <div class="special-item purple">
-                <span class="tag-pill tag-purple">命名</span>
-                专辑名 & 资料名末尾补充 <strong>"-电子样书"</strong>
-              </div>
-              <div class="special-item purple">
-                <span class="tag-pill tag-purple">标签</span>
-                资料和专辑额外勾选 <strong>"样书"</strong>
-              </div>
-              <div class="special-item purple">
-                <span class="tag-pill tag-purple">下载</span>
-                资料额外勾选 <strong>"禁止下载"</strong>
-              </div>
-              <div class="special-item purple">
-                <span class="tag-pill tag-purple">定价</span>
-                <strong>0元</strong>
-              </div>
-              <div class="special-item purple">
-                <span class="tag-pill tag-purple">发布</span>
-                立即发布
-              </div>
-            </div>
-          </div>
-
+      <div class="ai-search-box">
+        <div class="ai-input-wrap">
+          <input type="text" id="ai-query" class="ai-input" placeholder="例如：人教版、真题试卷、电子样书、中考...">
+          <button class="ai-btn" onclick="aiQuery()">
+            <span class="ai-btn-icon">🔍</span>
+            智能查询
+          </button>
+        </div>
+        <div class="ai-suggestions">
+          <span class="suggestion-label">快捷查询：</span>
+          <button class="suggestion-tag" onclick="setAiQuery('人教版')">人教版</button>
+          <button class="suggestion-tag" onclick="setAiQuery('真题试卷')">真题试卷</button>
+          <button class="suggestion-tag" onclick="setAiQuery('电子样书')">电子样书</button>
+          <button class="suggestion-tag" onclick="setAiQuery('中考')">中考</button>
+          <button class="suggestion-tag" onclick="setAiQuery('定价')">定价</button>
         </div>
       </div>
 
-      <!-- 提供者搜索内容 -->
-      <div v-show="activeTab === 'provider'" class="content-section">
+      <div id="ai-result" class="ai-result"></div>
 
-        <!-- 顶部：搜索 + 新增按钮 -->
-        <el-card style="margin-bottom:16px;">
-          <el-form label-width="80px">
-            <el-row :gutter="20" align="middle">
-              <el-col :span="6">
-                <el-form-item label="提供者">
-                  <el-select v-model="selectedProvider" placeholder="请选择提供者" filterable clearable @change="handleProviderChange" style="width:100%;">
-                    <el-option v-for="p in providerList" :key="p" :label="p" :value="p" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="2" style="padding-bottom:18px;">
-                <el-button type="primary" @click="openAddProvider">＋ 新增</el-button>
-              </el-col>              <el-col :span="7">
-                <el-form-item label="品牌">
-                  <el-select v-model="selectedBrand" placeholder="请先选择提供者" filterable clearable @change="handleBrandChange" :disabled="!selectedProvider" style="width:100%;">
-                    <el-option v-for="b in brandList" :key="b" :label="b" :value="b" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="2" style="padding-bottom:18px;">
-                <el-button type="success" :disabled="!selectedProvider" @click="openAddSeries(selectedProvider)">＋ 新增</el-button>
-              </el-col>
-              <el-col :span="5">
-                <el-form-item label="系列">
-                  <el-select v-model="selectedSeries" placeholder="请先选择品牌" filterable clearable :disabled="!selectedBrand" style="width:100%;">
-                    <el-option v-for="s in seriesList" :key="s" :label="s" :value="s" />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="2" style="padding-bottom:18px;">
-                <el-button type="success" :disabled="!selectedBrand" @click="openAddSeriesWithBrand(selectedProvider, selectedBrand)">＋ 新增</el-button>
-              </el-col>
-            </el-row>
-          </el-form>
-        </el-card>
+    </div>
+  </main>
 
-        <!-- 搜索结果：显示个性化规则 -->
-        <el-card v-if="currentRule" style="margin-bottom:16px;">
-          <template #header>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:16px; font-weight:bold;">📋 个性化生产规则</span>
-              <div style="display:flex;gap:8px;">
-                <el-button type="primary" size="small" @click="openEditRow(currentRule)">✏️ 编辑</el-button>
-              </div>
-            </div>
-          </template>
-          <el-descriptions :column="2" border size="large">
-            <el-descriptions-item label="提供者"><span style="font-weight:600;">{{ currentRule.provider }}</span></el-descriptions-item>
-            <el-descriptions-item label="品牌名称"><span style="font-weight:600;">{{ currentRule.brand }}</span></el-descriptions-item>
-            <el-descriptions-item label="系列名称" :span="2"><span style="font-weight:600;">{{ currentRule.series }}</span></el-descriptions-item>
-            <el-descriptions-item label="拆分" v-if="currentRule.splitDimension" :span="2">{{ currentRule.splitDimension }}</el-descriptions-item>
-            <el-descriptions-item label="定价" v-if="currentRule.pricing">{{ currentRule.pricing }}</el-descriptions-item>
-            <el-descriptions-item label="发布时间" v-if="currentRule.publishTime">{{ currentRule.publishTime }}</el-descriptions-item>
-            <el-descriptions-item label="特例" v-if="currentRule.specialCase" :span="2">
-              <div style="white-space:pre-wrap;">{{ currentRule.specialCase }}</div>
-            </el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-
-        <!-- 未选择时提示 -->
-        <el-card v-else>
-          <el-empty description="请选择提供者、品牌和系列查看个性化规则" />
-        </el-card>
-
-        <!-- 新增/编辑 对话框 -->
-        <el-dialog v-model="showDialog" :title="dialogTitle" width="600px" @close="resetForm">
-          <el-form :model="form" label-width="100px">
-            <el-form-item label="提供者" required>
-              <el-input v-model="form.provider" placeholder="请输入提供者名称" :disabled="dialogMode === 'addSeries' || dialogMode === 'edit'" />
-              <div v-if="dialogMode === 'add' && form.provider && providerList.some(p => p.includes(form.provider) || form.provider.includes(p.slice(0,4)))" style="color:#e6a23c;font-size:12px;margin-top:4px;">
-                ⚠️ 已存在相似提供者：{{ providerList.filter(p => p.includes(form.provider) || form.provider.includes(p.slice(0,4))).join('、') }}，请确认是否重复
-              </div>
-            </el-form-item>
-            <el-form-item label="品牌名称" required>
-              <el-input v-model="form.brand" placeholder="请输入品牌名称" />
-            </el-form-item>
-            <el-form-item label="系列名称" required>
-              <el-input v-model="form.series" placeholder="请输入系列名称" />
-            </el-form-item>
-            <el-form-item label="拆分">
-              <el-input v-model="form.splitDimension" placeholder="例如：通用规则、按章节等" />
-            </el-form-item>
-            <el-form-item label="定价">
-              <el-input v-model="form.pricing" placeholder="例如：3元、通用规则" />
-            </el-form-item>
-            <el-form-item label="发布时间">
-              <el-input v-model="form.publishTime" placeholder="例如：立即发布、按教学进度发布" />
-            </el-form-item>
-            <el-form-item label="特例">
-              <el-input v-model="form.specialCase" type="textarea" :rows="2" placeholder="如有特殊说明请填写，无则留空" />
-            </el-form-item>
-          </el-form>
-          <template #footer>
-            <el-button @click="showDialog = false">取消</el-button>
-            <el-button type="primary" @click="handleSubmit">保存</el-button>
-          </template>
-        </el-dialog>
+  <!-- 弹窗：新增/编辑提供者 -->
+  <div id="modal-provider" class="modal" style="display:none;">
+    <div class="modal-overlay" onclick="closeModal('modal-provider')"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-provider-title">新增提供者</h3>
+        <button class="modal-close" onclick="closeModal('modal-provider')">✕</button>
       </div>
-
-      <!-- AI查询内容 -->
-      <div v-show="activeTab === 'ai'" class="content-section">
-        <el-card style="margin-bottom:16px;">
-          <template #header>
-            <span style="font-size:16px;font-weight:bold;">🤖 AI智能查询</span>
-          </template>
-          <div style="margin-bottom:12px;color:#606266;font-size:14px;">
-            输入品牌名或提供者名称关键字，自动匹配对应的个性化生产规则
-          </div>
-          <div style="display:flex;gap:8px;">
-            <input 
-              id="aiSearchInput"
-              type="text" 
-              placeholder="请输入品牌或提供者关键字，例如：木牍中考、安徽木牍..."
-              style="flex:1;padding:10px 14px;font-size:15px;border:1px solid #dcdfe6;border-radius:6px;outline:none;"
-            />
-            <button onclick="doAiSearch()" style="padding:10px 24px;background:#409EFF;color:white;border:none;border-radius:6px;font-size:15px;cursor:pointer;">查询</button>
-          </div>
-        </el-card>
-        <div id="aiResultArea">
-          <el-card><el-empty description="输入关键字开始查询" /></el-card>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>知识店铺</label>
+          <input type="text" id="new-provider-shop" placeholder="请输入知识店铺名称">
         </div>
+        <div class="form-group">
+          <label>提供者</label>
+          <input type="text" id="new-provider-name" placeholder="请输入提供者名称">
+        </div>
+        <div class="form-group">
+          <label>品牌</label>
+          <input type="text" id="new-provider-brand" placeholder="请输入品牌名称">
+        </div>
+        <div class="form-group">
+          <label>系列</label>
+          <input type="text" id="new-provider-series" placeholder="请输入系列名称">
+        </div>
+        <div class="form-group">
+          <label>拆分</label>
+          <input type="text" id="new-provider-split" placeholder="如：通用规则、按章节拆分等">
+        </div>
+        <div class="form-group">
+          <label>定价</label>
+          <input type="text" id="new-provider-pricing" placeholder="如：3元、通用规则">
+        </div>
+        <div class="form-group">
+          <label>发布时间</label>
+          <input type="text" id="new-provider-publishtime" placeholder="如：立即发布、按教学进度发布">
+        </div>
+        <div class="form-group">
+          <label>特例</label>
+          <textarea id="new-provider-special" placeholder="如有特殊规则请填写，无则留空"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal('modal-provider')">取消</button>
+        <button class="btn-save" onclick="saveProvider()">保存</button>
       </div>
     </div>
   </div>
 
+  <!-- 弹窗：新增品牌 -->
+  <div id="modal-brand" class="modal" style="display:none;">
+    <div class="modal-overlay" onclick="closeModal('modal-brand')"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>新增品牌</h3>
+        <button class="modal-close" onclick="closeModal('modal-brand')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>品牌名称</label>
+          <input type="text" id="new-brand-name" placeholder="请输入品牌名称">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal('modal-brand')">取消</button>
+        <button class="btn-save" onclick="saveBrand()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 弹窗：新增系列 -->
+  <div id="modal-series" class="modal" style="display:none;">
+    <div class="modal-overlay" onclick="closeModal('modal-series')"></div>
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>新增系列</h3>
+        <button class="modal-close" onclick="closeModal('modal-series')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>提供者</label>
+          <input type="text" id="modal-series-provider" disabled>
+        </div>
+        <div class="form-group">
+          <label>品牌</label>
+          <input type="text" id="modal-series-brand" disabled>
+        </div>
+        <div class="form-group">
+          <label>系列名称</label>
+          <input type="text" id="new-series-name" placeholder="请输入系列名称（手动添加）">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeModal('modal-series')">取消</button>
+        <button class="btn-save" onclick="saveSeries()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示 -->
+  <div id="toast" class="toast" style="display:none;">
+    <span class="toast-icon">✓</span>
+    <span class="toast-message"></span>
+  </div>
+
   <script>
-    const { createApp, ref, reactive, computed } = Vue;
-    const { ElMessage } = ElementPlus;
-
-    createApp({
-      setup() {
-        const activeTab = ref('general');
-        const loading = ref(false);
-        const showDialog = ref(false);
-        const dialogMode = ref('add');
-        const editingId = ref(null);
-
-        // 三级联动
-        const selectedProvider = ref('');
-        const selectedBrand = ref('');
-        const selectedSeries = ref('');
-
-        // 数据库 - 必须在所有 computed 之前声明
-        const rulesDatabase = ref([
-          // 安徽木牍教育图书有限公司
-          { id: 1, provider: '安徽木牍教育图书有限公司', brand: '木牍中考', series: '同步优质课件', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '3元', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          { id: 2, provider: '安徽木牍教育图书有限公司', brand: '木牍中考•名师教案', series: '同步配套', splitDimension: '不换页眉页脚，直接上传', albumCatalog: '通用规则', tags: [], pricing: '', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          { id: 3, provider: '安徽木牍教育图书有限公司', brand: '木牍中考•课时A计划', series: '同步配套', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '3元', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          { id: 4, provider: '安徽木牍教育图书有限公司', brand: '木牍中考•课时A计划', series: '小册子', splitDimension: '不换页眉页脚，直接上传', albumCatalog: '通用规则', tags: [], pricing: '', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          // 胶州市拾光树文化传媒中心
-          { id: 5, provider: '胶州市拾光树文化传媒中心', brand: '优学精讲', series: '高中同步', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          { id: 6, provider: '胶州市拾光树文化传媒中心', brand: '优学精研', series: '高考一轮总复习', splitDimension: '按资源类型建书上传', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          { id: 7, provider: '胶州市拾光树文化传媒中心', brand: '第一梯队', series: '高考二轮', splitDimension: '按资源类型建书上传', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          { id: 8, provider: '胶州市拾光树文化传媒中心', brand: '备考最优解', series: '高考二轮', splitDimension: '按资源类型建书上传', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          // 湖南书虫教育科技有限公司
-          { id: 9, provider: '湖南书虫教育科技有限公司', brand: '全效学习', series: '同步学练测', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          // 河北金卷教育科技有限公司
-          { id: 10, provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '周测卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '4元', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          { id: 11, provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '专题卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '4元', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          { id: 12, provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '专项分组练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '4元', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          { id: 13, provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '掌涵基础分自主小练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '4元', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          // 中学生数理化高中版编辑部
-          { id: 14, provider: '中学生数理化高中版编辑部', brand: '中学生数理化', series: '高中版', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '1元', publishTime: '按教学进度发布', specialCase: '如有，参考特例说明', albumIntro: '' },
-          // 山东中辰文化传媒有限公司
-          { id: 15, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈必刷卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          { id: 16, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈名卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          { id: 17, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈名师天练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '', albumIntro: '' },
-          { id: 18, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈计算天练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '按单元拆分', specialCase: '', albumIntro: '' },
-          { id: 19, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '小学毕业升学必备', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '参考特例试卷规则', albumIntro: '' },
-          { id: 20, provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '期末真题汇编卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '参考特例试卷规则', albumIntro: '' },
-          // 郑州启明星书业有限公司
-          { id: 21, provider: '郑州启明星书业有限公司', brand: '优才书系', series: '英才同步单元卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          { id: 22, provider: '郑州启明星书业有限公司', brand: '同步课课练', series: '小学同步课课练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          // 梁山金大文化传媒有限公司
-          { id: 23, provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高考二轮复习', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          { id: 24, provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '168优化重组卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          { id: 25, provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高考一轮总复习', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          { id: 26, provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高中同步辅导与测试', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '立即发布', specialCase: '', albumIntro: '' },
-          // 天津择数文化传媒有限公司
-          { id: 27, provider: '天津择数文化传媒有限公司', brand: '择数', series: '高考闪电提分基础必刷1000题', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          // 洛阳字里行间文化传播有限公司
-          { id: 28, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '初中单元与期末', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 29, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '日日清口算题卡', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 30, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '同步真题阅读精准练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 31, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '小升初高题全优卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 32, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '小学同步测试卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 33, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '初中期末考试必刷卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 34, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '小学期末红100必刷卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 35, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '学业测评一卷通期末卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 36, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '初中全能训练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 37, provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '初中单元卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 38, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '初中单元与期末', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 39, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '日日清口算题卡', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 40, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '同步真题阅读精准练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 41, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '小升初高题全优卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 42, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '小学同步测试卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 43, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '初中期末考试必刷卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 44, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '小学期末红100必刷卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 45, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '学业测评一卷通期末卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 46, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '初中全能训练', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          { id: 47, provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '初中单元卷', splitDimension: '通用规则', albumCatalog: '', tags: [], pricing: '通用规则', publishTime: '通用规则', specialCase: '', albumIntro: '' },
-          // 河南捷睿必达教育科技有限公司 - 精准教学
-          { id: 48, provider: '河南捷睿必达教育科技有限公司', brand: '精准教学', series: '星际题库精编版', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 49, provider: '河南捷睿必达教育科技有限公司', brand: '精准教学', series: '开学检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 50, provider: '河南捷睿必达教育科技有限公司', brand: '精准教学', series: '单元专题卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 51, provider: '河南捷睿必达教育科技有限公司', brand: '精准教学', series: '期中测试AB卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 52, provider: '河南捷睿必达教育科技有限公司', brand: '精准教学', series: '期末测试AB卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 53, provider: '河南捷睿必达教育科技有限公司', brand: '精准教学', series: '期末过关检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 54, provider: '河南捷睿必达教育科技有限公司', brand: '精准教学', series: '期末复习专题卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 55, provider: '河南捷睿必达教育科技有限公司', brand: '精准教学', series: '题型专练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 56, provider: '河南捷睿必达教育科技有限公司', brand: '精准教学', series: '期末押题密卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 河南捷睿必达教育科技有限公司 - 能力培优
-          { id: 57, provider: '河南捷睿必达教育科技有限公司', brand: '能力培优', series: '星际题库精编版', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 58, provider: '河南捷睿必达教育科技有限公司', brand: '能力培优', series: '开学检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 59, provider: '河南捷睿必达教育科技有限公司', brand: '能力培优', series: '单元专题卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 60, provider: '河南捷睿必达教育科技有限公司', brand: '能力培优', series: '期中测试AB卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 61, provider: '河南捷睿必达教育科技有限公司', brand: '能力培优', series: '期末测试AB卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 62, provider: '河南捷睿必达教育科技有限公司', brand: '能力培优', series: '期末过关检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 63, provider: '河南捷睿必达教育科技有限公司', brand: '能力培优', series: '期末复习专题卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 64, provider: '河南捷睿必达教育科技有限公司', brand: '能力培优', series: '题型专练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 65, provider: '河南捷睿必达教育科技有限公司', brand: '能力培优', series: '期末押题密卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 河南捷睿必达教育科技有限公司 - 同步夯实基础
-          { id: 66, provider: '河南捷睿必达教育科技有限公司', brand: '同步夯实基础', series: '星际题库精编版', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 67, provider: '河南捷睿必达教育科技有限公司', brand: '同步夯实基础', series: '开学检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 68, provider: '河南捷睿必达教育科技有限公司', brand: '同步夯实基础', series: '单元专题卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 69, provider: '河南捷睿必达教育科技有限公司', brand: '同步夯实基础', series: '期中测试AB卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 70, provider: '河南捷睿必达教育科技有限公司', brand: '同步夯实基础', series: '期末测试AB卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 71, provider: '河南捷睿必达教育科技有限公司', brand: '同步夯实基础', series: '期末过关检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 72, provider: '河南捷睿必达教育科技有限公司', brand: '同步夯实基础', series: '期末复习专题卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 73, provider: '河南捷睿必达教育科技有限公司', brand: '同步夯实基础', series: '题型专练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 74, provider: '河南捷睿必达教育科技有限公司', brand: '同步夯实基础', series: '期末押题密卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 河南捷睿必达教育科技有限公司 - 期中期末复习
-          { id: 75, provider: '河南捷睿必达教育科技有限公司', brand: '期中期末复习', series: '星际题库精编版', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 76, provider: '河南捷睿必达教育科技有限公司', brand: '期中期末复习', series: '开学检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 77, provider: '河南捷睿必达教育科技有限公司', brand: '期中期末复习', series: '单元专题卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 78, provider: '河南捷睿必达教育科技有限公司', brand: '期中期末复习', series: '期中测试AB卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 79, provider: '河南捷睿必达教育科技有限公司', brand: '期中期末复习', series: '期末测试AB卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 80, provider: '河南捷睿必达教育科技有限公司', brand: '期中期末复习', series: '期末过关检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 81, provider: '河南捷睿必达教育科技有限公司', brand: '期中期末复习', series: '期末复习专题卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 82, provider: '河南捷睿必达教育科技有限公司', brand: '期中期末复习', series: '题型专练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 83, provider: '河南捷睿必达教育科技有限公司', brand: '期中期末复习', series: '期末押题密卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 山西英雅特教育科技有限公司 - 课堂在线
-          { id: 84, provider: '山西英雅特教育科技有限公司', brand: '课堂在线', series: '初中同步教学', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 85, provider: '山西英雅特教育科技有限公司', brand: '课堂在线', series: '高考英语听力课堂', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 86, provider: '山西英雅特教育科技有限公司', brand: '课堂在线', series: '高中同步英语听力课堂', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 87, provider: '山西英雅特教育科技有限公司', brand: '课堂在线', series: '初中英语语法', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 88, provider: '山西英雅特教育科技有限公司', brand: '课堂在线', series: '高中英语语法', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 山西英雅特教育科技有限公司 - 亿典教育
-          { id: 89, provider: '山西英雅特教育科技有限公司', brand: '亿典教育', series: '初中同步教学', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 90, provider: '山西英雅特教育科技有限公司', brand: '亿典教育', series: '高考英语听力课堂', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 91, provider: '山西英雅特教育科技有限公司', brand: '亿典教育', series: '高中同步英语听力课堂', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 92, provider: '山西英雅特教育科技有限公司', brand: '亿典教育', series: '初中英语语法', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 93, provider: '山西英雅特教育科技有限公司', brand: '亿典教育', series: '高中英语语法', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 山西英雅特教育科技有限公司 - 周报经典
-          { id: 94, provider: '山西英雅特教育科技有限公司', brand: '周报经典', series: '初中同步教学', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 95, provider: '山西英雅特教育科技有限公司', brand: '周报经典', series: '高考英语听力课堂', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 96, provider: '山西英雅特教育科技有限公司', brand: '周报经典', series: '高中同步英语听力课堂', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 97, provider: '山西英雅特教育科技有限公司', brand: '周报经典', series: '初中英语语法', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 98, provider: '山西英雅特教育科技有限公司', brand: '周报经典', series: '高中英语语法', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 时代京版北京文化传播有限公司 - 大语文
-          { id: 99, provider: '时代京版北京文化传播有限公司', brand: '大语文', series: '高中语文专项', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 100, provider: '时代京版北京文化传播有限公司', brand: '大语文', series: '高考一轮复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 101, provider: '时代京版北京文化传播有限公司', brand: '大语文', series: '高中同步课时基础检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 102, provider: '时代京版北京文化传播有限公司', brand: '大语文', series: '高中同步双测领航卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 103, provider: '时代京版北京文化传播有限公司', brand: '大语文', series: '高考复习冲刺全真模拟试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 时代京版北京文化传播有限公司 - 师大金卷
-          { id: 104, provider: '时代京版北京文化传播有限公司', brand: '师大金卷', series: '高中语文专项', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 105, provider: '时代京版北京文化传播有限公司', brand: '师大金卷', series: '高考一轮复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 106, provider: '时代京版北京文化传播有限公司', brand: '师大金卷', series: '高中同步课时基础检测卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 107, provider: '时代京版北京文化传播有限公司', brand: '师大金卷', series: '高中同步双测领航卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 108, provider: '时代京版北京文化传播有限公司', brand: '师大金卷', series: '高考复习冲刺全真模拟试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 洛阳燕川文化传播有限公司
-          { id: 109, provider: '洛阳燕川文化传播有限公司', brand: '豫燕川', series: '小升初总复习方案', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 110, provider: '洛阳燕川文化传播有限公司', brand: '豫燕川', series: '中考提分卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 浙江金睿文化传媒有限公司 - 全效学习
-          { id: 111, provider: '浙江金睿文化传媒有限公司', brand: '全效学习', series: '初中同步课件及教参', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 112, provider: '浙江金睿文化传媒有限公司', brand: '全效学习', series: '期末综合复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 113, provider: '浙江金睿文化传媒有限公司', brand: '全效学习', series: '中考学练测', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 114, provider: '浙江金睿文化传媒有限公司', brand: '全效学习', series: '高中同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 浙江金睿文化传媒有限公司 - 全效作业本
-          { id: 115, provider: '浙江金睿文化传媒有限公司', brand: '全效作业本', series: '初中同步课件及教参', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 116, provider: '浙江金睿文化传媒有限公司', brand: '全效作业本', series: '期末综合复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 117, provider: '浙江金睿文化传媒有限公司', brand: '全效作业本', series: '中考学练测', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 118, provider: '浙江金睿文化传媒有限公司', brand: '全效作业本', series: '高中同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 淄博书通数字文化发展有限公司
-          { id: 119, provider: '淄博书通数字文化发展有限公司', brand: '百川育人', series: '中考必刷真题分类', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 120, provider: '淄博书通数字文化发展有限公司', brand: '百川育人', series: '同步大试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 121, provider: '淄博书通数字文化发展有限公司', brand: 'A+金题', series: '中考必刷真题分类', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 122, provider: '淄博书通数字文化发展有限公司', brand: 'A+金题', series: '同步大试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 山东泉之源文化传媒有限公司
-          { id: 123, provider: '山东泉之源文化传媒有限公司', brand: '小作家报·读写天下', series: '高考复习阅读与写作', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 124, provider: '山东泉之源文化传媒有限公司', brand: '小作家报·读写天下', series: '高中同步阅读与写作', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 上海万瑞威尔文化创意有限公司
-          { id: 125, provider: '上海万瑞威尔文化创意有限公司', brand: '高中快车道', series: '高中同步练习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 沈阳庠序书刊有限公司
-          { id: 126, provider: '沈阳庠序书刊有限公司', brand: '考点大观', series: '全国中考真题分类一卷通', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 郑州纳睿文化传播有限公司
-          { id: 127, provider: '郑州纳睿文化传播有限公司', brand: '九级跳', series: '小升初衔接试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 128, provider: '郑州纳睿文化传播有限公司', brand: '九级跳', series: '中考模拟卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 129, provider: '郑州纳睿文化传播有限公司', brand: '中考密卷', series: '小升初衔接试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 130, provider: '郑州纳睿文化传播有限公司', brand: '中考密卷', series: '中考模拟卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 河南小旗手图书销售有限公司
-          { id: 131, provider: '河南小旗手图书销售有限公司', brand: '小四科', series: '活页好卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 132, provider: '河南小旗手图书销售有限公司', brand: '小四科', series: '期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 133, provider: '河南小旗手图书销售有限公司', brand: '小四科', series: '计算+应用题专练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 134, provider: '河南小旗手图书销售有限公司', brand: '大王科', series: '活页好卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 135, provider: '河南小旗手图书销售有限公司', brand: '大王科', series: '期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 136, provider: '河南小旗手图书销售有限公司', brand: '大王科', series: '计算+应用题专练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 137, provider: '河南小旗手图书销售有限公司', brand: '同步口算', series: '活页好卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 138, provider: '河南小旗手图书销售有限公司', brand: '同步口算', series: '期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 139, provider: '河南小旗手图书销售有限公司', brand: '同步口算', series: '计算+应用题专练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 河南君德容文化传播有限公司
-          { id: 140, provider: '河南君德容文化传播有限公司', brand: '易中考', series: '中考总复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 141, provider: '河南君德容文化传播有限公司', brand: '中考新方向', series: '中考总复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 西安玖典文创科技有限公司 - 典创
-          { id: 142, provider: '西安玖典文创科技有限公司', brand: '典创', series: '小学期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 143, provider: '西安玖典文创科技有限公司', brand: '典创', series: '初中测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 144, provider: '西安玖典文创科技有限公司', brand: '典创', series: '高中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 145, provider: '西安玖典文创科技有限公司', brand: '典创', series: '小学测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 146, provider: '西安玖典文创科技有限公司', brand: '典创', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 147, provider: '西安玖典文创科技有限公司', brand: '典创', series: '小学奥数', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 148, provider: '西安玖典文创科技有限公司', brand: '典创', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 149, provider: '西安玖典文创科技有限公司', brand: '典创', series: '小学单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 150, provider: '西安玖典文创科技有限公司', brand: '典创', series: '中考专项模拟大小卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 151, provider: '西安玖典文创科技有限公司', brand: '典创', series: '初中期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 152, provider: '西安玖典文创科技有限公司', brand: '典创', series: '初中单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 西安玖典文创科技有限公司 - 夺冠金卷
-          { id: 153, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '小学期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 154, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '初中测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 155, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '高中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 156, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '小学测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 157, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 158, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '小学奥数', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 159, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 160, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 161, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '中考专项模拟大小卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 162, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '初中期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 163, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '初中单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 164, provider: '西安玖典文创科技有限公司', brand: '夺冠金卷', series: '小学单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 西安玖典文创科技有限公司 - 快乐练习单元卷
-          { id: 165, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '小学期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 166, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '初中测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 167, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '高中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 168, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '小学测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 169, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 170, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '小学奥数', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 171, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 172, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 173, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '中考专项模拟大小卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 174, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '初中期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 175, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '初中单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 176, provider: '西安玖典文创科技有限公司', brand: '快乐练习单元卷', series: '小学单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 西安玖典文创科技有限公司 - 新思维小学奥数全解
-          { id: 177, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '小学期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 178, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '初中测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 179, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '高中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 180, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '小学测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 181, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 182, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '小学奥数', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 183, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 184, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 185, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '中考专项模拟大小卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 186, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '初中期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 187, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '初中单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 188, provider: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '小学单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 西安玖典文创科技有限公司 - 学练考
-          { id: 189, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '小学期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 190, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '初中测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 191, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '高中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 192, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '小学测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 193, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 194, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '小学奥数', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 195, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 196, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 197, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '中考专项模拟大小卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 198, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '初中期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 199, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '初中单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 200, provider: '西安玖典文创科技有限公司', brand: '学练考', series: '小学单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 西安玖典文创科技有限公司 - 优学优练全能夺冠
-          { id: 201, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '小学期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 202, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '初中测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 203, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '高中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 204, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '小学测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 205, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 206, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '小学奥数', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 207, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 208, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 209, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '中考专项模拟大小卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 210, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '初中期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 211, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '初中单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 212, provider: '西安玖典文创科技有限公司', brand: '优学优练全能夺冠', series: '小学单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 西安玖典文创科技有限公司 - 中考预测押题卷
-          { id: 213, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '小学期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 214, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '初中测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 215, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '高中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 216, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '小学测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 217, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 218, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '小学奥数', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 219, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 220, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '小学单元卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 221, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '中考专项模拟大小卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 222, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '初中期末卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 223, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '初中单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 224, provider: '西安玖典文创科技有限公司', brand: '中考预测押题卷', series: '小学单元诊断试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 郑州荣恒图书发行有限公司 - 必考点
-          { id: 225, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学同步练习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 226, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学同步阶段测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 227, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学寒假专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 228, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '暑假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 229, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学同步练习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 230, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学寒假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 231, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学语文句子训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 232, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 233, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学寒假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 234, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学数学专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 235, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学期末冲刺', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 236, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学期末试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 237, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '初中期末试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 238, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '初中期末复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 239, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '初中练考卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 240, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学练考卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 241, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 郑州荣恒图书发行有限公司 - 必考点（续）
-          { id: 242, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学思维导图训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 243, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '幼小衔接训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 244, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '初中数学运算', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 245, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '初中同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 246, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学阅读强化训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 247, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 248, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学暑假专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 249, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 250, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小升初', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 251, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 252, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学系列', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 253, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 254, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '小学同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 255, provider: '郑州荣恒图书发行有限公司', brand: '必考点', series: '初中同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 郑州荣恒图书发行有限公司 - 冲刺100分
-          { id: 256, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学同步练习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 257, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学同步阶段测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 258, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学寒假专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 259, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '暑假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 260, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学同步练习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 261, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学寒假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 262, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学语文句子训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 263, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 264, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学寒假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 265, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学数学专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 266, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学期末冲刺', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 267, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学期末试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 268, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '初中期末试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 269, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学期末复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 270, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '初中练考卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 271, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学练考卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 272, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 273, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学思维导图训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 274, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '幼小衔接训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 275, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '初中数学运算', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 276, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '初中同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 277, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学阅读强化训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 278, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 279, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学暑假专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 280, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 281, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小升初', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 282, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 郑州荣恒图书发行有限公司 - 冲刺100分（续）
-          { id: 283, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学系列', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 284, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 285, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '小学同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 286, provider: '郑州荣恒图书发行有限公司', brand: '冲刺100分', series: '初中同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 郑州荣恒图书发行有限公司 - 寒假专项训练
-          { id: 287, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学同步练习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 288, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学同步阶段测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 289, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学寒假专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 290, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '暑假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 291, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学同步练习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 292, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学寒假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 293, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学语文句子训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 294, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 295, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学寒假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 296, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学数学专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 297, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学期末冲刺', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 298, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学期末试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 299, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '初中期末试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 300, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学期末复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 301, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '初中练考卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 302, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学练考卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 303, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 304, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学思维导图训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 305, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '幼小衔接训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 306, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '初中数学运算', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 307, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '初中同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 308, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学阅读强化训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 309, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 310, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学暑假专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 311, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 312, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小升初', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 313, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 314, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学系列', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 315, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 316, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '小学同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 317, provider: '郑州荣恒图书发行有限公司', brand: '寒假专项训练', series: '初中同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // 郑州荣恒图书发行有限公司 - 黄冈快乐假期
-          { id: 318, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学同步练习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 319, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学同步阶段测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 320, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学寒假专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 321, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '暑假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 322, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学同步练习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 323, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学寒假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          // ===== 以下为批量导入数据 =====
-          // 郑州荣恒图书发行有限公司 - 黄冈快乐假期（续）
-          { id: 324, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学语文句子训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 325, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 326, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学寒假作业', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 327, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学数学专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 328, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学期末冲刺', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 329, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学期末试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 330, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '初中期末试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 331, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学期末复习', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 332, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '初中练考卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 333, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学练考卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 334, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 335, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学思维导图训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 336, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '幼小衔接训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 337, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '初中数学运算', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 338, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '初中同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 339, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学阅读强化训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 340, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学同步训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 341, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学暑假专项训练', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 342, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 343, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小升初', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 344, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 345, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学系列', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 346, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '初中同步测试卷', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 347, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '小学同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-          { id: 348, provider: '郑州荣恒图书发行有限公司', brand: '黄冈快乐假期', series: '初中同步', splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' },
-        ]);
-
-        // 批量数据注入（在setup外通过nextTick注入）
-        Vue.nextTick(() => {
-          const app = document.getElementById('app').__vue_app__;
-          if (app) {
-            const db = app._instance.setupState.rulesDatabase;
-            const bulk = window.__bulkProviderData__ || [];
-            let nextId = db.value.length > 0 ? Math.max(...db.value.map(r => r.id)) + 1 : 1;
-            bulk.forEach(item => {
-              db.value.push({ id: nextId++, ...item, splitDimension: '', albumCatalog: '', tags: [], pricing: '', publishTime: '', specialCase: '', albumIntro: '' });
-            });
-          }
-        });
-
-        // AI查询
-        const aiQuery = ref('');
-        const aiResults = ref([]);
-        const aiProviderList = ref([]);
-
-        const handleAiQuery = () => {
-          const q = aiQuery.value.trim().toLowerCase();
-          if (!q) {
-            aiResults.value = [];
-            aiProviderList.value = [];
-            return;
-          }
-          const matched = rulesDatabase.value.filter(r =>
-            r.provider.toLowerCase().includes(q) ||
-            r.brand.toLowerCase().includes(q)
-          );
-          aiResults.value = matched;
-          aiProviderList.value = [...new Set(matched.map(r => r.provider))];
-        };
-
-        const duplicateWarning = ref('');
-
-        const form = reactive({
-          provider: '', brand: '', series: '', splitDimension: '',
-          albumCatalog: '', tags: [], pricing: '', publishTime: '',
-          specialCase: '', albumIntro: ''
-        });
-
-        const dialogTitle = computed(() => {
-          if (dialogMode.value === 'edit') return '编辑品牌系列';
-          if (dialogMode.value === 'addSeries') return '添加品牌系列';
-          return '新增提供者';
-        });
-
-        const resetForm = () => {
-          Object.keys(form).forEach(k => { form[k] = Array.isArray(form[k]) ? [] : ''; });
-          editingId.value = null;
-        };
-
-        const openAddProvider = () => {
-          resetForm();
-          dialogMode.value = 'add';
-          showDialog.value = true;
-        };
-
-        const openAddSeries = (provider) => {
-          resetForm();
-          form.provider = provider;
-          dialogMode.value = 'addSeries';
-          showDialog.value = true;
-        };
-
-        const openAddSeriesWithBrand = (provider, brand) => {
-          resetForm();
-          form.provider = provider;
-          form.brand = brand;
-          dialogMode.value = 'addSeries';
-          showDialog.value = true;
-        };
-
-        const openEditRow = (row) => {
-          Object.assign(form, { ...row });
-          editingId.value = row.id;
-          dialogMode.value = 'edit';
-          showDialog.value = true;
-        };
-
-        const handleSubmit = () => {
-          if (!form.provider || !form.brand || !form.series) {
-            ElMessage.warning('提供者、品牌名称、系列名称为必填项');
-            return;
-          }
-          if (dialogMode.value === 'edit') {
-            const idx = rulesDatabase.value.findIndex(r => r.id === editingId.value);
-            if (idx !== -1) Object.assign(rulesDatabase.value[idx], { ...form });
-            ElMessage.success('修改成功');
-          } else {
-            rulesDatabase.value.push({ id: Date.now(), ...form, tags: [] });
-            ElMessage.success('添加成功');
-          }
-          showDialog.value = false;
-        };
-
-        const handleProviderChange = () => {
-          selectedBrand.value = '';
-          selectedSeries.value = '';
-        };
-
-        const handleBrandChange = () => {
-          selectedSeries.value = '';
-        };
-
-        // 获取所有提供者列表（去重）
-        const providerList = computed(() => {
-          return [...new Set(rulesDatabase.value.map(r => r.provider))];
-        });
-
-        const brandList = computed(() => {
-          if (!selectedProvider.value) return [];
-          return [...new Set(rulesDatabase.value.filter(r => r.provider === selectedProvider.value).map(r => r.brand))];
-        });
-
-        const seriesList = computed(() => {
-          if (!selectedProvider.value || !selectedBrand.value) return [];
-          return [...new Set(rulesDatabase.value.filter(r => r.provider === selectedProvider.value && r.brand === selectedBrand.value).map(r => r.series))];
-        });
-
-        const currentRule = computed(() => {
-          if (!selectedProvider.value || !selectedBrand.value || !selectedSeries.value) return null;
-          return rulesDatabase.value.find(r => r.provider === selectedProvider.value && r.brand === selectedBrand.value && r.series === selectedSeries.value) || null;
-        });
-
-        return { 
-          activeTab, loading, showDialog, dialogMode, dialogTitle, form,
-          selectedProvider, selectedBrand, selectedSeries,
-          providerList, brandList, seriesList, currentRule, rulesDatabase,
-          aiQuery, aiResults, aiProviderList, duplicateWarning, handleAiQuery,
-          openAddProvider, openAddSeries, openAddSeriesWithBrand, openEditRow,
-          handleSubmit, resetForm, handleProviderChange, handleBrandChange
-        };
-      }
-    }).use(ElementPlus).mount('#app');
-
-    // ===== 批量提供者数据 =====
-    window.__bulkProviderData__ = [
-      // 郑州荣恒图书发行有限公司 - 黄冈随堂练
-      {provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学同步练习'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学同步阶段测试卷'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学寒假专项训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'暑假作业'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学同步练习'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学寒假作业'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学语文句子训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学同步训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学寒假作业'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学数学专项训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学期末冲刺'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学期末试卷'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'初中期末试卷'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学期末复习'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'初中练考卷'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学练考卷'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学同步测试卷'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学思维导图训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'幼小衔接训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'初中数学运算'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'初中同步训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学阅读强化训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学同步训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学暑假专项训练'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小升初'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学同步'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学系列'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'初中同步测试卷'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'小学同步'},{provider:'郑州荣恒图书发行有限公司',brand:'黄冈随堂练',series:'初中同步'},
-    ];
-
-    // AI查询 - 原生JS实现，读取Vue数据
-    function doAiSearch() {
-      const input = document.getElementById('aiSearchInput');
-      const q = (input ? input.value : '').trim().toLowerCase();
-      const area = document.getElementById('aiResultArea');
-      if (!area) return;
-
-      // 优先从Vue实例读取实时数据（包含新增条目）
-      let data;
-      try {
-        const vueApp = document.getElementById('app').__vue_app__;
-        const vueInstance = vueApp.config.globalProperties;
-        // 通过组件实例获取rulesDatabase
-        const rootComponent = vueApp._instance;
-        data = rootComponent.setupState.rulesDatabase.value;
-      } catch(e) {
-        data = [];
-      }
-
-      // 兜底硬编码数据源
-      if (!data || !data.length) { data = [
-        { provider: '安徽木牍教育图书有限公司', brand: '木牍中考', series: '同步优质课件', splitDimension: '通用规则', pricing: '3元', publishTime: '立即发布', specialCase: '' },
-        { provider: '安徽木牍教育图书有限公司', brand: '木牍中考•名师教案', series: '同步配套', splitDimension: '不换页眉页脚，直接上传', pricing: '', publishTime: '立即发布', specialCase: '' },
-        { provider: '安徽木牍教育图书有限公司', brand: '木牍中考•课时A计划', series: '同步配套', splitDimension: '通用规则', pricing: '3元', publishTime: '立即发布', specialCase: '' },
-        { provider: '安徽木牍教育图书有限公司', brand: '木牍中考•课时A计划', series: '小册子', splitDimension: '不换页眉页脚，直接上传', pricing: '', publishTime: '立即发布', specialCase: '' },
-        { provider: '胶州市拾光树文化传媒中心', brand: '优学精讲', series: '高中同步', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '胶州市拾光树文化传媒中心', brand: '优学精研', series: '高考一轮总复习', splitDimension: '按资源类型建书上传', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '胶州市拾光树文化传媒中心', brand: '第一梯队', series: '高考二轮', splitDimension: '按资源类型建书上传', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '胶州市拾光树文化传媒中心', brand: '备考最优解', series: '高考二轮', splitDimension: '按资源类型建书上传', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '湖南书虫教育科技有限公司', brand: '全效学习', series: '同步学练测', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '周测卷', splitDimension: '通用规则', pricing: '4元', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '专题卷', splitDimension: '通用规则', pricing: '4元', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '专项分组练', splitDimension: '通用规则', pricing: '4元', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '河北金卷教育科技有限公司', brand: '衡水金卷·先享题', series: '掌涵基础分自主小练', splitDimension: '通用规则', pricing: '4元', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '中学生数理化高中版编辑部', brand: '中学生数理化', series: '高中版', splitDimension: '通用规则', pricing: '1元', publishTime: '按教学进度发布', specialCase: '如有，参考特例说明' },
-        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈必刷卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈名卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈名师天练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按教学进度发布', specialCase: '' },
-        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '黄冈计算天练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '按单元拆分', specialCase: '' },
-        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '小学毕业升学必备', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '参考特例试卷规则' },
-        { provider: '山东中辰文化传媒有限公司', brand: '中辰优学', series: '期末真题汇编卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '参考特例试卷规则' },
-        { provider: '郑州启明星书业有限公司', brand: '优才书系', series: '英才同步单元卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
-        { provider: '郑州启明星书业有限公司', brand: '同步课课练', series: '小学同步课课练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
-        { provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高考二轮复习', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
-        { provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '168优化重组卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
-        { provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高考一轮总复习', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
-        { provider: '梁山金大文化传媒有限公司', brand: '创新大课堂', series: '高中同步辅导与测试', splitDimension: '通用规则', pricing: '通用规则', publishTime: '立即发布', specialCase: '' },
-        // 天津择数文化传媒有限公司
-        { provider: '天津择数文化传媒有限公司', brand: '择数', series: '高考闪电提分基础必刷1000题', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        // 洛阳字里行间文化传播有限公司 - 优品
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '初中单元与期末', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '日日清口算题卡', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '同步真题阅读精准练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '小升初高题全优卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '小学同步测试卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '初中期末考试必刷卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '小学期末红100必刷卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '学业测评一卷通期末卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '初中全能训练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品', series: '初中单元卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        // 洛阳字里行间文化传播有限公司 - 优品金题卷
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '初中单元与期末', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '日日清口算题卡', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '同步真题阅读精准练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '小升初高题全优卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '小学同步测试卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '初中期末考试必刷卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '小学期末红100必刷卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '学业测评一卷通期末卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '初中全能训练', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-        { provider: '洛阳字里行间文化传播有限公司', brand: '优品金题卷', series: '初中单元卷', splitDimension: '通用规则', pricing: '通用规则', publishTime: '通用规则', specialCase: '' },
-      ]; }
-
-      if (!q) { area.innerHTML = '<div style="background:white;border-radius:8px;padding:40px;text-align:center;color:#909399;">请输入关键字开始查询</div>'; return; }
-
-      const matched = data.filter(r => r.provider.toLowerCase().includes(q) || r.brand.toLowerCase().includes(q));
-      if (!matched.length) { area.innerHTML = '<div style="background:white;border-radius:8px;padding:40px;text-align:center;color:#909399;">未找到匹配结果，请尝试其他关键字</div>'; return; }
-
-      const providers = [...new Set(matched.map(r => r.provider))];
-      let html = `<div style="margin-bottom:12px;color:#909399;font-size:13px;">找到 ${matched.length} 条匹配结果</div>`;
-      providers.forEach(pv => {
-        const rows = matched.filter(r => r.provider === pv);
-        html += `<div style="background:white;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.08);margin-bottom:16px;overflow:hidden;">
-          <div style="padding:14px 20px;border-bottom:1px solid #f0f0f0;font-size:15px;font-weight:700;color:#303133;">🏢 ${pv}</div>
-          <div style="padding:16px 20px;">`;
-        rows.forEach(r => {
-          html += `<div style="margin-bottom:14px;border:1px solid #f0f0f0;border-radius:8px;padding:14px;">
-            <div style="font-size:14px;font-weight:600;color:#409EFF;margin-bottom:10px;">${r.brand} · ${r.series}</div>
-            <table style="width:100%;border-collapse:collapse;font-size:13px;">`;
-          if (r.splitDimension) html += `<tr><td style="padding:6px 12px;background:#fafafa;border:1px solid #eee;width:80px;color:#606266;">拆分</td><td style="padding:6px 12px;border:1px solid #eee;">${r.splitDimension}</td></tr>`;
-          if (r.pricing) html += `<tr><td style="padding:6px 12px;background:#fafafa;border:1px solid #eee;color:#606266;">定价</td><td style="padding:6px 12px;border:1px solid #eee;">${r.pricing}</td></tr>`;
-          if (r.publishTime) html += `<tr><td style="padding:6px 12px;background:#fafafa;border:1px solid #eee;color:#606266;">发布时间</td><td style="padding:6px 12px;border:1px solid #eee;">${r.publishTime}</td></tr>`;
-          if (r.specialCase) html += `<tr><td style="padding:6px 12px;background:#fafafa;border:1px solid #eee;color:#606266;">特例</td><td style="padding:6px 12px;border:1px solid #eee;">${r.specialCase}</td></tr>`;
-          html += `</table></div>`;
-        });
-        html += `</div></div>`;
-      });
-      area.innerHTML = html;
-    }
-
-    // 支持回车触发
-    document.addEventListener('DOMContentLoaded', () => {
-      const input = document.getElementById('aiSearchInput');
-      if (input) input.addEventListener('keyup', e => { if (e.key === 'Enter') doAiSearch(); });
-    });
-  </script>
+function goPage(pageId) {
+  document.querySelectorAll('.page').forEach(page => {
+    page.classList.remove('active');
+  });
+  var target = document.getElementById('page-' + pageId);
+  if (target) {
+    target.classList.add('active');
+  }
+  window.scrollTo(0, 0);
+}
+function goHome() {
+  goPage('home');
+}
+</script>
+<script src="app.js"></script>
 </body>
 </html>
