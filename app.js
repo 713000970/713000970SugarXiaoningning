@@ -427,10 +427,25 @@ const defaultData = {
 
 // 初始化数据
 function initData() {
-  // 首次使用时预置数据
-  if (!localStorage.getItem(STORAGE_KEYS.PROVIDERS) || localStorage.getItem(STORAGE_KEYS.PROVIDERS) === '[]') {
-    localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(presetData.providers));
+  const storedData = localStorage.getItem(STORAGE_KEYS.PROVIDERS);
+  console.log('检查存储数据:', storedData ? storedData.substring(0, 200) : '无');
+  
+  // 如果已有用户数据，直接使用已有数据，不覆盖
+  if (storedData && storedData !== '[]' && storedData !== 'null') {
+    try {
+      const parsed = JSON.parse(storedData);
+      if (parsed && parsed.length > 0) {
+        console.log('已有数据条数:', parsed.length);
+        return; // 已有数据，保留不处理
+      }
+    } catch(e) {
+      console.log('解析数据出错:', e);
+    }
   }
+  
+  // 首次使用时预置数据
+  console.log('初始化预设数据条数:', presetData.providers.length);
+  localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(presetData.providers));
   if (!localStorage.getItem(STORAGE_KEYS.BRANDS) || localStorage.getItem(STORAGE_KEYS.BRANDS) === '[]') {
     localStorage.setItem(STORAGE_KEYS.BRANDS, JSON.stringify(presetData.brands.map((name, i) => ({ id: (i + 1).toString(), name }))));
   }
