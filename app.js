@@ -348,6 +348,131 @@ const presetData = {
     { shop: '', shopname: '', name: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '初中单元诊断试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
     { shop: '', shopname: '', name: '西安玖典文创科技有限公司', brand: '新思维小学奥数全解', series: '小学单元诊断试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
     
+    // 《数理报》社有限公司
+    { shop: '', shopname: '', name: '数理报社', brand: '数理报', series: '初中同步学案', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '数理报社', brand: '数理报', series: '高中同步学案', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '数理报社', brand: '数理报', series: '抢分计划高考复习专号', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '数理报社', brand: '数理报', series: '抢分计划中考复习专号', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '数理报社', brand: '数理报', series: '初中同步复习专号巩固提高一本通', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '数理报社', brand: '数理报', series: '初中同步复习专号升级突破大模拟', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '数理报社', brand: '数理报', series: '高中同步复习专号巩固提高一本通', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '数理报社', brand: '数理报', series: '高中同步复习专号升级突破大模拟', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '数理报社', brand: '数理报', series: '中考复习专号巩固提高一本通', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 北京金榜园教育科技有限公司
+    { shop: '', shopname: '', name: '北京金榜园教育科技有限公司', brand: '词语手册', series: '小学同步', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '北京金榜园教育科技有限公司', brand: '词语手册', series: '初中同步', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '北京金榜园教育科技有限公司', brand: '教材全解通', series: '小学同步', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '北京金榜园教育科技有限公司', brand: '教材全解通', series: '初中同步', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '北京金榜园教育科技有限公司', brand: '金榜卷', series: '小学同步', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '北京金榜园教育科技有限公司', brand: '金榜卷', series: '初中同步', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东学缘教育图书有限公司 - 考出好成绩
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '考出好成绩', series: '中考总复习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '考出好成绩', series: '初中同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '考出好成绩', series: '小学同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '考出好成绩', series: '小学阶段测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东学缘教育图书有限公司 - 阳光计划
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '阳光计划', series: '中考总复习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '阳光计划', series: '初中同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '阳光计划', series: '小学同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '阳光计划', series: '小学阶段测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东学缘教育图书有限公司 - 练出好成绩
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '练出好成绩', series: '中考总复习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '练出好成绩', series: '初中同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '练出好成绩', series: '小学同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '练出好成绩', series: '小学阶段测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东学缘教育图书有限公司 - 核心素养翻转课堂
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养翻转课堂', series: '中考总复习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养翻转课堂', series: '初中同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养翻转课堂', series: '小学同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养翻转课堂', series: '小学阶段测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东学缘教育图书有限公司 - 核心素养评价卷
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养评价卷', series: '中考总复习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养评价卷', series: '初中同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养评价卷', series: '小学同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养评价卷', series: '小学阶段测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东学缘教育图书有限公司 - 核心素养天天练
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养天天练', series: '中考总复习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养天天练', series: '初中同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养天天练', series: '小学同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '核心素养天天练', series: '小学阶段测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东学缘教育图书有限公司 - 中考特训
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '中考特训', series: '中考总复习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '中��特训', series: '初中同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '中考特训', series: '小学同步练习', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东学缘教育图书有限公司', brand: '中考特训', series: '小学阶段测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 南京师文教育咨询中心
+    { shop: '', shopname: '', name: '南京师文教育咨询中心', brand: '中学课程辅导高考版', series: '高考', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 河北天智达图书有限公司 - 高考考什么
+    { shop: '', shopname: '', name: '河北天智达图书有限公司', brand: '高考考什么', series: '高考跟踪卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '河北天智达图书有限公司', brand: '高考考什么', series: '高考真题', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 河北天智达图书有限公司 - 中国好题
+    { shop: '', shopname: '', name: '河北天智达图书有限公司', brand: '中国好题', series: '高考跟踪卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '河北天智达图书有限公司', brand: '中国好题', series: '高考真题', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 湖北智慧万羽文化传媒有限公司 - 快乐成长
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '快乐成长', series: '一课一练', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '快乐成长', series: '初中同步', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '快乐成长', series: '中考复习之堂堂清', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '快乐成长', series: '单元卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 湖北智慧万羽文化传媒有限公司 - 名师学案
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '名师学案', series: '一课一练', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '名师学案', series: '初中同步', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '名师学案', series: '中考复习之堂堂清', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '名师学案', series: '单元卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 湖北智慧万羽文化传媒有限公司 - 综合测评卷
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '综合测评卷', series: '一课一练', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '综合测评卷', series: '初中同步', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '综合测评卷', series: '中考复习之堂堂清', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '湖北智慧万羽文化传媒有限公司', brand: '综合测评卷', series: '单元卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东正大图书有限公司 - 练测考
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '练测考', series: '测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '练测考', series: '中考系列', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '练测考', series: '试题汇编', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '练测考', series: '模拟预测卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '练测考', series: '课外阅读', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东正大图书有限公司 - 真题分类卷
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '真题分类卷', series: '测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '真题分类卷', series: '中考系列', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '真题分类卷', series: '试题汇编', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '真题分类卷', series: '模拟预测卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '真题分类卷', series: '课外阅读', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东正大图书有限公司 - 正大中考
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '正大中考', series: '测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '正大中考', series: '中考系列', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '正大中考', series: '试题汇编', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '正大中考', series: '模拟预测卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '正大中考', series: '课外阅读', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东正大图书有限公司 - 中考对策系列
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '中考对策系列', series: '测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '中考对策系列', series: '中考系列', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '中考对策系列', series: '试题汇编', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '中考对策系列', series: '模拟预测卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '中考对策系列', series: '课外阅读', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
+    // 山东正大图书有限公司 - 啄木鸟阅读
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '啄木鸟阅读', series: '测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '啄木鸟阅读', series: '中考系列', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '啄木鸟阅读', series: '试题汇编', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '啄木鸟阅读', series: '模拟预测卷', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '', shopname: '', name: '山东正大图书有限公司', brand: '啄木鸟阅读', series: '课外阅读', split: '', pricing: '', publishTime: '', specialCase: '' },
+    
     // 西安玖典文创科技有限公司 - 学练考
     { shop: '', shopname: '', name: '西安玖典文创科技有限公司', brand: '学练考', series: '小学期末卷', split: '', pricing: '', publishTime: '', specialCase: '' },
     { shop: '', shopname: '', name: '西安玖典文创科技有限公司', brand: '学练考', series: '初中测试卷', split: '', pricing: '', publishTime: '', specialCase: '' },
