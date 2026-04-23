@@ -1159,6 +1159,7 @@ body::before {
 .filter-input-wrap {
   display: flex;
   gap: 12px;
+  position: relative;
 }
 
 .filter-input,

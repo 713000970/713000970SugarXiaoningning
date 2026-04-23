@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+  <body>
 
   <!-- 顶部导航 -->
   <header class="topbar">
@@ -46,8 +46,8 @@
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item">
-            <span class="stat-num">12</span>
-            <span class="stat-label">规则项</span>
+            <span class="stat-num" id="stat-shops">0</span>
+            <span class="stat-label">店铺</span>
           </div>
         </div>
       </div>
@@ -97,6 +97,8 @@
             <span class="card-link">开始查询 <span class="arrow">→</span></span>
           </div>
         </div>
+
+        
 
         <div class="feature-card" onclick="goPage('ai')" data-color="purple">
           <div class="card-glow"></div>
@@ -319,6 +321,19 @@
           <div class="query-filters">
             <div class="filter-group">
               <label class="filter-label">
+                <span class="fl-icon">🏪</span>
+                店铺名称
+              </label>
+              <div class="filter-input-wrap">
+                <input type="text" id="shop-search-input" class="filter-input" placeholder="输入店铺名称搜索..." oninput="onShopSearchInput()">
+                <button class="btn-search" onclick="searchShopByInput()">搜索</button>
+                <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
+              </div>
+              <div id="shop-dropdown" class="search-dropdown" style="display:none;"></div>
+            </div>
+
+            <div class="filter-group">
+              <label class="filter-label">
                 <span class="fl-icon">👤</span>
                 提供者
               </label>
@@ -333,27 +348,14 @@
             <div class="filter-group">
               <label class="filter-label">
                 <span class="fl-icon">🏷️</span>
-                品牌词
+                品牌
               </label>
               <div class="filter-input-wrap">
-                <select id="brand-select" class="filter-select" onchange="onBrandChange()">
-                  <option value="">— 选择品牌 —</option>
-                </select>
+                <input type="text" id="brand-input" class="filter-input" placeholder="请先选择店铺..." oninput="onBrandInput()">
+                <input type="button" id="brand-list-btn" value="▼ 品牌" onclick="showBrandList(event)" style="background:var(--primary-cyan);color:white;padding:12px 16px;border:none;border-radius:var(--radius-md);cursor:pointer;">
                 <button class="btn-add-sm" onclick="openAddBrand()">＋ 新增</button>
               </div>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">
-                <span class="fl-icon">📚</span>
-                系列
-              </label>
-              <div class="filter-input-wrap">
-                <select id="series-select" class="filter-select" onchange="onSeriesChange()">
-                  <option value="">— 选择系列 —</option>
-                </select>
-                <button class="btn-add-sm" onclick="openAddSeries()">＋ 新增</button>
-              </div>
+              <div id="brand-dropdown" class="search-dropdown" style="display:none;"></div>
             </div>
           </div>
 
@@ -499,6 +501,10 @@
           <label>特例</label>
           <textarea id="new-provider-special" placeholder="如有特殊规则请填写，无则留空"></textarea>
         </div>
+        <div class="form-group">
+          <label>其他信息</label>
+          <textarea id="new-provider-otherinfo" placeholder="其他补充信息"></textarea>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn-cancel" onclick="closeModal('modal-provider')">取消</button>
@@ -578,6 +584,40 @@ function goHome() {
   goPage('home');
 }
 </script>
-<script src="app.js"></script>
+  <script src="db.js"></script>
+  <script>
+    // db.js 加载后初始化并显示数据
+    (function() {
+      if (typeof presetData !== 'undefined') {
+        var providers = presetData.providers;
+        var brands = presetData.brands;
+        
+        // 检查是否已有数据，避免覆盖用户保存的数据
+        var existingProviders = localStorage.getItem('rule_library_providers');
+        
+        // 只有当没有数据时才初始化
+        if (!existingProviders || existingProviders === '[]') {
+          console.log('Initializing data from presetData');
+          localStorage.setItem('rule_library_providers', JSON.stringify(providers));
+          localStorage.setItem('rule_library_brands', JSON.stringify(brands.map(function(n, i) { return { id: String(i+1), name: n }; })));
+        } else {
+          console.log('Keeping existing data, not overwriting');
+        }
+        
+        // 更新首页显示 - 始终使用实际存储的数据
+        var existingData = localStorage.getItem('rule_library_providers');
+        var displayProviders = existingData ? JSON.parse(existingData) : providers;
+        
+        document.getElementById('stat-providers').textContent = displayProviders.length;
+        document.getElementById('stat-brands').textContent = brands.length;
+        
+        var shops = [...new Set(displayProviders.map(function(p) { return p.shop; }).filter(Boolean))];
+        document.getElementById('stat-shops').textContent = shops.length;
+        
+        console.log('Display providers: ' + displayProviders.length);
+      }
+    })();
+  </script>
+  <script src="app.js"></script>
 </body>
 </html>
