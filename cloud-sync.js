@@ -25,7 +25,6 @@ async function cloudSync() {
       const localData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
       
       if (localData.length > 0) {
-        // 格式化数据
         const formatted = localData.map(function(p) {
           return {
             shop: p.shop || '',
@@ -72,7 +71,8 @@ async function syncToCloud(data) {
     if (res.ok) {
       console.log('🌥️ 已同步到云端');
     } else {
-      console.error('🌥️ 同步失败:', res.status);
+      const errText = await res.text();
+      console.error('🌥️ 同步失败:', res.status, errText);
     }
   } catch(e) {
     console.error('🌥️ 同步失败:', e);
