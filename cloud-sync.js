@@ -34,8 +34,8 @@ async function cloudSync() {
             series: p.series || '',
             split: p.split || '',
             pricing: p.pricing || '',
-            publishTime: p.publishTime || '',
-            specialCase: p.specialCase || '',
+            publishtime: p.publishTime || '',
+            specialcase: p.specialCase || '',
             otherinfo: p.otherInfo || ''
           };
         });
