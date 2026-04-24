@@ -36,7 +36,7 @@ async function cloudSync() {
             pricing: p.pricing || '',
             publishTime: p.publishTime || '',
             specialCase: p.specialCase || '',
-            otherInfo: p.otherInfo || ''
+            otherinfo: p.otherInfo || ''
           };
         });
         
