@@ -67,6 +67,10 @@ function initData() {
   if (statShops) statShops.textContent = shops.length;
 }
 
+function initCollapsibles() {
+  // 占位函数
+}
+
 // 重置为预置数据（可清除所有修改）
 function resetToPresetData() {
   if (confirm('确定要重置所有数据吗？这将清除所有已修改的数据，恢复为初始数据。')) {
@@ -87,6 +91,11 @@ function getData(key) {
 
 function setData(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
+  
+  // 如果是 providers 数据，自动同步到云端
+  if (key === STORAGE_KEYS.PROVIDERS && typeof syncToCloud === 'function') {
+    syncToCloud(data);
+  }
 }
 
 // ========================================
@@ -143,7 +152,7 @@ function forceRefreshData() {
 }
 document.addEventListener('DOMContentLoaded', () => {
   initData();
-  initCollapsibles();
+  if (typeof initCollapsibles === 'function') initCollapsibles();
   loadProviderSelect();
   
   var brandSelect = document.getElementById('brand-select');
