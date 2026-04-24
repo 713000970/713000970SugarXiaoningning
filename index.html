@@ -461,10 +461,10 @@ function goHome() {
 }
   </script>
   <script src="db.js"></script>
-  <script src="cloud-sync.js" onload="console.log('✅ cloud-sync.js loaded')"></script>
+<script src="cloud-sync.js"></script>
   <script>
     // 云同步加载 + 初始化
-    window.addEventListener('load', async function() {
+    setTimeout(async function() {
       console.log('🚀 开始初始化...');
       
       if (typeof cloudSync === 'function') {
@@ -472,8 +472,8 @@ function goHome() {
         await cloudSync();
       } else {
         console.log('🚀 cloudSync 未定义');
-}
-       
+      }
+      
       if (typeof presetData !== 'undefined') {
         var providers = presetData.providers;
         var brands = presetData.brands;
