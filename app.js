@@ -511,14 +511,19 @@ function showRulesByBrandAndShop(brandName, shopName) {
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
   
   // 过滤：匹配特定店铺+品牌
-  var matched = providersData.filter(function(p) { 
-    return p.brand === brandName && p.shop === shopName; 
+  var matched = [];
+  providersData.forEach(function(p, i) {
+    if (p.brand === brandName && p.shop === shopName) {
+      matched.push({ data: p, index: i });
+    }
   });
   
   // 如果没有精确匹配，只按品牌匹配
   if (matched.length === 0) {
-    matched = providersData.filter(function(p) { 
-      return p.brand === brandName; 
+    providersData.forEach(function(p, i) {
+      if (p.brand === brandName) {
+        matched.push({ data: p, index: i });
+      }
     });
   }
   
@@ -532,9 +537,10 @@ function showRulesByBrandAndShop(brandName, shopName) {
   
   var html = '<div class="rule-result-list">';
   
-  matched.slice(0, 20).forEach(function(p, idx) {
+  matched.slice(0, 20).forEach(function(item) {
+    var p = item.data;
+    var globalIndex = item.index;
     var ruleName = p.brand || p.name || '未命名规则';
-    var globalIndex = providersData.findIndex(function(x) { return x === p; });
     var actionButtons = '<button class="rule-edit-btn" onclick="editRuleByIndex(' + globalIndex + ')">✏️ 修改</button>' +
                      '<button class="rule-delete-btn" onclick="deleteRuleByIndex(' + globalIndex + ')">🗑️ 删除</button>';
     html += '<div class="rule-card">';
@@ -946,7 +952,8 @@ function saveRuleByIndex(globalIndex) {
   providersData[globalIndex].specialCase = newSpecialCase;
   providersData[globalIndex].otherInfo = newOtherInfo;
   
-  localStorage.setItem('rule_library_providers', JSON.stringify(providersData));
+  console.log('💾 保存的数据:', providersData[globalIndex]);
+  setData(STORAGE_KEYS.PROVIDERS, providersData);
   showToast('保存成功');
   showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
 }
