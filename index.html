@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
-  <body>
+<body>
 
   <!-- 顶部导航 -->
   <header class="topbar">
@@ -86,7 +86,7 @@
             <span class="card-tag">查询</span>
           </div>
           <h3 class="card-title">提供者查询</h3>
-          <p class="card-desc">三级联动筛选：提供者 → 品牌 → 系列，精准匹配个性化规则</p>
+          <p class="card-desc">三级联动筛选：提供者 → 品牌 → 系列，精准��配个性化规则</p>
           <ul class="card-features">
             <li>提供者管理</li>
             <li>品牌词筛选</li>
@@ -129,23 +129,15 @@
     </footer>
   </main>
 
-  <!-- 通用规则页 -->
-  <main id="page-rules" class="page">
+  <!-- 通用规则页面 -->
+  <section id="page-rules" class="page">
     <div class="page-header">
-      <button class="back-btn" onclick="goHome()">
-        <span class="back-icon">←</span> 返回首页
-      </button>
-      <div class="page-title">
-        <span class="page-icon">📋</span>
-        <span>通用规则</span>
-      </div>
+      <button class="back-btn" onclick="goHome()">← 返回</button>
+      <h1 class="page-title">📋 通用规则</h1>
     </div>
-
     <div class="page-content">
-      
-      <!-- 通用规则卡片布局 -->
       <div class="rules-grid">
-
+        
         <!-- 卡片1：拆分维度 -->
         <div class="rule-card material">
           <div class="rule-card-header">
@@ -157,7 +149,7 @@
             <div class="rule-row"><span class="badge badge-ppt">PPT</span>删除敏感信息（联系方式、二维码等），直接上传</div>
             <div class="rule-row"><span class="badge badge-word">WORD</span>删除敏感信息（联系方式、二维码等），直接上传</div>
             <hr class="divider">
-            <div class="rule-note-box">
+            <div class="rule-note">
               ⚠️ <strong>备注：</strong>以上三种格式有存在主书+小册子的情况，小册子拆分后，需<strong>单独建立专辑上传</strong>
             </div>
           </div>
@@ -213,7 +205,7 @@
             <hr class="divider">
             <div class="rule-block">
               <div class="rule-block-title">专辑简介模板</div>
-              <div class="rule-row rule-intro-tpl">
+              <div class="rule-row rule-intro-template">
                 XXXX（书籍名称）系列资料由 XXXX（提供者）提供，并授权学科网在互联网进行发布，侵权必究！
               </div>
             </div>
@@ -221,7 +213,7 @@
             <div class="rule-block">
               <div class="rule-block-title">专辑封面</div>
               <div class="rule-row">① 无封面 → 使用去年同期产品封面</div>
-              <div class="rule-row">② 去年无 → 智能平台生成，要求最下标必须写 <span class="badge badge-warn">学科网书城</span>，<a href="https://bar.xkw.com/cover/size" target="_blank" class="rule-link">点击制作封面 →</a></div>
+              <div class="rule-row">② 去年无 → 智能平台生成，要求最下标必须写 <span class="badge badge-warn">学科网书城</span></div>
             </div>
             <hr class="divider">
             <div class="rule-block">
@@ -231,7 +223,7 @@
           </div>
         </div>
 
-        <!-- 卡片5：特例（试卷/中职/音视频） -->
+        <!-- 卡片5：特例 -->
         <div class="rule-card special">
           <div class="rule-card-header">
             <span class="icon">⚠️</span>
@@ -258,7 +250,7 @@
           </div>
         </div>
 
-        <!-- 卡片6：特例（电子样书） -->
+        <!-- 卡片6：电子样书 -->
         <div class="rule-card special3">
           <div class="rule-card-header">
             <span class="icon">📖</span>
@@ -283,184 +275,86 @@
             </div>
             <div class="special-item purple">
               <span class="tag-pill tag-purple">发布</span>
-              立即发布
+              选择<strong>「立即发布」</strong>
             </div>
           </div>
         </div>
 
       </div>
-
     </div>
-  </main>
+</section>
 
-  <!-- 提供者查询页 -->
-  <main id="page-provider" class="page">
+<!-- 提供者查询页面 -->
+  <section id="page-provider" class="page">
     <div class="page-header">
-      <button class="back-btn" onclick="goHome()">
-        <span class="back-icon">←</span> 返回首页
-      </button>
-      <div class="page-title">
-        <span class="page-icon">🔍</span>
-        <span>提供者查询</span>
-      </div>
+      <button class="back-btn" onclick="goHome()">← 返回</button>
+      <h1 class="page-title">🔍 提供者查询</h1>
     </div>
-
     <div class="page-content">
       
-      <section class="rule-section">
-        <div class="section-header">
-          <div class="section-num">01</div>
-          <div class="section-title-wrap">
-            <h2 class="section-title">筛选条件</h2>
+      <!-- 搜索筛选 -->
+      <div class="query-filters">
+        
+        <!-- 店铺搜索 -->
+        <div class="filter-group">
+          <label class="filter-label">
+            <span class="fl-icon">🏪</span>
+            店铺名称
+          </label>
+          <div class="filter-input-wrap">
+            <input type="text" id="shop-search-input" class="filter-input" placeholder="输入店铺名称搜索..." oninput="onShopSearchInput()">
+            <button class="btn-search" onclick="searchShopByInput()">搜索</button>
+            <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
           </div>
+          <div id="shop-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>
-        <div class="section-content">
-          
-          <!-- 已知信息 -->
-          <div class="filter-section-title">📋 已知信息</div>
-          <div class="query-filters">
-            <div class="filter-group">
-              <label class="filter-label">
-                <span class="fl-icon">🏪</span>
-                店铺名称
-              </label>
-              <div class="filter-input-wrap">
-                <input type="text" id="shop-search-input" class="filter-input" placeholder="输入店铺名称搜索..." oninput="onShopSearchInput()">
-                <button class="btn-search" onclick="searchShopByInput()">搜索</button>
-                <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
-              </div>
-              <div id="shop-dropdown" class="search-dropdown" style="display:none;"></div>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">
-                <span class="fl-icon">👤</span>
-                提供者
-              </label>
-              <div class="filter-input-wrap">
-                <input type="text" id="provider-search-input" class="filter-input" placeholder="输入提供者名称搜索..." oninput="onProviderSearchInput()">
-                <button class="btn-search" onclick="searchProviderByInput()">搜索</button>
-                <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
-              </div>
-              <div id="provider-dropdown" class="search-dropdown" style="display:none;"></div>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">
-                <span class="fl-icon">🏷️</span>
-                品牌
-              </label>
-              <div class="filter-input-wrap">
-                <input type="text" id="brand-input" class="filter-input" placeholder="请先选择店铺..." oninput="onBrandInput()">
-                <input type="button" id="brand-list-btn" value="▼ 品牌" onclick="showBrandList(event)" style="background:var(--primary-cyan);color:white;padding:12px 16px;border:none;border-radius:var(--radius-md);cursor:pointer;">
-                <button class="btn-add-sm" onclick="openAddBrand()">＋ 新增</button>
-              </div>
-              <div id="brand-dropdown" class="search-dropdown" style="display:none;"></div>
-            </div>
+        
+        <!-- 提供者搜索 -->
+        <div class="filter-group">
+          <label class="filter-label">
+            <span class="fl-icon">👤</span>
+            提供者
+          </label>
+          <div class="filter-input-wrap">
+            <input type="text" id="provider-search-input" class="filter-input" placeholder="输入提供者名称搜索..." oninput="onProviderSearchInput()">
+            <button class="btn-search" onclick="searchProviderByInput()">搜索</button>
+            <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
           </div>
-
-          <!-- 手工录入信息 -->
-          <div id="manual-input-section" class="filter-section-title mt-20" style="display:none;">✏️ 手工录入信息</div>
-          <div id="manual-input-form" class="query-filters rule-inputs" style="display:none;">
-            <div class="filter-group">
-              <label class="filter-label">
-                <span class="fl-icon">✂️</span>
-                拆分
-              </label>
-              <div class="filter-input-wrap">
-                <input type="text" id="split-dimension" class="filter-input" placeholder="请输入拆分规则，如：通用规则、按章节等" onchange="saveRuleInput()">
-              </div>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">
-                <span class="fl-icon">💰</span>
-                定价
-              </label>
-              <div class="filter-input-wrap">
-                <input type="text" id="pricing" class="filter-input" placeholder="请输入定价，如：3元、通用规则" onchange="saveRuleInput()">
-              </div>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">
-                <span class="fl-icon">🚀</span>
-                发布时间
-              </label>
-              <div class="filter-input-wrap">
-                <input type="text" id="publish-time" class="filter-input" placeholder="如：立即发布、按教学进度发布" onchange="saveRuleInput()">
-              </div>
-            </div>
-
-            <div class="filter-group">
-              <label class="filter-label">
-                <span class="fl-icon">⚠️</span>
-                特例
-              </label>
-              <div class="filter-input-wrap">
-                <input type="text" id="special-case" class="filter-input" placeholder="如有特殊说明请填写" onchange="saveRuleInput()">
-              </div>
-            </div>
-          </div>
-
-          
-
+          <div id="provider-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>
-      </section>
-
-      <!-- 个性化规则展示 -->
-      <div id="custom-rule-display" class="custom-rule-box" style="display:none;"></div>
-
-    </div>
-  </main>
-
-  <!-- AI 查询页 -->
-  <main id="page-ai" class="page">
-    <div class="page-header">
-      <button class="back-btn" onclick="goHome()">
-        <span class="back-icon">←</span> 返回首页
-      </button>
-      <div class="page-title">
-        <span class="page-icon">🤖</span>
-        <span>AI 智能查询</span>
+        
+        <!-- 品牌搜索 -->
+        <div class="filter-group">
+          <label class="filter-label">
+            <span class="fl-icon">🏷️</span>
+            品牌
+          </label>
+          <div class="filter-input-wrap">
+            <input type="text" id="brand-input" class="filter-input" placeholder="请先选择店铺..." oninput="onBrandInput()">
+            <button id="brand-list-btn" onclick="showBrandList(event)" style="background:var(--primary-cyan);color:white;padding:12px 16px;border:none;border-radius:var(--radius-md);cursor:pointer;font-size:14px;">▼ 品牌</button>
+            <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
+          </div>
+          <div id="brand-dropdown" class="search-dropdown" style="display:none;"></div>
+        </div>
+        
       </div>
-    </div>
-
-    <div class="page-content">
       
-      <div class="ai-hero">
-        <div class="ai-icon-wrap">
-          <span class="ai-main-icon">🤖</span>
-          <span class="ai-pulse"></span>
+      <!-- 规则显示区域 -->
+      <div id="custom-rule-display" class="custom-rule-display" style="display:none;"></div>
+      
+      <!-- 提供者列表 -->
+      <div id="provider-list-container" style="display:none;">
+        <div class="provider-list-header" style="display:flex;justify-content:space-between;align-items:center;margin:24px 0 16px;">
+          <span style="font-size:16px;font-weight:600;color:var(--text-primary);">提供者列表</span>
+          <span id="provider-count" class="count-badge">0</span>
         </div>
-        <h2>智能规则匹配</h2>
-        <p>输入品牌名、提供者名称或规则关键词，快速获取对应生产规则</p>
+        <div id="provider-list" class="provider-list"></div>
       </div>
-
-      <div class="ai-search-box">
-        <div class="ai-input-wrap">
-          <input type="text" id="ai-query" class="ai-input" placeholder="例如：人教版、真题试卷、电子样书、中考...">
-          <button class="ai-btn" onclick="aiQuery()">
-            <span class="ai-btn-icon">🔍</span>
-            智能查询
-          </button>
-        </div>
-        <div class="ai-suggestions">
-          <span class="suggestion-label">快捷查询：</span>
-          <button class="suggestion-tag" onclick="setAiQuery('人教版')">人教版</button>
-          <button class="suggestion-tag" onclick="setAiQuery('真题试卷')">真题试卷</button>
-          <button class="suggestion-tag" onclick="setAiQuery('电子样书')">电子样书</button>
-          <button class="suggestion-tag" onclick="setAiQuery('中考')">中考</button>
-          <button class="suggestion-tag" onclick="setAiQuery('定价')">定价</button>
-        </div>
-      </div>
-
-      <div id="ai-result" class="ai-result"></div>
-
+      <div id="manual-input-section" class="filter-section-title mt-20" style="display:none;">✏️ 手动录入信息</div>
     </div>
-  </main>
+  </section>
 
-  <!-- 弹窗：新增/编辑提供者 -->
+  <!-- 新增提供者弹窗 -->
   <div id="modal-provider" class="modal" style="display:none;">
     <div class="modal-overlay" onclick="closeModal('modal-provider')"></div>
     <div class="modal-box">
@@ -470,40 +364,38 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label>知识店铺</label>
-          <input type="text" id="new-provider-shop" placeholder="请输入知识店铺名称">
+          <label>提供者名称</label>
+          <input type="text" id="new-provider-name" class="form-input">
         </div>
         <div class="form-group">
-          <label>提供者</label>
-          <input type="text" id="new-provider-name" placeholder="请输入提供者名称">
+          <label>店铺</label>
+          <input type="text" id="new-provider-shop" class="form-input">
+          <input type="hidden" id="new-provider-shopname">
         </div>
         <div class="form-group">
           <label>品牌</label>
-          <input type="text" id="new-provider-brand" placeholder="请输入品牌名称">
+          <input type="text" id="new-provider-brand" class="form-input">
+        </div>
+        <input type="hidden" id="new-provider-series">
+        <div class="form-group">
+          <label>拆分规则</label>
+          <input type="text" id="new-provider-split" class="form-input">
         </div>
         <div class="form-group">
-          <label>系列</label>
-          <input type="text" id="new-provider-series" placeholder="请输入系列名称">
-        </div>
-        <div class="form-group">
-          <label>拆分</label>
-          <input type="text" id="new-provider-split" placeholder="如：通用规则、按章节拆分等">
-        </div>
-        <div class="form-group">
-          <label>定价</label>
-          <input type="text" id="new-provider-pricing" placeholder="如：3元、通用规则">
+          <label>定价规则</label>
+          <input type="text" id="new-provider-pricing" class="form-input">
         </div>
         <div class="form-group">
           <label>发布时间</label>
-          <input type="text" id="new-provider-publishtime" placeholder="如：立即发布、按教学进度发布">
+          <input type="text" id="new-provider-publishtime" class="form-input">
         </div>
         <div class="form-group">
           <label>特例</label>
-          <textarea id="new-provider-special" placeholder="如有特殊规则请填写，无则留空"></textarea>
+          <input type="text" id="new-provider-special" class="form-input">
         </div>
         <div class="form-group">
           <label>其他信息</label>
-          <textarea id="new-provider-otherinfo" placeholder="其他补充信息"></textarea>
+          <input type="text" id="new-provider-otherinfo" class="form-input">
         </div>
       </div>
       <div class="modal-footer">
@@ -513,55 +405,39 @@
     </div>
   </div>
 
-  <!-- 弹窗：新增品牌 -->
-  <div id="modal-brand" class="modal" style="display:none;">
-    <div class="modal-overlay" onclick="closeModal('modal-brand')"></div>
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3>新增品牌</h3>
-        <button class="modal-close" onclick="closeModal('modal-brand')">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>品牌名称</label>
-          <input type="text" id="new-brand-name" placeholder="请输入品牌名称">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn-cancel" onclick="closeModal('modal-brand')">取消</button>
-        <button class="btn-save" onclick="saveBrand()">保存</button>
-      </div>
+  <!-- AI查询页面 -->
+  <section id="page-ai" class="page">
+    <div class="page-header">
+      <button class="back-btn" onclick="goHome()">← 返回</button>
+      <h1 class="page-title">🤖 AI智能查询</h1>
     </div>
-  </div>
-
-  <!-- 弹窗：新增系列 -->
-  <div id="modal-series" class="modal" style="display:none;">
-    <div class="modal-overlay" onclick="closeModal('modal-series')"></div>
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3>新增系列</h3>
-        <button class="modal-close" onclick="closeModal('modal-series')">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>提供者</label>
-          <input type="text" id="modal-series-provider" disabled>
+    <div class="page-content">
+      <div class="ai-hero">
+        <div class="ai-icon-wrap">
+          <span class="ai-main-icon">🤖</span>
+          <span class="ai-pulse"></span>
         </div>
-        <div class="form-group">
-          <label>品牌</label>
-          <input type="text" id="modal-series-brand" disabled>
+        <h2>AI智能查询</h2>
+        <p>输入品牌名或提供者名称关键字，自动匹配对应的个性化生产规则</p>
+      </div>
+      
+      <div class="ai-search-box">
+        <div class="ai-input-wrap">
+          <input type="text" id="ai-query" class="ai-input" placeholder="请输入品牌或提供者关键字，例如：木牍中考、安徽木牍...">
+          <button class="ai-btn" onclick="aiQuery()">🔍 查询</button>
         </div>
-        <div class="form-group">
-          <label>系列名称</label>
-          <input type="text" id="new-series-name" placeholder="请输入系列名称（手动添加）">
+        <div class="ai-suggestions">
+          <span class="suggestion-label">试试：</span>
+          <span class="suggestion-tag" onclick="setAiQuery('初中数学')">初中数学</span>
+          <span class="suggestion-tag" onclick="setAiQuery('高中物理')">高中物理</span>
+          <span class="suggestion-tag" onclick="setAiQuery('中考')">中考</span>
+          <span class="suggestion-tag" onclick="setAiQuery('高考')">高考</span>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn-cancel" onclick="closeModal('modal-series')">取消</button>
-        <button class="btn-save" onclick="saveSeries()">保存</button>
-      </div>
+      
+      <div id="ai-result" class="ai-result"></div>
     </div>
-  </div>
+  </section>
 
   <!-- Toast 提示 -->
   <div id="toast" class="toast" style="display:none;">
@@ -583,7 +459,7 @@ function goPage(pageId) {
 function goHome() {
   goPage('home');
 }
-</script>
+  </script>
   <script src="db.js"></script>
   <script>
     // db.js 加载后初始化并显示数据

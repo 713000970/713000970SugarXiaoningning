@@ -4,6 +4,8 @@
 
 var currentBrand = '';
 var currentProvider = '';
+var currentEditingBrand = '';
+var currentEditingShop = '';
 
 // ========================================
 // 数据存储（本地存储）
@@ -180,19 +182,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
-function initCollapsibles() {
-  document.querySelectorAll('.collapsible').forEach(header => {
-    header.addEventListener('click', () => {
-      const targetId = header.dataset.target;
-      const content = document.getElementById(targetId);
-      if (content) {
-        header.classList.toggle('collapsed');
-        content.classList.toggle('collapsed');
-      }
-    });
-  });
-}
-
 // ========================================
 // 统计更新
 // ========================================
@@ -273,18 +262,29 @@ function loadProviders() {
 }
 
 function loadBrands() {
-  const brands = getData(STORAGE_KEYS.BRANDS);
-  const selects = [
+  var brands = getData(STORAGE_KEYS.BRANDS);
+  // 如果本地没有，尝试从presetData获取
+  if ((!brands || brands.length === 0) && typeof presetData !== 'undefined' && presetData.brands) {
+    brands = presetData.brands;
+  }
+  var selects = [
     document.getElementById('brand-select'),
     document.getElementById('new-provider-brand'),
     document.getElementById('new-series-brand')
   ];
   
-  selects.forEach(select => {
+  selects.forEach(function(select) {
     if (!select) return;
-    const currentVal = select.value;
-    select.innerHTML = '<option value="">— 选择品牌 —</option>' + 
-      brands.map(b => `<option value="${b.id || b}">${b.name || b}</option>`).join('');
+    var currentVal = select.value;
+    var optionsHtml = '<option value="">— 选择品牌 —</option>';
+    if (brands && brands.length > 0) {
+      optionsHtml += brands.map(function(b) {
+        var name = b.name || b;
+        var id = b.id || name;
+        return '<option value="' + id + '">' + name + '</option>';
+      }).join('');
+    }
+    select.innerHTML = optionsHtml;
     select.value = currentVal;
   });
 }
@@ -412,7 +412,7 @@ function showBrandList(e) {
   
   if (shopBrands.length > 0) {
     dropdown.innerHTML = shopBrands.slice(0, 15).map(function(b) { 
-      return '<div class="dropdown-item" onclick="selectBrand(\'' + b + '\')">' + b + '</div>';
+      return '<div class="dropdown-item" onclick="selectBrand(&quot;' + b + '&quot;)">' + b + '</div>';
     }).join('');
     dropdown.style.display = 'block';
   }
@@ -480,20 +480,24 @@ function searchBrandByInput() {
 }
 
 function selectBrand(brandName) {
+  console.log('selectBrand called:', brandName);
   var input = document.getElementById('brand-input');
   var dropdown = document.getElementById('brand-dropdown');
   if (input) input.value = brandName;
   if (dropdown) dropdown.style.display = 'none';
   
-  // 获取当前选中的店铺名称
   var shopInput = document.getElementById('shop-search-input');
   var shopName = shopInput ? shopInput.value : '';
   
-  // 显示特定店铺+品牌的规则
+  currentEditingBrand = brandName;
+  currentEditingShop = shopName;
+  
+  console.log('calling showRulesByBrandAndShop with:', brandName, shopName);
   showRulesByBrandAndShop(brandName, shopName);
 }
 
 function showRulesByBrandAndShop(brandName, shopName) {
+  console.log('showRulesByBrandAndShop called:', brandName, shopName);
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
   
@@ -517,20 +521,17 @@ function showRulesByBrandAndShop(brandName, shopName) {
     return;
   }
   
-  var html = '<div class="match-hint">' +
-    '<span class="match-icon">✅</span>' +
-    '<span class="match-text">已匹配: <strong>' + (shopName || '全部店铺') + '</strong> + <strong>' + brandName + '</strong></span>' +
-    (matched.length > 1 ? '<span class="match-count">（共' + matched.length + '条匹配）</span>' : '') +
-  '</div>';
+  var html = '<div class="rule-result-list">';
   
-  html += '<div class="rule-result-list">';
-  
-  matched.slice(0, 20).forEach(function(p, index) {
-    var ruleName = p.series || '未命名规则';
+  matched.slice(0, 20).forEach(function(p, idx) {
+    var ruleName = p.brand || p.name || '未命名规则';
+    var globalIndex = providersData.findIndex(function(x) { return x === p; });
+    var actionButtons = '<button class="rule-edit-btn" onclick="editRuleByIndex(' + globalIndex + ')">✏️ 修改</button>' +
+                     '<button class="rule-delete-btn" onclick="deleteRuleByIndex(' + globalIndex + ')">🗑️ 删除</button>';
     html += '<div class="rule-card">';
     html += '  <div class="rule-card-header">';
     html += '    <div class="rule-card-title">' + ruleName + '</div>';
-    html += '    <button class="rule-edit-btn" onclick="editRuleByIndex(\'' + brandName + '\', \'' + shopName + '\', \'' + (p.series || '') + '\')">✏️ 修改</button>';
+    html += '    <div class="rule-card-actions">' + actionButtons + '</div>';
     html += '  </div>';
     html += '  <div class="rule-card-body">';
     html += '    <div class="rule-row"><span class="rule-label">拆分：</span><span class="rule-value">' + (p.split || '待录入') + '</span></div>';
@@ -649,27 +650,36 @@ function selectProvider(providerName) {
     });
   }
   
-hideManualInput();
-   
+  hideManualInput();
+    
   if (matched.length > 0) {
+    // 获取该提供者关联的所有店铺
+    var uniqueShops = matched.map(function(p) { return p.shop; }).filter(Boolean);
+    uniqueShops = [...new Set(uniqueShops)];
+    
+    // 自动填充第一个店铺
+    var shopInput = document.getElementById('shop-search-input');
+    if (shopInput && uniqueShops.length > 0) {
+      shopInput.value = uniqueShops[0];
+    }
+    
+    // 存储品牌供品牌搜索使用
     var uniqueBrands = matched.map(function(p) { return p.brand; }).filter(Boolean);
     uniqueBrands = [...new Set(uniqueBrands)];
     
-    var brandSelect = document.getElementById('brand-select');
-    if (brandSelect) {
-      brandSelect.innerHTML = '<option value="">— 选择品牌 —</option>' + 
-        uniqueBrands.map(function(b) { return '<option value="' + b + '">' + b + '</option>'; }).join('');
+    var brandInput = document.getElementById('brand-input');
+    if (brandInput) {
+      brandInput.setAttribute('data-provider-brands', JSON.stringify(uniqueBrands));
+      brandInput.placeholder = '输入品牌词搜索...';
+      brandInput.removeAttribute('data-shop-brands');
     }
     
-    var seriesSelect = document.getElementById('series-select');
-    if (seriesSelect) {
-      seriesSelect.innerHTML = '<option value="">— 选择系列 —</option>';
+    // 如果有店铺，自动显示该店铺的品牌
+    if (uniqueShops.length > 0) {
+      loadBrandsByShopAndShowDropdown(uniqueShops[0]);
     }
     
-    showMatchHint(matched);
     loadProviders();
-    
-    // 等待用户手动选择品牌和系列，不自动选中
   }
 }
 
@@ -881,26 +891,22 @@ function saveEditRule() {
   onSeriesChange();
 }
 
-function editRuleByIndex(brandName, shopName, seriesName) {
+function editRuleByIndex(globalIndex) {
   var providers = localStorage.getItem('rule_library_providers');
-  var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
+  var providersData = providers ? JSON.parse(providers) : [];
+  var rule = providersData[globalIndex];
   
-  var matched = providersData.filter(function(p) { 
-    return p.brand === brandName && p.shop === shopName && p.series === seriesName; 
-  });
-  
-  if (matched.length === 0) {
+  if (!rule) {
     showToast('未找到该规则');
     return;
   }
   
-  var rule = matched[0];
   var display = document.getElementById('custom-rule-display');
   
   var html = '<div class="rule-card-edit">';
   html += '  <div class="rule-card-header">';
-  html += '    <div class="rule-card-title">编辑: ' + (seriesName || '未命名规则') + '</div>';
-  html += '    <button class="rule-edit-btn" onclick="cancelEditRuleByIndex(\'' + brandName + '\', \'' + shopName + '\', \'' + seriesName + '\')">✖ 取消</button>';
+  html += '    <div class="rule-card-title">编辑: ' + (rule.brand || '未命名规则') + '</div>';
+  html += '    <button class="rule-edit-btn" onclick="showRulesByBrandAndShop(currentEditingBrand, currentEditingShop)">✖ 取消</button>';
   html += '  </div>';
   html += '  <div class="rule-card-body">';
   html += '    <div class="rule-row"><span class="rule-label">拆分：</span><input type="text" class="rule-input" id="edit-split" value="' + (rule.split || '') + '"></div>';
@@ -908,45 +914,47 @@ function editRuleByIndex(brandName, shopName, seriesName) {
   html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><input type="text" class="rule-input" id="edit-publishTime" value="' + (rule.publishTime || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">特例：</span><input type="text" class="rule-input" id="edit-specialCase" value="' + (rule.specialCase || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><input type="text" class="rule-input" id="edit-otherInfo" value="' + (rule.otherInfo || '') + '"></div>';
-  html += '    <div class="rule-row"><button class="rule-save-btn" onclick="saveRuleByIndex(\'' + brandName + '\', \'' + shopName + '\', \'' + seriesName + '\')">💾 保存</button></div>';
+  html += '    <div class="rule-row"><button class="rule-save-btn" onclick="saveRuleByIndex(' + globalIndex + ')">💾 保存</button></div>';
   html += '  </div>';
   html += '</div>';
   
   display.innerHTML = html;
 }
 
-function saveRuleByIndex(brandName, shopName, seriesName) {
-  var newSplit = document.getElementById('edit-split').value.trim();
-  var newPricing = document.getElementById('edit-pricing').value.trim();
-  var newPublishTime = document.getElementById('edit-publishTime').value.trim();
-  var newSpecialCase = document.getElementById('edit-specialCase').value.trim();
+function saveRuleByIndex(globalIndex) {
+  var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
+  var newPricing = document.getElementById('edit-pricing') ? document.getElementById('edit-pricing').value.trim() : '';
+  var newPublishTime = document.getElementById('edit-publishTime') ? document.getElementById('edit-publishTime').value.trim() : '';
+  var newSpecialCase = document.getElementById('edit-specialCase') ? document.getElementById('edit-specialCase').value.trim() : '';
   var newOtherInfo = document.getElementById('edit-otherInfo') ? document.getElementById('edit-otherInfo').value.trim() : '';
   
-  // 使用正确的 key
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : [];
   
-  alert('save: total=' + providersData.length + ', looking for brand=' + brandName + ', shop=' + shopName);
-  
-  for (var i = 0; i < providersData.length; i++) {
-    if (providersData[i].brand === brandName && providersData[i].shop === shopName && providersData[i].series === seriesName) {
-      providersData[i].split = newSplit;
-      providersData[i].pricing = newPricing;
-      providersData[i].publishTime = newPublishTime;
-      providersData[i].specialCase = newSpecialCase;
-      providersData[i].otherInfo = newOtherInfo;
-      alert('updated index ' + i + ', split=' + newSplit);
-      break;
-    }
-  }
+  providersData[globalIndex].split = newSplit;
+  providersData[globalIndex].pricing = newPricing;
+  providersData[globalIndex].publishTime = newPublishTime;
+  providersData[globalIndex].specialCase = newSpecialCase;
+  providersData[globalIndex].otherInfo = newOtherInfo;
   
   localStorage.setItem('rule_library_providers', JSON.stringify(providersData));
   showToast('保存成功');
-  showRulesByBrandAndShop(brandName, shopName);
+  showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
 }
 
-function cancelEditRuleByIndex(brandName, shopName, seriesName) {
-  showRulesByBrandAndShop(brandName, shopName);
+function deleteRuleByIndex(globalIndex) {
+  if (!confirm('确定要删除这条规则吗？')) return;
+  
+  var providers = localStorage.getItem('rule_library_providers');
+  var providersData = providers ? JSON.parse(providers) : [];
+  var deleted = providersData[globalIndex];
+  var brand = deleted ? deleted.brand : '';
+  var shop = deleted ? deleted.shop : '';
+  
+  providersData.splice(globalIndex, 1);
+  localStorage.setItem('rule_library_providers', JSON.stringify(providersData));
+  showToast('删除成功');
+  showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
 }
 
 function showManualInput() {
@@ -1171,18 +1179,48 @@ function closeModal(modalId) {
 function openAddProvider() {
   document.getElementById('modal-provider-title').textContent = '新增提供者';
   
-  // 清空表单（保留已输入的搜索关键词）
-  var searchInput = document.getElementById('provider-search-input');
-  var keyword = searchInput ? searchInput.value : '';
+  // 获取当前已选择的店铺和提供者
+  var shopInput = document.getElementById('shop-search-input');
+  var providerInput = document.getElementById('provider-search-input');
+  var brandInput = document.getElementById('brand-input');
   
+  var currentShop = shopInput ? shopInput.value : '';
+  var currentProvider = providerInput ? providerInput.value : '';
+  
+  // 清空表单（先清空，再填充店铺和提供者）
   document.getElementById('new-provider-shop').value = '';
-  document.getElementById('new-provider-name').value = keyword;
+  document.getElementById('new-provider-name').value = '';
   document.getElementById('new-provider-brand').value = '';
-  document.getElementById('new-provider-series').value = '';
+  var seriesEl = document.getElementById('new-provider-series');
+  if (seriesEl) seriesEl.value = '';
   document.getElementById('new-provider-split').value = '';
   document.getElementById('new-provider-pricing').value = '';
   document.getElementById('new-provider-publishtime').value = '';
   document.getElementById('new-provider-special').value = '';
+  
+  // 填充已选择的店铺和提供者
+  document.getElementById('new-provider-shop').value = currentShop;
+  document.getElementById('new-provider-name').value = currentProvider;
+  
+  // 如果已选择店铺或提供者，则禁用对应字段
+  var shopField = document.getElementById('new-provider-shop');
+  var providerField = document.getElementById('new-provider-name');
+  
+  if (currentShop) {
+    shopField.readOnly = true;
+    shopField.style.background = '#f5f5f5';
+  } else {
+    shopField.readOnly = false;
+    shopField.style.background = '';
+  }
+  
+  if (currentProvider) {
+    providerField.readOnly = true;
+    providerField.style.background = '#f5f5f5';
+  } else {
+    providerField.readOnly = false;
+    providerField.style.background = '';
+  }
   
   openModal('modal-provider');
 }
@@ -1202,10 +1240,8 @@ function openAddSeries() {
 // ========================================
 function saveProvider() {
   const shop = document.getElementById('new-provider-shop')?.value.trim();
-  const shopname = document.getElementById('new-provider-shopname')?.value.trim();
   const name = document.getElementById('new-provider-name')?.value.trim();
   const brandName = document.getElementById('new-provider-brand')?.value.trim();
-  const seriesName = document.getElementById('new-provider-series')?.value.trim();
   const split = document.getElementById('new-provider-split')?.value.trim();
   const pricing = document.getElementById('new-provider-pricing')?.value.trim();
   const publishTime = document.getElementById('new-provider-publishtime')?.value.trim();
@@ -1220,10 +1256,8 @@ function saveProvider() {
   const providers = getData(STORAGE_KEYS.PROVIDERS);
   providers.push({
     shop: shop || '',
-    shopname: shopname || '',
     name,
     brand: brandName || '',
-    series: seriesName || '',
     split: split || '',
     pricing: pricing || '',
     publishTime: publishTime || '',
@@ -1235,24 +1269,21 @@ function saveProvider() {
   showToast('保存成功');
   closeModal('modal-provider');
   
-  // 刷新当前页面显示
-  var brandSelect = document.getElementById('brand-select');
-  var seriesSelect = document.getElementById('series-select');
-  if (brandSelect) {
-    brandSelect.innerHTML = '<option value="">— 选择品牌 —</option>' + 
-      '<option value="' + brandName + '">' + brandName + '</option>';
-  }
-  if (seriesSelect) {
-    seriesSelect.innerHTML = '<option value="">— 选择系列 —</option>' + 
-      '<option value="' + seriesName + '">' + seriesName + '</option>';
-    if (seriesName) seriesSelect.value = seriesName;
+  loadProviders();
+  
+  var brandInput = document.getElementById('brand-input');
+  var shopInput = document.getElementById('shop-search-input');
+  var currentShop = shopInput ? shopInput.value : '';
+  
+  if (brandInput) {
+    brandInput.value = brandName;
   }
   
-  // 显示新增的规则
-  if (brandName) {
-    displayBrandRule(brandName);
+  if (brandName && currentShop) {
+    showRulesByBrandAndShop(brandName, currentShop);
+  } else if (brandName) {
+    showRulesByBrandAndShop(brandName, '');
   }
-  showToast('提供者添加成功');
 }
 
 function saveBrand() {
@@ -1882,6 +1913,22 @@ extraStyles.textContent = `
     cursor: pointer;
     font-size: 14px;
     margin-top: 8px;
+  }
+  .rule-card-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .rule-delete-btn {
+    background: #ff4757;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .rule-delete-btn:hover {
+    background: #ff6b7a;
   }
 `;
 document.head.appendChild(extraStyles);
