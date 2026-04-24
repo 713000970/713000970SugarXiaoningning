@@ -464,7 +464,7 @@ function goHome() {
 <script src="cloud-sync.js"></script>
   <script>
     // 云同步加载 + 初始化
-    setTimeout(async function() {
+    (async function() {
       console.log('🚀 开始初始化...');
       
       if (typeof cloudSync === 'function') {
@@ -473,6 +473,8 @@ function goHome() {
       } else {
         console.log('🚀 cloudSync 未定义');
       }
+      
+      console.log('🚀 检查数据...');
       
       if (typeof presetData !== 'undefined') {
         var providers = presetData.providers;
@@ -502,7 +504,7 @@ function goHome() {
         
         console.log('Display providers: ' + displayProviders.length);
       }
-    });
+    })();
   </script>
   <script src="app.js"></script>
 </body>
