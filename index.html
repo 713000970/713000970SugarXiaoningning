@@ -472,12 +472,8 @@ function goHome() {
         await cloudSync();
       } else {
         console.log('🚀 cloudSync 未定义');
-      }
-      
-      if (typeof presetData !== 'undefined') {
-        console.error('初始化失败:', e);
-      }
-      
+}
+       
       if (typeof presetData !== 'undefined') {
         var providers = presetData.providers;
         var brands = presetData.brands;
