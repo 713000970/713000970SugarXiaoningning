@@ -1588,13 +1588,41 @@ function aiQuery() {
   }
   
   const queryLower = query.toLowerCase();
+  const normalizedQuery = normalizeForSearch(query);
+  const queryTerms = buildQueryTerms(query);
+  const isStrictMultiTermQuery = queryTerms.length >= 2;
   
   // 首先搜索提供者/品牌/系列数据 - 只搜索 localStorage 中的用户保存数据
   var localProviders = getData(STORAGE_KEYS.PROVIDERS);
   
   // 只搜索本地数据（用户保存的规则），不使用 presetData
-  var matchedProviders = localProviders
+  var providerCandidates = localProviders
     .map(function(p) {
+      var identityText = [
+        p.name || '',
+        p.brand || '',
+        p.series || '',
+        p.shop || ''
+      ].join(' ');
+      var normalizedIdentity = normalizeForSearch(identityText);
+      var searchableText = [
+        p.name || '',
+        p.brand || '',
+        p.series || '',
+        p.shop || '',
+        p.split || '',
+        p.pricing || '',
+        p.publishTime || '',
+        p.specialCase || '',
+        p.otherInfo || ''
+      ].join(' ');
+      var normalizedText = normalizeForSearch(searchableText);
+      var termMatchedCount = queryTerms.filter(function(term) {
+        return normalizedText.indexOf(term) !== -1;
+      }).length;
+      var allTermsMatched = queryTerms.length > 0 && termMatchedCount === queryTerms.length;
+      var exactContains = normalizedText.indexOf(normalizedQuery) !== -1;
+      var identityExactContains = normalizedIdentity.indexOf(normalizedQuery) !== -1;
       var providerText = [
         p.name || '',
         p.brand || '',
@@ -1608,10 +1636,33 @@ function aiQuery() {
       ].join(' ');
       return {
         data: p,
-        score: getFuzzyScore(query, providerText)
+        score: getFuzzyScore(query, providerText) + (termMatchedCount * 40) + (allTermsMatched ? 80 : 0),
+        termMatchedCount: termMatchedCount,
+        allTermsMatched: allTermsMatched,
+        exactContains: exactContains,
+        identityExactContains: identityExactContains
       };
     })
-    .filter(function(item) { return item.score > 0; })
+    .filter(function(item) { return item.score > 0; });
+
+  // 组合词（如“木牍中考”）时收窄结果：优先要求在品牌/系列/提供者/店铺中命中完整短语
+  if (isStrictMultiTermQuery) {
+    var exactPhraseProviders = providerCandidates.filter(function(item) {
+      return item.identityExactContains;
+    });
+    if (exactPhraseProviders.length > 0) {
+      providerCandidates = exactPhraseProviders;
+    } else {
+    var strictProviders = providerCandidates.filter(function(item) {
+      return item.allTermsMatched || item.exactContains;
+    });
+    if (strictProviders.length > 0) {
+      providerCandidates = strictProviders;
+    }
+    }
+  }
+
+  var matchedProviders = providerCandidates
     .sort(function(a, b) { return b.score - a.score; })
     .map(function(item) { return item.data; });
   
@@ -1663,7 +1714,7 @@ function aiQuery() {
   
   // 如果没有匹配到提供者/品牌/系列，搜索通用规则
   const rules = getAIRules();
-  const matched = rules
+  var ruleCandidates = rules
     .map(function(rule) {
       var sectionText = (rule.sections || []).map(function(s) {
         return (s.title || '') + ' ' + stripHtmlTags(s.content || '');
@@ -1673,12 +1724,32 @@ function aiQuery() {
         rule.title || '',
         sectionText
       ].join(' ');
+      var normalizedText = normalizeForSearch(searchableText);
+      var termMatchedCount = queryTerms.filter(function(term) {
+        return normalizedText.indexOf(term) !== -1;
+      }).length;
+      var allTermsMatched = queryTerms.length > 0 && termMatchedCount === queryTerms.length;
+      var exactContains = normalizedText.indexOf(normalizedQuery) !== -1;
       return {
         rule: rule,
-        score: getFuzzyScore(query, searchableText)
+        score: getFuzzyScore(query, searchableText) + (termMatchedCount * 40) + (allTermsMatched ? 80 : 0),
+        termMatchedCount: termMatchedCount,
+        allTermsMatched: allTermsMatched,
+        exactContains: exactContains
       };
     })
-    .filter(function(item) { return item.score > 0; })
+    .filter(function(item) { return item.score > 0; });
+
+  if (isStrictMultiTermQuery) {
+    var strictRules = ruleCandidates.filter(function(item) {
+      return item.allTermsMatched || item.exactContains;
+    });
+    if (strictRules.length > 0) {
+      ruleCandidates = strictRules;
+    }
+  }
+
+  const matched = ruleCandidates
     .sort(function(a, b) { return b.score - a.score; })
     .map(function(item) { return item.rule; });
   
@@ -1724,6 +1795,32 @@ function normalizeForSearch(text) {
     .toLowerCase()
     .replace(/\s+/g, '')
     .trim();
+}
+
+function buildQueryTerms(query) {
+  var q = normalizeForSearch(query);
+  if (!q) return [];
+
+  // 英文/拼音/空格分词
+  if (/\s/.test(String(query || ''))) {
+    return String(query || '')
+      .toLowerCase()
+      .split(/\s+/)
+      .map(function(t) { return normalizeForSearch(t); })
+      .filter(function(t) { return t.length > 0; });
+  }
+
+  // 中文连续输入时按 2 字分块，提升组合词精度（如：木牍中考 -> 木牍 / 中考）
+  if (q.length >= 4) {
+    var parts = [];
+    for (var i = 0; i < q.length; i += 2) {
+      var part = q.slice(i, i + 2);
+      if (part.length >= 2) parts.push(part);
+    }
+    if (parts.length > 1) return parts;
+  }
+
+  return [q];
 }
 
 function getFuzzyScore(query, text) {
