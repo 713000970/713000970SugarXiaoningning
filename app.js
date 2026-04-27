@@ -94,6 +94,7 @@ function setData(key, data) {
   
   // 如果是 providers 数据，自动同步到云端
   if (key === STORAGE_KEYS.PROVIDERS && typeof syncToCloud === 'function') {
+    console.log('📤 setData 开始同步...');
     var formatted = data.map(function(p) {
       return {
         shop: p.shop || '',
@@ -108,6 +109,7 @@ function setData(key, data) {
         otherinfo: p.otherInfo || ''
       };
     });
+    console.log('📤 格式化数据:', formatted.length, '条');
     syncToCloud(formatted);
   }
 }
@@ -951,6 +953,7 @@ function editRuleByIndex(globalIndex) {
 }
 
 function saveRuleByIndex(globalIndex) {
+  console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
   var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
   var newPricing = document.getElementById('edit-pricing') ? document.getElementById('edit-pricing').value.trim() : '';
   var newPublishTime = document.getElementById('edit-publishTime') ? document.getElementById('edit-publishTime').value.trim() : '';
