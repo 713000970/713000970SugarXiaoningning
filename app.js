@@ -288,12 +288,22 @@ window.addEventListener('cloud-sync-status', function(evt) {
   var detail = evt ? evt.detail : null;
   var indicator = document.getElementById('sync-status-indicator');
   if (!indicator) return;
+  if (detail && typeof detail.pendingSyncCount === 'number') {
+    indicator.setAttribute('data-pending-sync', String(detail.pendingSyncCount));
+  } else {
+    indicator.removeAttribute('data-pending-sync');
+  }
   if (detail && detail.lastSuccessAt) {
     var time = new Date(detail.lastSuccessAt);
     var hh = String(time.getHours()).padStart(2, '0');
     var mm = String(time.getMinutes()).padStart(2, '0');
     var ss = String(time.getSeconds()).padStart(2, '0');
-    indicator.title = '最近同步时间：' + hh + ':' + mm + ':' + ss;
+    var pendingCount = indicator.getAttribute('data-pending-sync');
+    if (pendingCount) {
+      indicator.title = '最近同步时间：' + hh + ':' + mm + ':' + ss + '；待回传变更：' + pendingCount + ' 条';
+    } else {
+      indicator.title = '最近同步时间：' + hh + ':' + mm + ':' + ss;
+    }
   } else {
     indicator.title = '最近同步时间：暂无';
   }

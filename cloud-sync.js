@@ -12,6 +12,7 @@ let retryTimer = null;
 let retryCountdownTimer = null;
 let retryRemainSec = 0;
 let lastSuccessAt = null;
+let pendingSyncData = null;
 
 function emitSyncStatus(status, message, extra) {
   window.dispatchEvent(new CustomEvent('cloud-sync-status', {
@@ -39,6 +40,25 @@ function markSyncSuccess(message) {
   clearRetryTimers();
   lastSuccessAt = Date.now();
   emitSyncStatus('success', message || '已同步');
+}
+
+function queuePendingSync(data) {
+  pendingSyncData = Array.isArray(data) ? data : [];
+  emitSyncStatus('syncing', '检测到本地变更，排队回传中...', {
+    pendingSyncCount: pendingSyncData.length
+  });
+}
+
+function flushPendingSync() {
+  if (isCloudSyncing || !pendingSyncData) return;
+  var nextData = pendingSyncData;
+  pendingSyncData = null;
+  emitSyncStatus('syncing', '正在回传本地变更...', {
+    pendingSyncCount: nextData.length
+  });
+  setTimeout(function() {
+    syncToCloud(nextData);
+  }, 0);
 }
 
 function scheduleRetry() {
@@ -151,7 +171,17 @@ async function cloudSync() {
       // 远程有数据，转回驼峰后更新本地
       const formatted = remoteData.map(toLocalProvider);
       const remoteSnapshot = calcSnapshot(formatted);
-      const localSnapshot = calcSnapshot(JSON.parse(localStorage.getItem('rule_library_providers') || '[]'));
+      const localProviders = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+      const localSnapshot = calcSnapshot(localProviders);
+
+      // 本地有尚未上云的新数据时，不用远程覆盖本地，改为排队回传本地
+      if (localSnapshot !== lastCloudSnapshot && localSnapshot !== remoteSnapshot) {
+        console.log('🌥️ 检测到本地未同步的新数据，保留本地并排队回传云端');
+        queuePendingSync(localProviders);
+        markSyncSuccess('检测到本地新数据，已排队回传');
+        return;
+      }
+
       localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
       lastCloudSnapshot = remoteSnapshot;
       if (remoteSnapshot !== localSnapshot) {
@@ -170,12 +200,17 @@ async function cloudSync() {
     scheduleRetry();
   } finally {
     isCloudSyncing = false;
+    flushPendingSync();
   }
 }
 
 // 保存数据后自动同步到云端
 async function syncToCloud(data) {
-  if (isCloudSyncing) return;
+  if (isCloudSyncing) {
+    queuePendingSync(data);
+    emitSyncStatus('syncing', '同步排队中...');
+    return;
+  }
   isCloudSyncing = true;
   clearRetryTimers();
   emitSyncStatus('syncing', '同步中...');
@@ -236,6 +271,7 @@ async function syncToCloud(data) {
     scheduleRetry();
   } finally {
     isCloudSyncing = false;
+    flushPendingSync();
   }
 }
 
