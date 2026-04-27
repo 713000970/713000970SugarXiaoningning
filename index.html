@@ -305,7 +305,7 @@
           <div class="filter-input-wrap">
             <input type="text" id="shop-search-input" class="filter-input" placeholder="输入店铺名称搜索..." oninput="onShopSearchInput()">
             <button class="btn-search" onclick="searchShopByInput()">搜索</button>
-            <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
+            <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增提供者</button>
           </div>
           <div id="shop-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>
@@ -319,7 +319,7 @@
           <div class="filter-input-wrap">
             <input type="text" id="provider-search-input" class="filter-input" placeholder="输入提供者名称搜索..." oninput="onProviderSearchInput()">
             <button class="btn-search" onclick="searchProviderByInput()">搜索</button>
-            <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
+            <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增提供者</button>
           </div>
           <div id="provider-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>
@@ -333,7 +333,7 @@
           <div class="filter-input-wrap">
             <input type="text" id="brand-input" class="filter-input" placeholder="请先选择店铺..." oninput="onBrandInput()">
             <button id="brand-list-btn" onclick="showBrandList(event)" style="background:var(--primary-cyan);color:white;padding:12px 16px;border:none;border-radius:var(--radius-md);cursor:pointer;font-size:14px;">▼ 品牌</button>
-            <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增</button>
+            <button class="btn-add-sm" onclick="openAddBrand()">＋ 新增品牌</button>
           </div>
           <div id="brand-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>

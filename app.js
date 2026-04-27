@@ -380,6 +380,44 @@ function loadProviders() {
 
 function loadBrands() {
   var brands = getData(STORAGE_KEYS.BRANDS);
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+
+  // 保证品牌库与提供者数据一致：如果提供者里出现新品牌，自动补齐到品牌库
+  var normalizedBrands = (brands || []).map(function(b) {
+    if (typeof b === 'string') {
+      return { id: b, name: b };
+    }
+    return b;
+  });
+  var brandNameSet = new Set(
+    normalizedBrands
+      .map(function(b) { return (b && b.name ? String(b.name).trim() : ''); })
+      .filter(Boolean)
+  );
+  var providerBrandNames = [...new Set(
+    (providers || [])
+      .map(function(p) { return p && p.brand ? String(p.brand).trim() : ''; })
+      .filter(Boolean)
+  )];
+  var hasBrandChanges = false;
+
+  providerBrandNames.forEach(function(name, idx) {
+    if (brandNameSet.has(name)) return;
+    normalizedBrands.push({
+      id: 'auto_' + Date.now() + '_' + idx,
+      name: name
+    });
+    brandNameSet.add(name);
+    hasBrandChanges = true;
+  });
+
+  if (hasBrandChanges) {
+    brands = normalizedBrands;
+    localStorage.setItem(STORAGE_KEYS.BRANDS, JSON.stringify(brands));
+  } else {
+    brands = normalizedBrands;
+  }
+
   // 如果本地没有，尝试从presetData获取
   if ((!brands || brands.length === 0) && typeof presetData !== 'undefined' && presetData.brands) {
     brands = presetData.brands;
@@ -1365,8 +1403,9 @@ function openAddProvider() {
 }
 
 function openAddBrand() {
-  // 新增品牌时弹出与新增提供者相同的弹窗
-  openAddProvider();
+  var name = window.prompt('请输入品牌名称');
+  if (name == null) return;
+  saveBrand(name);
 }
 
 function openAddSeries() {
@@ -1425,8 +1464,8 @@ function saveProvider() {
   }
 }
 
-function saveBrand() {
-  const name = document.getElementById('new-brand-name')?.value.trim();
+function saveBrand(nameInput) {
+  const name = (nameInput || document.getElementById('new-brand-name')?.value || '').trim();
   
   if (!name) {
     showToast('请输入品牌名称');
@@ -1443,8 +1482,10 @@ function saveBrand() {
   brands.push({ id: Date.now().toString(), name });
   setData(STORAGE_KEYS.BRANDS, brands);
   
-  closeModal('modal-brand');
+  var modalBrand = document.getElementById('modal-brand');
+  if (modalBrand) closeModal('modal-brand');
   loadBrands();
+  updateStats();
   showToast('品牌添加成功');
 }
 
