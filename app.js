@@ -89,6 +89,21 @@ function getData(key) {
   return JSON.parse(localStorage.getItem(key) || '[]');
 }
 
+function normalizeText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isSameContextProvider(p, shopName, providerName) {
+  var targetShop = normalizeText(shopName);
+  var targetProvider = normalizeText(providerName);
+  var shop = normalizeText(p && p.shop);
+  var shopname = normalizeText(p && p.shopname);
+  var provider = normalizeText(p && p.name);
+  var shopMatched = !!targetShop && (shop === targetShop || shopname === targetShop || shop.indexOf(targetShop) !== -1 || shopname.indexOf(targetShop) !== -1);
+  var providerMatched = !!targetProvider && (provider === targetProvider || provider.indexOf(targetProvider) !== -1 || targetProvider.indexOf(provider) !== -1);
+  return shopMatched && providerMatched;
+}
+
 function setData(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
   window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'local' } }));
@@ -554,11 +569,13 @@ function selectShop(shopName) {
 function loadBrandsByShopAndShowDropdown(shopName) {
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
+  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
   var targetShop = String(shopName || '').trim().toLowerCase();
   var matched = providersData.filter(function(p) {
-    var shop = String((p && p.shop) || '').trim().toLowerCase();
-    var shopname = String((p && p.shopname) || '').trim().toLowerCase();
     if (!targetShop) return false;
+    if (providerName) return isSameContextProvider(p, shopName, providerName);
+    var shop = normalizeText(p && p.shop);
+    var shopname = normalizeText(p && p.shopname);
     return shop === targetShop || shopname === targetShop || shop.indexOf(targetShop) !== -1 || shopname.indexOf(targetShop) !== -1;
   });
   var brands = [...new Set(matched.map(function(p) { return p.brand; }).filter(Boolean))];
@@ -610,10 +627,10 @@ function onBrandInput() {
   if (brandInput) {
     currentShop = brandInput.getAttribute('data-current-shop') || '';
   }
-  if (!currentShop) {
-    currentShop = document.getElementById('shop-search-input')?.value || '';
-  }
-  currentShop = String(currentShop).trim().toLowerCase();
+  if (!currentShop) currentShop = document.getElementById('shop-search-input')?.value || '';
+  var currentProvider = document.getElementById('provider-search-input')?.value || '';
+  currentShop = normalizeText(currentShop);
+  currentProvider = normalizeText(currentProvider);
   
   // 如果没有输入，显示该店铺的所有品牌
   if (!input) {
@@ -640,9 +657,12 @@ function onBrandInput() {
     var shopFiltered = providersData;
     if (currentShop) {
       shopFiltered = providersData.filter(function(p) {
-        var shop = String((p && p.shop) || '').trim().toLowerCase();
-        var shopname = String((p && p.shopname) || '').trim().toLowerCase();
-        return shop === currentShop || shopname === currentShop || shop.indexOf(currentShop) !== -1 || shopname.indexOf(currentShop) !== -1;
+        var shop = normalizeText(p && p.shop);
+        var shopname = normalizeText(p && p.shopname);
+        var provider = normalizeText(p && p.name);
+        var shopMatched = shop === currentShop || shopname === currentShop || shop.indexOf(currentShop) !== -1 || shopname.indexOf(currentShop) !== -1;
+        var providerMatched = !currentProvider || provider === currentProvider || provider.indexOf(currentProvider) !== -1 || currentProvider.indexOf(provider) !== -1;
+        return shopMatched && providerMatched;
       });
     }
     uniqueBrands = [...new Set(shopFiltered.map(function(p) { return p.brand; }).filter(Boolean))];
@@ -687,11 +707,18 @@ function showRulesByBrandAndShop(brandName, shopName) {
   console.log('showRulesByBrandAndShop called:', brandName, shopName);
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
+  var targetBrand = normalizeText(brandName);
+  var targetShop = normalizeText(shopName);
   
   // 过滤：匹配特定店铺+品牌
   var matched = [];
   providersData.forEach(function(p, i) {
-    if (p.brand === brandName && p.shop === shopName) {
+    var itemBrand = normalizeText(p && p.brand);
+    var itemShop = normalizeText(p && p.shop);
+    var itemShopname = normalizeText(p && p.shopname);
+    var brandMatched = itemBrand === targetBrand;
+    var shopMatched = !targetShop || itemShop === targetShop || itemShopname === targetShop || itemShop.indexOf(targetShop) !== -1 || itemShopname.indexOf(targetShop) !== -1;
+    if (brandMatched && shopMatched) {
       matched.push({ data: p, index: i });
     }
   });
@@ -699,7 +726,7 @@ function showRulesByBrandAndShop(brandName, shopName) {
   // 如果没有精确匹配，只按品牌匹配
   if (matched.length === 0) {
     providersData.forEach(function(p, i) {
-      if (p.brand === brandName) {
+      if (normalizeText(p && p.brand) === targetBrand) {
         matched.push({ data: p, index: i });
       }
     });
@@ -1447,8 +1474,16 @@ function openAddBrand() {
 }
 
 function openAddSeries() {
-  // 新增系列时弹出与新增提供者相同的弹窗
-  openAddProvider();
+  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
+  var brandName = (document.getElementById('brand-input')?.value || '').trim();
+  if (!shopName || !providerName || !brandName) {
+    showToast('新增系列前请先填写店铺、提供者、品牌');
+    return;
+  }
+  var seriesName = window.prompt('请输入系列名称');
+  if (seriesName == null) return;
+  saveSeries('', seriesName, brandName, shopName, providerName);
 }
 
 // ========================================
@@ -1529,9 +1564,8 @@ function saveBrand(nameInput) {
   // 自动建立品牌与店铺/提供者的关联，确保可被搜索链路命中
   var providers = getData(STORAGE_KEYS.PROVIDERS);
   var hasLinkedRecord = providers.some(function(p) {
-    return (p.shop || '') === shopName &&
-      (p.name || '') === providerName &&
-      (p.brand || '') === name;
+    return isSameContextProvider(p, shopName, providerName) &&
+      normalizeText(p.brand) === normalizeText(name);
   });
   if (!hasLinkedRecord) {
     providers.push({
@@ -1553,7 +1587,11 @@ function saveBrand(nameInput) {
   var brandInputEl = document.getElementById('brand-input');
   if (brandInputEl) {
     brandInputEl.value = name;
+    brandInputEl.setAttribute('data-current-shop', shopName);
   }
+  onBrandInput();
+  // 新增后直接触发品牌选择，立即弹出规则卡片
+  selectBrand(name);
   
   var modalBrand = document.getElementById('modal-brand');
   if (modalBrand) closeModal('modal-brand');
@@ -1566,32 +1604,64 @@ function saveBrand(nameInput) {
   }
 }
 
-function saveSeries() {
-  const brandId = document.getElementById('new-series-brand')?.value;
-  const name = document.getElementById('new-series-name')?.value.trim();
-  
-  if (!brandId) {
-    showToast('请选择所属品牌');
+function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, providerInput) {
+  const brandId = brandIdInput || document.getElementById('new-series-brand')?.value || '';
+  const name = (nameInput || document.getElementById('new-series-name')?.value || '').trim();
+  const shopName = (shopInput || document.getElementById('shop-search-input')?.value || '').trim();
+  const providerName = (providerInput || document.getElementById('provider-search-input')?.value || '').trim();
+  const brandName = (brandNameInput || document.getElementById('brand-input')?.value || '').trim();
+
+  if (!shopName || !providerName || !brandName) {
+    showToast('新增系列前请先填写店铺、提供者、品牌');
     return;
   }
-  
+
   if (!name) {
     showToast('请输入系列名称');
     return;
   }
   
   const series = getData(STORAGE_KEYS.SERIES);
-  
-  if (series.some(s => s.brandId === brandId && s.name === name)) {
+
+  if (series.some(s => (s.brandId || '') === brandId && s.name === name)) {
     showToast('该系列已存在');
-    return;
+  } else {
+    series.push({ id: Date.now().toString(), brandId, name });
+    setData(STORAGE_KEYS.SERIES, series);
   }
-  
-  series.push({ id: Date.now().toString(), brandId, name });
-  setData(STORAGE_KEYS.SERIES, series);
-  
-  closeModal('modal-series');
-  showToast('系列添加成功');
+
+  // 核心：将系列挂到当前店铺+提供者+品牌记录，确保能弹规则卡片且刷新后可搜索
+  const providers = getData(STORAGE_KEYS.PROVIDERS);
+  var linked = false;
+  providers.forEach(function(p) {
+    if ((p.shop || '') === shopName && (p.name || '') === providerName && (p.brand || '') === brandName && (p.series || '') === name) {
+      linked = true;
+    }
+  });
+
+  if (!linked) {
+    providers.push({
+      shop: shopName,
+      name: providerName,
+      brand: brandName,
+      series: name,
+      split: '',
+      pricing: '',
+      publishTime: '',
+      specialCase: '',
+      otherInfo: ''
+    });
+    setData(STORAGE_KEYS.PROVIDERS, providers);
+  }
+
+  var seriesSelect = document.getElementById('series-select');
+  if (seriesSelect) {
+    seriesSelect.innerHTML += '<option value="' + name + '">' + name + '</option>';
+    seriesSelect.value = name;
+  }
+
+  showRulesByBrandAndShop(brandName, shopName);
+  showToast(linked ? '系列已存在并已关联当前规则' : '系列添加成功');
 }
 
 // ========================================
