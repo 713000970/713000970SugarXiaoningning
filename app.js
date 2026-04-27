@@ -94,6 +94,28 @@ function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function getAllProvidersForSearch() {
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
+  var presetProviders = (typeof presetData !== 'undefined' && presetData && Array.isArray(presetData.providers)) ? presetData.providers : [];
+  var merged = [].concat(localProviders || [], presetProviders || []);
+  var seen = new Set();
+  var result = [];
+  merged.forEach(function(p) {
+    if (!p) return;
+    var key = [
+      normalizeText(p.shop),
+      normalizeText(p.shopname),
+      normalizeText(p.name),
+      normalizeText(p.brand),
+      normalizeText(p.series)
+    ].join('|');
+    if (seen.has(key)) return;
+    seen.add(key);
+    result.push(p);
+  });
+  return result;
+}
+
 function isSameContextProvider(p, shopName, providerName) {
   var targetShop = normalizeText(shopName);
   var targetProvider = normalizeText(providerName);
@@ -813,9 +835,7 @@ function onProviderSearchInput() {
     return;
   }
   
-  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
-  var presetProviders = (typeof presetData !== 'undefined' && presetData && Array.isArray(presetData.providers)) ? presetData.providers : [];
-  var providersData = localProviders.length > 0 ? localProviders : presetProviders;
+  var providersData = getAllProvidersForSearch();
   var uniqueProviders = [...new Set(providersData.map(function(p) { return (p && p.name) ? String(p.name).trim() : ''; }).filter(Boolean))];
   var matched = uniqueProviders.filter(function(p) {
     var normalizedName = normalizeText(p);
@@ -838,9 +858,7 @@ function searchProviderByInput() {
   if (!input) return;
   
   var normalizedInput = normalizeText(input);
-  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
-  var presetProviders = (typeof presetData !== 'undefined' && presetData && Array.isArray(presetData.providers)) ? presetData.providers : [];
-  var providersData = localProviders.length > 0 ? localProviders : presetProviders;
+  var providersData = getAllProvidersForSearch();
   var matched = providersData.filter(function(p) {
     var name = normalizeText(p && p.name);
     return name && (name.indexOf(normalizedInput) !== -1 || normalizedInput.indexOf(name) !== -1);
@@ -874,9 +892,7 @@ function selectProvider(providerName) {
   currentProvider = providerName;
   
   var normalizedProvider = normalizeText(providerName);
-  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
-  var presetProviders = (typeof presetData !== 'undefined' && presetData && Array.isArray(presetData.providers)) ? presetData.providers : [];
-  var providersData = localProviders.length > 0 ? localProviders : presetProviders;
+  var providersData = getAllProvidersForSearch();
   var matched = providersData.filter(function(p) {
     return normalizeText(p && p.name) === normalizedProvider;
   });
