@@ -94,7 +94,21 @@ function setData(key, data) {
   
   // 如果是 providers 数据，自动同步到云端
   if (key === STORAGE_KEYS.PROVIDERS && typeof syncToCloud === 'function') {
-    syncToCloud(data);
+    var formatted = data.map(function(p) {
+      return {
+        shop: p.shop || '',
+        shopname: p.shopname || '',
+        name: p.name || '',
+        brand: p.brand || '',
+        series: p.series || '',
+        split: p.split || '',
+        pricing: p.pricing || '',
+        publishtime: p.publishTime || '',
+        specialcase: p.specialCase || '',
+        otherinfo: p.otherInfo || ''
+      };
+    });
+    syncToCloud(formatted);
   }
 }
 
