@@ -544,7 +544,13 @@ function selectShop(shopName) {
 function loadBrandsByShopAndShowDropdown(shopName) {
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
-  var matched = providersData.filter(function(p) { return p.shop === shopName; });
+  var targetShop = String(shopName || '').trim().toLowerCase();
+  var matched = providersData.filter(function(p) {
+    var shop = String((p && p.shop) || '').trim().toLowerCase();
+    var shopname = String((p && p.shopname) || '').trim().toLowerCase();
+    if (!targetShop) return false;
+    return shop === targetShop || shopname === targetShop || shop.indexOf(targetShop) !== -1 || shopname.indexOf(targetShop) !== -1;
+  });
   var brands = [...new Set(matched.map(function(p) { return p.brand; }).filter(Boolean))];
   
   var brandInput = document.getElementById('brand-input');
@@ -590,6 +596,14 @@ function onBrandInput() {
   var dropdown = document.getElementById('brand-dropdown');
   var brandInput = document.getElementById('brand-input');
   var shopBrands = brandInput && brandInput.getAttribute('data-shop-brands') ? JSON.parse(brandInput.getAttribute('data-shop-brands')) : [];
+  var currentShop = '';
+  if (brandInput) {
+    currentShop = brandInput.getAttribute('data-current-shop') || '';
+  }
+  if (!currentShop) {
+    currentShop = document.getElementById('shop-search-input')?.value || '';
+  }
+  currentShop = String(currentShop).trim().toLowerCase();
   
   // 如果没有输入，显示该店铺的所有品牌
   if (!input) {
@@ -613,7 +627,15 @@ function onBrandInput() {
   if (shopBrands.length > 0) {
     uniqueBrands = shopBrands.filter(function(b) { return b.toLowerCase().indexOf(input) !== -1; });
   } else {
-    uniqueBrands = [...new Set(providersData.map(function(p) { return p.brand; }).filter(Boolean))];
+    var shopFiltered = providersData;
+    if (currentShop) {
+      shopFiltered = providersData.filter(function(p) {
+        var shop = String((p && p.shop) || '').trim().toLowerCase();
+        var shopname = String((p && p.shopname) || '').trim().toLowerCase();
+        return shop === currentShop || shopname === currentShop || shop.indexOf(currentShop) !== -1 || shopname.indexOf(currentShop) !== -1;
+      });
+    }
+    uniqueBrands = [...new Set(shopFiltered.map(function(p) { return p.brand; }).filter(Boolean))];
     uniqueBrands = uniqueBrands.filter(function(b) { return b.toLowerCase().indexOf(input) !== -1; });
   }
   
