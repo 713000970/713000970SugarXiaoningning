@@ -1477,22 +1477,21 @@ function saveBrand(nameInput) {
     showToast('请输入品牌名称');
     return;
   }
-  
-  const brands = getData(STORAGE_KEYS.BRANDS);
-  
-  if (brands.some(b => (b.name || b) === name)) {
-    showToast('该品牌已存在');
-    return;
-  }
-  
-  brands.push({ id: Date.now().toString(), name });
-  setData(STORAGE_KEYS.BRANDS, brands);
 
   var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
   if (!shopName || !providerName) {
     showToast('新增品牌前请先填写店铺名称和提供者');
     return;
+  }
+
+  const brands = getData(STORAGE_KEYS.BRANDS);
+  var brandExists = brands.some(function(b) {
+    return (b.name || b) === name;
+  });
+  if (!brandExists) {
+    brands.push({ id: Date.now().toString(), name });
+    setData(STORAGE_KEYS.BRANDS, brands);
   }
 
   // 自动建立品牌与店铺/提供者的关联，确保可被搜索链路命中
@@ -1528,7 +1527,11 @@ function saveBrand(nameInput) {
   if (modalBrand) closeModal('modal-brand');
   loadBrands();
   updateStats();
-  showToast('品牌添加成功');
+  if (hasLinkedRecord) {
+    showToast(brandExists ? '品牌已存在并已关联到当前店铺/提供者' : '品牌添加成功');
+  } else {
+    showToast(brandExists ? '品牌已存在，已新增当前店铺/提供者关联' : '品牌添加成功');
+  }
 }
 
 function saveSeries() {
