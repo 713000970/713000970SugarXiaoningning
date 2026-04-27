@@ -1892,57 +1892,32 @@ function aiQuery() {
     .map(function(item) { return item.data; });
   
   if (matchedProviders.length > 0) {
-    // 按提供者 -> 品牌 -> 系列分组显示，避免同品牌多系列混淆
-    var providerGroups = {};
-    matchedProviders.forEach(function(p) {
-      if (!providerGroups[p.name]) {
-        providerGroups[p.name] = { brand: {} };
-      }
-      if (p.brand && !providerGroups[p.name].brand[p.brand]) {
-        providerGroups[p.name].brand[p.brand] = {};
-      }
-      var brandKey = p.brand || '未设置品牌';
-      var seriesKey = (p.series || '').trim() || '未设置系列';
-      if (!providerGroups[p.name].brand[brandKey]) {
-        providerGroups[p.name].brand[brandKey] = {};
-      }
-      if (!providerGroups[p.name].brand[brandKey][seriesKey]) {
-        providerGroups[p.name].brand[brandKey][seriesKey] = [];
-      }
-      providerGroups[p.name].brand[brandKey][seriesKey].push(p);
-    });
-    
-    var html = '';
-    for (var providerName in providerGroups) {
-      var group = providerGroups[providerName];
-      html += '<div class="ai-result-card">' +
+    // 一条规则一张卡片，提升可读性（避免同卡片内信息过密）
+    var html = matchedProviders.map(function(rule) {
+      var providerName = rule.name || '未命名提供者';
+      var brandName = rule.brand || '未设置品牌';
+      var seriesName = (rule.series || '').trim() || '未设置系列';
+      var shopName = rule.shop || rule.shopname || '未设置店铺';
+      return '<div class="ai-result-card">' +
         '<div class="ai-result-header">' +
-          '<span class="ai-result-icon">🏢</span>' +
-          '<span class="ai-result-title">' + providerName + '</span>' +
+          '<span class="ai-result-icon">📌</span>' +
+          '<span class="ai-result-title">' + providerName + ' · ' + brandName + ' · ' + seriesName + '</span>' +
         '</div>' +
-        '<div class="ai-result-body">';
-      
-      for (var brandName in group.brand) {
-        var seriesGroup = group.brand[brandName];
-        for (var seriesName in seriesGroup) {
-          var seriesList = seriesGroup[seriesName];
-          seriesList.forEach(function(rule) {
-            html += '<div class="ai-result-section">' +
-              '<h5>📦 ' + brandName + '</h5>' +
-              '<p><strong>系列：</strong>' + (seriesName || '未设置系列') + '</p>' +
-              '<p><strong>店铺：</strong>' + (rule.shop || rule.shopname || '无') + '</p>' +
-              '<p><strong>拆分：</strong>' + (rule.split || '无') + '</p>' +
-              '<p><strong>定价：</strong>' + (rule.pricing || '无') + '</p>' +
-              '<p><strong>发布时间：</strong>' + (rule.publishTime || '无') + '</p>' +
-              '<p><strong>特例：</strong>' + (rule.specialCase || '无') + '</p>' +
-              '<p><strong>其他信息：</strong>' + (rule.otherInfo || '无') + '</p>' +
-            '</div>';
-          });
-        }
-      }
-      
-      html += '</div></div></div>';
-    }
+        '<div class="ai-result-body">' +
+          '<div class="ai-result-section">' +
+            '<p><strong>店铺：</strong>' + shopName + '</p>' +
+            '<p><strong>提供者：</strong>' + providerName + '</p>' +
+            '<p><strong>品牌：</strong>' + brandName + '</p>' +
+            '<p><strong>系列：</strong>' + seriesName + '</p>' +
+            '<p><strong>拆分：</strong>' + (rule.split || '无') + '</p>' +
+            '<p><strong>定价：</strong>' + (rule.pricing || '无') + '</p>' +
+            '<p><strong>发布时间：</strong>' + (rule.publishTime || '无') + '</p>' +
+            '<p><strong>特例：</strong>' + (rule.specialCase || '无') + '</p>' +
+            '<p><strong>其他信息：</strong>' + (rule.otherInfo || '无') + '</p>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
     
     resultBox.innerHTML = html;
     return;
