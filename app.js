@@ -1402,6 +1402,12 @@ function openAddProvider() {
   openModal('modal-provider');
 }
 
+function openAddShop() {
+  openAddProvider();
+  var titleEl = document.getElementById('modal-provider-title');
+  if (titleEl) titleEl.textContent = '新增店铺名称';
+}
+
 function openAddBrand() {
   var name = window.prompt('请输入品牌名称');
   if (name == null) return;
@@ -1481,6 +1487,35 @@ function saveBrand(nameInput) {
   
   brands.push({ id: Date.now().toString(), name });
   setData(STORAGE_KEYS.BRANDS, brands);
+
+  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
+  if (!shopName || !providerName) {
+    showToast('新增品牌前请先填写店铺名称和提供者');
+    return;
+  }
+
+  // 自动建立品牌与店铺/提供者的关联，确保可被搜索链路命中
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var hasLinkedRecord = providers.some(function(p) {
+    return (p.shop || '') === shopName &&
+      (p.name || '') === providerName &&
+      (p.brand || '') === name;
+  });
+  if (!hasLinkedRecord) {
+    providers.push({
+      shop: shopName,
+      name: providerName,
+      brand: name,
+      series: '',
+      split: '',
+      pricing: '',
+      publishTime: '',
+      specialCase: '',
+      otherInfo: ''
+    });
+    setData(STORAGE_KEYS.PROVIDERS, providers);
+  }
   
   var modalBrand = document.getElementById('modal-brand');
   if (modalBrand) closeModal('modal-brand');
