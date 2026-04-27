@@ -1892,17 +1892,24 @@ function aiQuery() {
     .map(function(item) { return item.data; });
   
   if (matchedProviders.length > 0) {
-    // 按提供者分组显示
+    // 按提供者 -> 品牌 -> 系列分组显示，避免同品牌多系列混淆
     var providerGroups = {};
     matchedProviders.forEach(function(p) {
       if (!providerGroups[p.name]) {
-        providerGroups[p.name] = { brand: {}, series: [] };
+        providerGroups[p.name] = { brand: {} };
       }
       if (p.brand && !providerGroups[p.name].brand[p.brand]) {
-        providerGroups[p.name].brand[p.brand] = [];
+        providerGroups[p.name].brand[p.brand] = {};
       }
-      // 无论 series 是否存在，都添加规则
-      providerGroups[p.name].brand[p.brand].push(p);
+      var brandKey = p.brand || '未设置品牌';
+      var seriesKey = (p.series || '').trim() || '未设置系列';
+      if (!providerGroups[p.name].brand[brandKey]) {
+        providerGroups[p.name].brand[brandKey] = {};
+      }
+      if (!providerGroups[p.name].brand[brandKey][seriesKey]) {
+        providerGroups[p.name].brand[brandKey][seriesKey] = [];
+      }
+      providerGroups[p.name].brand[brandKey][seriesKey].push(p);
     });
     
     var html = '';
@@ -1916,18 +1923,22 @@ function aiQuery() {
         '<div class="ai-result-body">';
       
       for (var brandName in group.brand) {
-        var seriesList = group.brand[brandName];
-        // 按每个系列显示规则
-        seriesList.forEach(function(rule) {
-          html += '<div class="ai-result-section">' +
-            '<h5>📦 ' + brandName + '</h5>' +
-            '<p><strong>拆分：</strong>' + (rule.split || '无') + '</p>' +
-            '<p><strong>定价：</strong>' + (rule.pricing || '无') + '</p>' +
-            '<p><strong>发布时间：</strong>' + (rule.publishTime || '无') + '</p>' +
-            '<p><strong>特例：</strong>' + (rule.specialCase || '无') + '</p>' +
-            '<p><strong>其他信息：</strong>' + (rule.otherInfo || '无') + '</p>' +
-          '</div>';
-        });
+        var seriesGroup = group.brand[brandName];
+        for (var seriesName in seriesGroup) {
+          var seriesList = seriesGroup[seriesName];
+          seriesList.forEach(function(rule) {
+            html += '<div class="ai-result-section">' +
+              '<h5>📦 ' + brandName + '</h5>' +
+              '<p><strong>系列：</strong>' + (seriesName || '未设置系列') + '</p>' +
+              '<p><strong>店铺：</strong>' + (rule.shop || rule.shopname || '无') + '</p>' +
+              '<p><strong>拆分：</strong>' + (rule.split || '无') + '</p>' +
+              '<p><strong>定价：</strong>' + (rule.pricing || '无') + '</p>' +
+              '<p><strong>发布时间：</strong>' + (rule.publishTime || '无') + '</p>' +
+              '<p><strong>特例：</strong>' + (rule.specialCase || '无') + '</p>' +
+              '<p><strong>其他信息：</strong>' + (rule.otherInfo || '无') + '</p>' +
+            '</div>';
+          });
+        }
       }
       
       html += '</div></div></div>';
