@@ -804,7 +804,8 @@ function showRulesByShop(shopName) {
 
 // 提供者输入搜索
 function onProviderSearchInput() {
-  var input = document.getElementById('provider-search-input').value.trim().toLowerCase();
+  var rawInput = document.getElementById('provider-search-input').value.trim();
+  var input = normalizeText(rawInput);
   var dropdown = document.getElementById('provider-dropdown');
   
   if (!input) {
@@ -812,10 +813,14 @@ function onProviderSearchInput() {
     return;
   }
   
-  var providers = localStorage.getItem(STORAGE_KEYS.PROVIDERS);
-  var providersData = providers ? JSON.parse(providers) : presetData.providers;
-  var uniqueProviders = [...new Set(providersData.map(function(p) { return p.name; }).filter(Boolean))];
-  var matched = uniqueProviders.filter(function(p) { return p.toLowerCase().indexOf(input) !== -1; });
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
+  var presetProviders = (typeof presetData !== 'undefined' && presetData && Array.isArray(presetData.providers)) ? presetData.providers : [];
+  var providersData = localProviders.length > 0 ? localProviders : presetProviders;
+  var uniqueProviders = [...new Set(providersData.map(function(p) { return (p && p.name) ? String(p.name).trim() : ''; }).filter(Boolean))];
+  var matched = uniqueProviders.filter(function(p) {
+    var normalizedName = normalizeText(p);
+    return normalizedName.indexOf(input) !== -1 || input.indexOf(normalizedName) !== -1;
+  });
   
   if (matched.length === 0) {
     dropdown.style.display = 'none';
@@ -832,9 +837,14 @@ function searchProviderByInput() {
   var input = document.getElementById('provider-search-input').value.trim();
   if (!input) return;
   
-  var providers = localStorage.getItem(STORAGE_KEYS.PROVIDERS);
-  var providersData = providers ? JSON.parse(providers) : presetData.providers;
-  var matched = providersData.filter(function(p) { return p.name && p.name.indexOf(input) !== -1; });
+  var normalizedInput = normalizeText(input);
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
+  var presetProviders = (typeof presetData !== 'undefined' && presetData && Array.isArray(presetData.providers)) ? presetData.providers : [];
+  var providersData = localProviders.length > 0 ? localProviders : presetProviders;
+  var matched = providersData.filter(function(p) {
+    var name = normalizeText(p && p.name);
+    return name && (name.indexOf(normalizedInput) !== -1 || normalizedInput.indexOf(name) !== -1);
+  });
   
   // 如果存在匹配提供者，调用选择逻辑
   if (matched.length > 0) {
@@ -863,13 +873,18 @@ function selectProvider(providerName) {
   if (input) input.value = providerName;
   currentProvider = providerName;
   
-  var providers = localStorage.getItem(STORAGE_KEYS.PROVIDERS);
-  var providersData = providers ? JSON.parse(providers) : presetData.providers;
-  var matched = providersData.filter(function(p) { return p.name === providerName; });
+  var normalizedProvider = normalizeText(providerName);
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
+  var presetProviders = (typeof presetData !== 'undefined' && presetData && Array.isArray(presetData.providers)) ? presetData.providers : [];
+  var providersData = localProviders.length > 0 ? localProviders : presetProviders;
+  var matched = providersData.filter(function(p) {
+    return normalizeText(p && p.name) === normalizedProvider;
+  });
   
   if (matched.length === 0) {
     matched = providersData.filter(function(p) { 
-      return p.name && p.name.indexOf(providerName) !== -1; 
+      var name = normalizeText(p && p.name);
+      return name && (name.indexOf(normalizedProvider) !== -1 || normalizedProvider.indexOf(name) !== -1); 
     });
   }
   
