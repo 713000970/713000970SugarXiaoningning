@@ -19,9 +19,10 @@
       </div>
       <div class="topbar-meta">
         <span class="version-badge">V1.0</span>
-        <span class="status-indicator">
-          <span class="status-dot"></span>
-          <span class="status-text">实时更新</span>
+        <button id="manual-sync-btn" class="sync-btn" type="button">立即同步</button>
+        <span class="status-indicator" id="sync-status-indicator">
+          <span class="status-dot" id="sync-status-dot"></span>
+          <span class="status-text" id="sync-status-text">等待同步</span>
         </span>
       </div>
     </div>
@@ -86,7 +87,7 @@
             <span class="card-tag">查询</span>
           </div>
           <h3 class="card-title">提供者查询</h3>
-          <p class="card-desc">三级联动筛选：提供者 → 品牌 → 系列，精准��配个性化规则</p>
+          <p class="card-desc">三级联动筛选：提供者 → 品牌 → 系列，精准匹配个性化规则</p>
           <ul class="card-features">
             <li>提供者管理</li>
             <li>品牌词筛选</li>
@@ -470,6 +471,9 @@ function goHome() {
       if (typeof cloudSync === 'function') {
         console.log('🚀 调用 cloudSync...');
         await cloudSync();
+        if (typeof startCloudAutoSync === 'function') {
+          startCloudAutoSync();
+        }
       } else {
         console.log('🚀 cloudSync 未定义');
       }

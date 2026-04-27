@@ -91,6 +91,7 @@ function getData(key) {
 
 function setData(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
+  window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'local' } }));
   
   // 如果是 providers 数据，自动同步到云端
   if (key === STORAGE_KEYS.PROVIDERS && typeof syncToCloud === 'function') {
@@ -170,6 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initData();
   if (typeof initCollapsibles === 'function') initCollapsibles();
   loadProviderSelect();
+  loadProviders();
+  loadBrands();
+  updateStats();
   
   var brandSelect = document.getElementById('brand-select');
   if (brandSelect) {
@@ -205,6 +209,94 @@ document.addEventListener('DOMContentLoaded', () => {
       brandDropdown.style.display = 'none';
     }
   });
+
+  // 多标签/多人场景：本地变化和云端拉取后都刷新当前页面
+  window.addEventListener('storage', function(evt) {
+    if (!evt || evt.key !== STORAGE_KEYS.PROVIDERS) return;
+    refreshProviderViews();
+  });
+  window.addEventListener('providers-data-updated', function() {
+    refreshProviderViews();
+  });
+
+  window.addEventListener('cloud-sync-status', function(evt) {
+    var detail = evt ? evt.detail : null;
+    updateSyncStatusBadge(detail && detail.status, detail && detail.message);
+  });
+  var manualSyncBtn = document.getElementById('manual-sync-btn');
+  if (manualSyncBtn) {
+    manualSyncBtn.addEventListener('click', function() {
+      triggerManualSync();
+    });
+  }
+  updateSyncStatusBadge('idle', '等待同步');
+});
+
+function refreshProviderViews() {
+  loadProviderSelect();
+  loadProviders();
+  loadBrands();
+  updateStats();
+  if (currentEditingBrand) {
+    showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
+  }
+}
+
+function updateSyncStatusBadge(status, message) {
+  var dot = document.getElementById('sync-status-dot');
+  var text = document.getElementById('sync-status-text');
+  var btn = document.getElementById('manual-sync-btn');
+  if (!dot || !text) return;
+
+  var nextStatus = status || 'idle';
+  dot.classList.remove('sync-idle', 'syncing', 'sync-success', 'sync-error');
+
+  if (nextStatus === 'syncing') {
+    dot.classList.add('syncing');
+    text.textContent = message || '同步中...';
+    if (btn) btn.disabled = true;
+    return;
+  }
+  if (nextStatus === 'success') {
+    dot.classList.add('sync-success');
+    text.textContent = message || '已同步';
+    if (btn) btn.disabled = false;
+    return;
+  }
+  if (nextStatus === 'error') {
+    dot.classList.add('sync-error');
+    text.textContent = message || '同步失败';
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  dot.classList.add('sync-idle');
+  text.textContent = message || '等待同步';
+  if (btn) btn.disabled = false;
+}
+
+function triggerManualSync() {
+  if (typeof cloudSync !== 'function') {
+    showToast('同步功能不可用');
+    return;
+  }
+  cloudSync();
+  showToast('已开始手动同步');
+}
+
+window.addEventListener('cloud-sync-status', function(evt) {
+  var detail = evt ? evt.detail : null;
+  var indicator = document.getElementById('sync-status-indicator');
+  if (!indicator) return;
+  if (detail && detail.lastSuccessAt) {
+    var time = new Date(detail.lastSuccessAt);
+    var hh = String(time.getHours()).padStart(2, '0');
+    var mm = String(time.getMinutes()).padStart(2, '0');
+    var ss = String(time.getSeconds()).padStart(2, '0');
+    indicator.title = '最近同步时间：' + hh + ':' + mm + ':' + ss;
+  } else {
+    indicator.title = '最近同步时间：暂无';
+  }
 });
 
 // ========================================
@@ -945,34 +1037,47 @@ function editRuleByIndex(globalIndex) {
   html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><input type="text" class="rule-input" id="edit-publishTime" value="' + (rule.publishTime || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">特例：</span><input type="text" class="rule-input" id="edit-specialCase" value="' + (rule.specialCase || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><input type="text" class="rule-input" id="edit-otherInfo" value="' + (rule.otherInfo || '') + '"></div>';
-  html += '    <div class="rule-row"><button class="rule-save-btn" onclick="saveRuleByIndex(' + globalIndex + ')">💾 保存</button></div>';
+  html += '    <div class="rule-row"><button class="rule-save-btn" id="save-rule-btn" data-index="' + globalIndex + '">💾 保存</button></div>';
   html += '  </div>';
   html += '</div>';
   
   display.innerHTML = html;
+  
+  document.getElementById('save-rule-btn').addEventListener('click', function() {
+    saveRuleByIndex(globalIndex);
+  });
 }
 
 function saveRuleByIndex(globalIndex) {
-  console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
-  var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
-  var newPricing = document.getElementById('edit-pricing') ? document.getElementById('edit-pricing').value.trim() : '';
-  var newPublishTime = document.getElementById('edit-publishTime') ? document.getElementById('edit-publishTime').value.trim() : '';
-  var newSpecialCase = document.getElementById('edit-specialCase') ? document.getElementById('edit-specialCase').value.trim() : '';
-  var newOtherInfo = document.getElementById('edit-otherInfo') ? document.getElementById('edit-otherInfo').value.trim() : '';
-  
-  var providers = localStorage.getItem('rule_library_providers');
-  var providersData = providers ? JSON.parse(providers) : [];
-  
-  providersData[globalIndex].split = newSplit;
-  providersData[globalIndex].pricing = newPricing;
-  providersData[globalIndex].publishTime = newPublishTime;
-  providersData[globalIndex].specialCase = newSpecialCase;
-  providersData[globalIndex].otherInfo = newOtherInfo;
-  
-  console.log('💾 保存的数据:', providersData[globalIndex]);
-  setData(STORAGE_KEYS.PROVIDERS, providersData);
-  showToast('保存成功');
-  showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
+  try {
+    console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
+    var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
+    var newPricing = document.getElementById('edit-pricing') ? document.getElementById('edit-pricing').value.trim() : '';
+    var newPublishTime = document.getElementById('edit-publishTime') ? document.getElementById('edit-publishTime').value.trim() : '';
+    var newSpecialCase = document.getElementById('edit-specialCase') ? document.getElementById('edit-specialCase').value.trim() : '';
+    var newOtherInfo = document.getElementById('edit-otherInfo') ? document.getElementById('edit-otherInfo').value.trim() : '';
+    
+    var providers = localStorage.getItem('rule_library_providers');
+    var providersData = providers ? JSON.parse(providers) : [];
+    if (!providersData[globalIndex]) {
+      showToast('未找到该规则');
+      return;
+    }
+    
+    providersData[globalIndex].split = newSplit;
+    providersData[globalIndex].pricing = newPricing;
+    providersData[globalIndex].publishTime = newPublishTime;
+    providersData[globalIndex].specialCase = newSpecialCase;
+    providersData[globalIndex].otherInfo = newOtherInfo;
+    
+    console.log('💾 保存的数据:', providersData[globalIndex]);
+    setData(STORAGE_KEYS.PROVIDERS, providersData);
+    showToast('保存成功');
+    showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
+  } catch (err) {
+    console.error('saveRuleByIndex 失败:', err);
+    showToast('保存失败，请重试');
+  }
 }
 
 function deleteRuleByIndex(globalIndex) {
@@ -980,12 +1085,13 @@ function deleteRuleByIndex(globalIndex) {
   
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : [];
-  var deleted = providersData[globalIndex];
-  var brand = deleted ? deleted.brand : '';
-  var shop = deleted ? deleted.shop : '';
+  if (!providersData[globalIndex]) {
+    showToast('未找到该规则');
+    return;
+  }
   
   providersData.splice(globalIndex, 1);
-  localStorage.setItem('rule_library_providers', JSON.stringify(providersData));
+  setData(STORAGE_KEYS.PROVIDERS, providersData);
   showToast('删除成功');
   showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
 }
@@ -1487,11 +1593,27 @@ function aiQuery() {
   var localProviders = getData(STORAGE_KEYS.PROVIDERS);
   
   // 只搜索本地数据（用户保存的规则），不使用 presetData
-  var matchedProviders = localProviders.filter(function(p) {
-    return (p.name && p.name.includes(query)) ||
-           (p.brand && p.brand.includes(query)) ||
-           (p.series && p.series.includes(query));
-  });
+  var matchedProviders = localProviders
+    .map(function(p) {
+      var providerText = [
+        p.name || '',
+        p.brand || '',
+        p.series || '',
+        p.shop || '',
+        p.split || '',
+        p.pricing || '',
+        p.publishTime || '',
+        p.specialCase || '',
+        p.otherInfo || ''
+      ].join(' ');
+      return {
+        data: p,
+        score: getFuzzyScore(query, providerText)
+      };
+    })
+    .filter(function(item) { return item.score > 0; })
+    .sort(function(a, b) { return b.score - a.score; })
+    .map(function(item) { return item.data; });
   
   if (matchedProviders.length > 0) {
     // 按提供者分组显示
@@ -1541,9 +1663,24 @@ function aiQuery() {
   
   // 如果没有匹配到提供者/品牌/系列，搜索通用规则
   const rules = getAIRules();
-  const matched = rules.filter(r => 
-    queryLower.includes(r.keyword) || r.keyword.includes(queryLower)
-  );
+  const matched = rules
+    .map(function(rule) {
+      var sectionText = (rule.sections || []).map(function(s) {
+        return (s.title || '') + ' ' + stripHtmlTags(s.content || '');
+      }).join(' ');
+      var searchableText = [
+        rule.keyword || '',
+        rule.title || '',
+        sectionText
+      ].join(' ');
+      return {
+        rule: rule,
+        score: getFuzzyScore(query, searchableText)
+      };
+    })
+    .filter(function(item) { return item.score > 0; })
+    .sort(function(a, b) { return b.score - a.score; })
+    .map(function(item) { return item.rule; });
   
   if (matched.length === 0) {
     resultBox.innerHTML = `
@@ -1576,6 +1713,58 @@ function aiQuery() {
       </div>
     </div>
   `).join('');
+}
+
+function stripHtmlTags(html) {
+  return String(html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeForSearch(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .trim();
+}
+
+function getFuzzyScore(query, text) {
+  var q = normalizeForSearch(query);
+  var t = normalizeForSearch(text);
+  if (!q || !t) return 0;
+
+  // 完全包含优先级最高
+  if (t.indexOf(q) !== -1) return 100 + q.length;
+  if (q.indexOf(t) !== -1) return 80 + t.length;
+
+  // 子序列匹配（允许中间有间隔字符）
+  var qi = 0;
+  var firstHit = -1;
+  var lastHit = -1;
+  for (var i = 0; i < t.length && qi < q.length; i++) {
+    if (t.charAt(i) === q.charAt(qi)) {
+      if (firstHit === -1) firstHit = i;
+      lastHit = i;
+      qi++;
+    }
+  }
+  if (qi === q.length) {
+    var span = Math.max(1, lastHit - firstHit + 1);
+    var compactBonus = Math.max(0, 30 - (span - q.length));
+    return 50 + q.length + compactBonus;
+  }
+
+  // 连续字符片段匹配
+  var maxChunk = 0;
+  for (var start = 0; start < q.length; start++) {
+    for (var end = start + 2; end <= q.length; end++) {
+      var chunk = q.slice(start, end);
+      if (t.indexOf(chunk) !== -1 && chunk.length > maxChunk) {
+        maxChunk = chunk.length;
+      }
+    }
+  }
+  if (maxChunk >= 2) return 20 + maxChunk;
+
+  return 0;
 }
 
 function getAIRules() {

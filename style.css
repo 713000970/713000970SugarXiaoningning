@@ -120,6 +120,29 @@ body::before {
   gap: 16px;
 }
 
+.sync-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.sync-btn:hover {
+  background: var(--primary-cyan);
+  border-color: var(--primary-cyan);
+  color: #fff;
+}
+
+.sync-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .version-badge {
   background: linear-gradient(135deg, var(--primary-green), var(--primary-teal));
   color: white;
@@ -143,6 +166,26 @@ body::before {
   border-radius: 50%;
   animation: pulse 2s infinite;
   box-shadow: 0 0 8px rgba(5, 150, 105, 0.5);
+}
+.status-dot.sync-idle {
+  background: var(--text-muted);
+  box-shadow: 0 0 8px rgba(122, 155, 141, 0.5);
+  animation: none;
+}
+.status-dot.syncing {
+  background: var(--primary-cyan);
+  box-shadow: 0 0 8px rgba(0, 180, 216, 0.6);
+  animation: pulse 1s infinite;
+}
+.status-dot.sync-success {
+  background: var(--success);
+  box-shadow: 0 0 8px rgba(5, 150, 105, 0.5);
+  animation: none;
+}
+.status-dot.sync-error {
+  background: var(--danger);
+  box-shadow: 0 0 8px rgba(220, 38, 38, 0.6);
+  animation: none;
 }
 
 @keyframes pulse {
