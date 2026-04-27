@@ -15,6 +15,7 @@ const STORAGE_KEYS = {
   BRANDS: 'rule_library_brands',
   SERIES: 'rule_library_series'
 };
+const LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 
  
 
@@ -106,6 +107,8 @@ function isSameContextProvider(p, shopName, providerName) {
 
 function setData(key, data) {
   localStorage.setItem(key, JSON.stringify(data));
+  // 记录本地有变更，避免被云端旧数据短时间覆盖
+  localStorage.setItem(LOCAL_DIRTY_KEY, '1');
   window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'local' } }));
   
   // 如果是 providers 数据，自动同步到云端

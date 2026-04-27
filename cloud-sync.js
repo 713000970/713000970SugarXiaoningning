@@ -3,6 +3,7 @@ const SUPABASE_URL = 'https://wsrbjgiscfxsyucsgzof.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EenxYjB0VmulAQRr24IyDw_mj1AxX38';
 const CLOUD_SYNC_INTERVAL_MS = 10000;
 const CLOUD_RETRY_DELAY_MS = 5000;
+const LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 
 let onCloudSyncReady = null;
 let cloudSyncTimer = null;
@@ -131,6 +132,17 @@ async function cloudSync() {
   emitSyncStatus('syncing', '同步中...');
   try {
     console.log('🌥️ 开始同步云端数据...');
+    const localProviders = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+    const localSnapshot = calcSnapshot(localProviders);
+    const localDirty = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
+
+    // 本地有待同步改动时，优先把本地推云，避免拉取覆盖本地新增
+    if (localDirty && localSnapshot !== lastCloudSnapshot) {
+      console.log('🌥️ 本地有未同步改动，优先回传云端，跳过本轮下拉覆盖');
+      queuePendingSync(localProviders);
+      markSyncSuccess('本地改动待回传');
+      return;
+    }
     
     const res = await fetch(`${SUPABASE_URL}/rest/v1/providers?select=*`, {
       headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
@@ -171,20 +183,21 @@ async function cloudSync() {
       // 远程有数据，转回驼峰后更新本地
       const formatted = remoteData.map(toLocalProvider);
       const remoteSnapshot = calcSnapshot(formatted);
-      const localProviders = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
-      const localSnapshot = calcSnapshot(localProviders);
+      const localProvidersNow = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+      const localSnapshotNow = calcSnapshot(localProvidersNow);
 
       // 本地有尚未上云的新数据时，不用远程覆盖本地，改为排队回传本地
-      if (localSnapshot !== lastCloudSnapshot && localSnapshot !== remoteSnapshot) {
+      if (localSnapshotNow !== lastCloudSnapshot && localSnapshotNow !== remoteSnapshot) {
         console.log('🌥️ 检测到本地未同步的新数据，保留本地并排队回传云端');
-        queuePendingSync(localProviders);
+        queuePendingSync(localProvidersNow);
         markSyncSuccess('检测到本地新数据，已排队回传');
         return;
       }
 
       localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
+      localStorage.setItem(LOCAL_DIRTY_KEY, '0');
       lastCloudSnapshot = remoteSnapshot;
-      if (remoteSnapshot !== localSnapshot) {
+      if (remoteSnapshot !== localSnapshotNow) {
         notifyProvidersUpdated('cloud-pull');
       }
       markSyncSuccess('已同步');
@@ -221,6 +234,7 @@ async function syncToCloud(data) {
     const formatted = (data || []).map(toCloudProvider);
     const nextSnapshot = JSON.stringify(formatted);
     if (nextSnapshot === lastCloudSnapshot) {
+      localStorage.setItem(LOCAL_DIRTY_KEY, '0');
       markSyncSuccess('已同步');
       return;
     }
@@ -241,6 +255,7 @@ async function syncToCloud(data) {
     
     if (formatted.length === 0) {
       lastCloudSnapshot = nextSnapshot;
+      localStorage.setItem(LOCAL_DIRTY_KEY, '0');
       markSyncSuccess('已同步');
       console.log('🌥️ 已同步到云端');
       return;
@@ -264,6 +279,7 @@ async function syncToCloud(data) {
     }
 
     lastCloudSnapshot = nextSnapshot;
+    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
     markSyncSuccess('已同步');
     console.log('🌥️ 已同步到云端');
   } catch(e) {

@@ -463,7 +463,7 @@ function goHome() {
 }
   </script>
   <script src="db.js"></script>
-<script src="cloud-sync.js?v=20260427-5"></script>
+<script src="cloud-sync.js?v=20260427-6"></script>
   <script>
     // 云同步加载 + 初始化
     (async function() {
@@ -502,7 +502,8 @@ function goHome() {
         var displayProviders = existingData ? JSON.parse(existingData) : providers;
         
         document.getElementById('stat-providers').textContent = displayProviders.length;
-        document.getElementById('stat-brands').textContent = brands.length;
+        var localBrands = JSON.parse(localStorage.getItem('rule_library_brands') || '[]');
+        document.getElementById('stat-brands').textContent = localBrands.length;
         
         var shops = [...new Set(displayProviders.map(function(p) { return p.shop; }).filter(Boolean))];
         document.getElementById('stat-shops').textContent = shops.length;
@@ -511,6 +512,6 @@ function goHome() {
       }
     })();
   </script>
-  <script src="app.js?v=20260427-5"></script>
+  <script src="app.js?v=20260427-6"></script>
 </body>
 </html>
