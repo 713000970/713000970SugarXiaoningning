@@ -1516,6 +1516,13 @@ function saveBrand(nameInput) {
     });
     setData(STORAGE_KEYS.PROVIDERS, providers);
   }
+
+  // 新增后立即刷新当前店铺品牌缓存，避免搜索仍使用旧列表
+  loadBrandsByShopAndShowDropdown(shopName);
+  var brandInputEl = document.getElementById('brand-input');
+  if (brandInputEl) {
+    brandInputEl.value = name;
+  }
   
   var modalBrand = document.getElementById('modal-brand');
   if (modalBrand) closeModal('modal-brand');
