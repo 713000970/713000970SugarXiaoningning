@@ -765,29 +765,43 @@ function showRulesByBrandAndShop(brandName, shopName) {
     return;
   }
   
-  var html = '<div class="rule-result-list">';
-  
-  matched.slice(0, 20).forEach(function(item) {
-    var p = item.data;
-    var globalIndex = item.index;
-    var ruleName = p.brand || p.name || '未命名规则';
-    var actionButtons = '<button class="rule-edit-btn" onclick="editRuleByIndex(' + globalIndex + ')">✏️ 修改</button>' +
-                     '<button class="rule-delete-btn" onclick="deleteRuleByIndex(' + globalIndex + ')">🗑️ 删除</button>';
-    html += '<div class="rule-card">';
-    html += '  <div class="rule-card-header">';
-    html += '    <div class="rule-card-title">' + ruleName + '</div>';
-    html += '    <div class="rule-card-actions">' + actionButtons + '</div>';
-    html += '  </div>';
-    html += '  <div class="rule-card-body">';
-    html += '    <div class="rule-row"><span class="rule-label">拆分：</span><span class="rule-value">' + (p.split || '待录入') + '</span></div>';
-    html += '    <div class="rule-row"><span class="rule-label">定价：</span><span class="rule-value">' + (p.pricing || '待录入') + '</span></div>';
-    html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><span class="rule-value">' + (p.publishTime || '待录入') + '</span></div>';
-    html += '    <div class="rule-row"><span class="rule-label">特例：</span><span class="rule-value">' + (p.specialCase || '待录入') + '</span></div>';
-    html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><span class="rule-value">' + (p.otherInfo || '待录入') + '</span></div>';
-    html += '  </div>';
-    html += '</div>';
+  // 同一品牌下按系列分组展示，避免多个系列难以区分
+  var grouped = {};
+  matched.slice(0, 50).forEach(function(item) {
+    var p = item.data || {};
+    var seriesKey = (p.series || '').trim() || '未设置系列';
+    if (!grouped[seriesKey]) grouped[seriesKey] = [];
+    grouped[seriesKey].push(item);
   });
-  
+
+  var html = '<div class="rule-result-list">';
+  Object.keys(grouped).sort().forEach(function(seriesName) {
+    var seriesItems = grouped[seriesName];
+    html += '<div class="rule-group-header" style="margin:10px 0 8px;color:#0f766e;font-weight:600;">📚 系列：' + seriesName + '（' + seriesItems.length + '）</div>';
+
+    seriesItems.forEach(function(item) {
+      var p = item.data;
+      var globalIndex = item.index;
+      var ruleName = (p.brand || p.name || '未命名规则') + ' · ' + ((p.series || '').trim() || '未设置系列');
+      var actionButtons = '<button class="rule-edit-btn" onclick="editRuleByIndex(' + globalIndex + ')">✏️ 修改</button>' +
+                       '<button class="rule-delete-btn" onclick="deleteRuleByIndex(' + globalIndex + ')">🗑️ 删除</button>';
+      html += '<div class="rule-card">';
+      html += '  <div class="rule-card-header">';
+      html += '    <div class="rule-card-title">' + ruleName + '</div>';
+      html += '    <div class="rule-card-actions">' + actionButtons + '</div>';
+      html += '  </div>';
+      html += '  <div class="rule-card-body">';
+      html += '    <div class="rule-row"><span class="rule-label">系列：</span><span class="rule-value">' + ((p.series || '').trim() || '未设置系列') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">拆分：</span><span class="rule-value">' + (p.split || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">定价：</span><span class="rule-value">' + (p.pricing || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><span class="rule-value">' + (p.publishTime || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">特例：</span><span class="rule-value">' + (p.specialCase || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><span class="rule-value">' + (p.otherInfo || '待录入') + '</span></div>';
+      html += '  </div>';
+      html += '</div>';
+    });
+  });
+
   html += '</div>';
   display.innerHTML = html;
   display.style.display = 'block';
