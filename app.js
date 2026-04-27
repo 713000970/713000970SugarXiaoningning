@@ -1541,6 +1541,7 @@ function saveProvider() {
   const shop = document.getElementById('new-provider-shop')?.value.trim();
   const name = document.getElementById('new-provider-name')?.value.trim();
   const brandName = document.getElementById('new-provider-brand')?.value.trim();
+  const seriesName = document.getElementById('new-provider-series')?.value.trim();
   const split = document.getElementById('new-provider-split')?.value.trim();
   const pricing = document.getElementById('new-provider-pricing')?.value.trim();
   const publishTime = document.getElementById('new-provider-publishtime')?.value.trim();
@@ -1557,6 +1558,7 @@ function saveProvider() {
     shop: shop || '',
     name,
     brand: brandName || '',
+    series: seriesName || '',
     split: split || '',
     pricing: pricing || '',
     publishTime: publishTime || '',
@@ -1729,20 +1731,12 @@ function editProvider(index) {
   document.getElementById('new-provider-shop').value = provider.shop || '';
   document.getElementById('new-provider-shopname').value = provider.shopname || '';
   document.getElementById('new-provider-name').value = provider.name || '';
+  document.getElementById('new-provider-brand').value = provider.brand || '';
+  document.getElementById('new-provider-series').value = provider.series || '';
   document.getElementById('new-provider-split').value = provider.split || '';
   document.getElementById('new-provider-pricing').value = provider.pricing || '';
   document.getElementById('new-provider-publishtime').value = provider.publishTime || '';
   document.getElementById('new-provider-special').value = provider.specialCase || '';
-  
-  loadBrands();
-  
-  setTimeout(() => {
-    document.getElementById('new-provider-brand').value = provider.brandId || '';
-    loadSeries(provider.brandId, document.getElementById('new-provider-series'));
-    setTimeout(() => {
-      document.getElementById('new-provider-series').value = provider.seriesId || '';
-    }, 50);
-  }, 50);
   
   openModal('modal-provider');
   
@@ -1754,8 +1748,8 @@ function updateProvider() {
   const shop = document.getElementById('new-provider-shop')?.value.trim();
   const shopname = document.getElementById('new-provider-shopname')?.value.trim();
   const name = document.getElementById('new-provider-name')?.value.trim();
-  const brandId = document.getElementById('new-provider-brand')?.value;
-  const seriesId = document.getElementById('new-provider-series')?.value;
+  const brandName = document.getElementById('new-provider-brand')?.value.trim();
+  const seriesName = document.getElementById('new-provider-series')?.value.trim();
   const split = document.getElementById('new-provider-split')?.value.trim();
   const pricing = document.getElementById('new-provider-pricing')?.value.trim();
   const publishTime = document.getElementById('new-provider-publishtime')?.value.trim();
@@ -1766,18 +1760,13 @@ function updateProvider() {
     return;
   }
   
-  const brands = getData(STORAGE_KEYS.BRANDS);
-  const brandName = brandId ? (brands.find(b => b.id === brandId)?.name || '') : '';
-  
   const providers = getData(STORAGE_KEYS.PROVIDERS);
   providers[editingProviderIndex] = {
     shop: shop || '',
     shopname: shopname || '',
     name,
     brand: brandName,
-    brandId: brandId || null,
-    seriesId: seriesId || null,
-    series: seriesId ? (getData(STORAGE_KEYS.SERIES).find(s => s.id === seriesId)?.name || '') : '',
+    series: seriesName || '',
     split: split || '',
     pricing: pricing || '',
     publishTime: publishTime || '',

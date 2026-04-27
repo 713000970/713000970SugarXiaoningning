@@ -377,7 +377,10 @@
           <label>品牌</label>
           <input type="text" id="new-provider-brand" class="form-input">
         </div>
-        <input type="hidden" id="new-provider-series">
+        <div class="form-group">
+          <label>系列</label>
+          <input type="text" id="new-provider-series" class="form-input" placeholder="例如：中考冲刺卷">
+        </div>
         <div class="form-group">
           <label>拆分规则</label>
           <input type="text" id="new-provider-split" class="form-input">
@@ -462,7 +465,7 @@ function goHome() {
 }
   </script>
   <script src="db.js"></script>
-<script src="cloud-sync.js?v=20260427-10"></script>
+<script src="cloud-sync.js?v=20260427-11"></script>
   <script>
     // 云同步加载 + 初始化
     (async function() {
@@ -511,6 +514,6 @@ function goHome() {
       }
     })();
   </script>
-  <script src="app.js?v=20260427-10"></script>
+  <script src="app.js?v=20260427-11"></script>
 </body>
 </html>
