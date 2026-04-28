@@ -685,6 +685,7 @@ function loadBrandsByShopAndShowDropdown(shopName) {
     // 存储该店铺的品牌到 brandInput 的 data 属性
     brandInput.setAttribute('data-shop-brands', JSON.stringify(brands));
     brandInput.setAttribute('data-current-shop', shopName);
+    brandInput.setAttribute('data-current-provider', providerName);
   }
 }
 
@@ -820,8 +821,8 @@ function showRulesByBrandAndShop(brandName, shopName) {
     }
   });
   
-  // 如果没有精确匹配，只按品牌匹配
-  if (matched.length === 0) {
+  // 仅在“未选择店铺”时才允许按品牌兜底，避免跨店铺串数据
+  if (matched.length === 0 && !targetShop) {
     providersData.forEach(function(p, i) {
       if (normalizeText(p && p.brand) === targetBrand) {
         matched.push({ data: p, index: i });
@@ -833,7 +834,12 @@ function showRulesByBrandAndShop(brandName, shopName) {
   if (!display) return;
   
   if (matched.length === 0) {
-    display.style.display = 'none';
+    if (targetBrand && targetShop) {
+      display.style.display = 'block';
+      display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">当前店铺下未找到该品牌规则，已保持店铺上下文，不会回退到其他店铺。</span></div>';
+    } else {
+      display.style.display = 'none';
+    }
     return;
   }
   
@@ -1008,14 +1014,22 @@ function selectProvider(providerName) {
   hideManualInput();
     
   if (matched.length > 0) {
-    // 获取该提供者关联的所有店铺
-    var uniqueShops = matched.map(function(p) { return p.shop; }).filter(Boolean);
+    // 获取该提供者关联的所有店铺（兼容 shop/shopname）
+    var uniqueShops = matched.map(function(p) { return (p && (p.shop || p.shopname)) || ''; }).filter(Boolean);
     uniqueShops = [...new Set(uniqueShops)];
     
-    // 自动填充第一个店铺
+    // 自动填充店铺时优先保留当前上下文，避免跳到其他店铺
     var shopInput = document.getElementById('shop-search-input');
-    if (shopInput && uniqueShops.length > 0) {
-      shopInput.value = uniqueShops[0];
+    var currentShopValue = shopInput ? String(shopInput.value || '').trim() : '';
+    var preferredShop = '';
+    if (currentShopValue) {
+      preferredShop = uniqueShops.find(function(s) { return isEntityMatched(s, currentShopValue); }) || '';
+    }
+    if (!preferredShop) {
+      preferredShop = uniqueShops[0] || '';
+    }
+    if (shopInput && preferredShop) {
+      shopInput.value = preferredShop;
     }
     
     // 存储品牌供品牌搜索使用
@@ -1027,11 +1041,12 @@ function selectProvider(providerName) {
       brandInput.setAttribute('data-provider-brands', JSON.stringify(uniqueBrands));
       brandInput.placeholder = '输入品牌词搜索...';
       brandInput.removeAttribute('data-shop-brands');
+      brandInput.setAttribute('data-current-provider', providerName);
     }
     
     // 如果有店铺，自动显示该店铺的品牌
-    if (uniqueShops.length > 0) {
-      loadBrandsByShopAndShowDropdown(uniqueShops[0]);
+    if (preferredShop) {
+      loadBrandsByShopAndShowDropdown(preferredShop);
     }
     
     loadProviders();
