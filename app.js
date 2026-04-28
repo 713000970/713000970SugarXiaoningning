@@ -1282,7 +1282,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   html += '    <div class="rule-row"><span class="rule-label">店铺：</span><span class="rule-value">' + (rule.shop || '未设置店铺') + '</span></div>';
   html += '    <div class="rule-row"><span class="rule-label">提供者：</span><span class="rule-value">' + (rule.name || '未设置提供者') + '</span></div>';
   html += '    <div class="rule-row"><span class="rule-label">品牌：</span><span class="rule-value">' + (rule.brand || '未设置品牌') + '</span></div>';
-  html += '    <div class="rule-row"><span class="rule-label">系列：</span><span class="rule-value">' + ((rule.series || '').trim() || '未设置系列') + '</span></div>';
+  html += '    <div class="rule-row"><span class="rule-label">系列：</span><input type="text" class="rule-input" id="edit-series" value="' + ((rule.series || '').trim()) + '" placeholder="可选，留空表示未设置系列"></div>';
   html += '    <div class="rule-row"><span class="rule-label">拆分：</span><input type="text" class="rule-input" id="edit-split" value="' + (rule.split || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">定价：</span><input type="text" class="rule-input" id="edit-pricing" value="' + (rule.pricing || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><input type="text" class="rule-input" id="edit-publishTime" value="' + (rule.publishTime || '') + '"></div>';
@@ -1302,6 +1302,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
 function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, targetSeries) {
   try {
     console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
+    var newSeries = document.getElementById('edit-series') ? document.getElementById('edit-series').value.trim() : '';
     var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
     var newPricing = document.getElementById('edit-pricing') ? document.getElementById('edit-pricing').value.trim() : '';
     var newPublishTime = document.getElementById('edit-publishTime') ? document.getElementById('edit-publishTime').value.trim() : '';
@@ -1340,6 +1341,7 @@ function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, t
     providersData[resolvedIndex].publishTime = newPublishTime;
     providersData[resolvedIndex].specialCase = newSpecialCase;
     providersData[resolvedIndex].otherInfo = newOtherInfo;
+    providersData[resolvedIndex].series = newSeries;
     
     console.log('💾 保存的数据:', providersData[resolvedIndex]);
     setData(STORAGE_KEYS.PROVIDERS, providersData);
