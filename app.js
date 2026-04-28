@@ -148,12 +148,12 @@ function getAllProvidersForSearch() {
 
 function isSameContextProvider(p, shopName, providerName) {
   var targetShop = normalizeEntityKey(shopName);
-  var targetProvider = normalizeText(providerName);
+  var targetProvider = normalizeEntityKey(providerName);
   var shop = normalizeEntityKey(p && p.shop);
   var shopname = normalizeEntityKey(p && p.shopname);
-  var provider = normalizeText(p && p.name);
+  var provider = normalizeEntityKey(p && p.name);
   var shopMatched = !!targetShop && (isEntityMatched(shop, targetShop) || isEntityMatched(shopname, targetShop));
-  var providerMatched = !!targetProvider && (provider === targetProvider || provider.indexOf(targetProvider) !== -1 || targetProvider.indexOf(provider) !== -1);
+  var providerMatched = !!targetProvider && isEntityMatched(provider, targetProvider);
   return shopMatched && providerMatched;
 }
 
@@ -720,7 +720,7 @@ function onBrandInput() {
   if (!currentShop) currentShop = document.getElementById('shop-search-input')?.value || '';
   var currentProvider = document.getElementById('provider-search-input')?.value || '';
   currentShop = normalizeEntityKey(currentShop);
-  currentProvider = normalizeText(currentProvider);
+  currentProvider = normalizeEntityKey(currentProvider);
   
   // 如果没有输入，显示该店铺的所有品牌
   if (!input) {
@@ -749,9 +749,9 @@ function onBrandInput() {
       shopFiltered = providersData.filter(function(p) {
         var shop = normalizeEntityKey(p && p.shop);
         var shopname = normalizeEntityKey(p && p.shopname);
-        var provider = normalizeText(p && p.name);
+        var provider = normalizeEntityKey(p && p.name);
         var shopMatched = isEntityMatched(shop, currentShop) || isEntityMatched(shopname, currentShop);
-        var providerMatched = !currentProvider || provider === currentProvider || provider.indexOf(currentProvider) !== -1 || currentProvider.indexOf(provider) !== -1;
+        var providerMatched = !currentProvider || isEntityMatched(provider, currentProvider);
         return shopMatched && providerMatched;
       });
     }
@@ -981,15 +981,15 @@ function selectProvider(providerName) {
   if (input) input.value = providerName;
   currentProvider = providerName;
   
-  var normalizedProvider = normalizeText(providerName);
+  var normalizedProvider = normalizeEntityKey(providerName);
   var providersData = getAllProvidersForSearch();
   var matched = providersData.filter(function(p) {
-    return normalizeText(p && p.name) === normalizedProvider;
+    return normalizeEntityKey(p && p.name) === normalizedProvider;
   });
   
   if (matched.length === 0) {
     matched = providersData.filter(function(p) { 
-      var name = normalizeText(p && p.name);
+      var name = normalizeEntityKey(p && p.name);
       return name && (name.indexOf(normalizedProvider) !== -1 || normalizedProvider.indexOf(name) !== -1); 
     });
   }
