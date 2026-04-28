@@ -105,6 +105,13 @@ function isEntityMatched(source, target) {
   return sourceKey === targetKey || sourceKey.indexOf(targetKey) !== -1 || targetKey.indexOf(sourceKey) !== -1;
 }
 
+function isEntitySameExact(source, target) {
+  var sourceKey = normalizeEntityKey(source);
+  var targetKey = normalizeEntityKey(target);
+  if (!sourceKey || !targetKey) return false;
+  return sourceKey === targetKey;
+}
+
 function hasParentheses(value) {
   return /[()（）]/.test(String(value || ''));
 }
@@ -1244,15 +1251,15 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   var providersData = providers ? JSON.parse(providers) : [];
   var resolvedIndex = globalIndex;
   var rule = providersData[resolvedIndex];
+  var targetShop = decodeURIComponent(shopEncoded || '');
+  var targetProvider = decodeURIComponent(providerEncoded || '');
+  var targetBrand = decodeURIComponent(brandEncoded || '');
+  var targetSeries = decodeURIComponent(seriesEncoded || '');
 
   if (!rule) {
-    var targetShop = decodeURIComponent(shopEncoded || '');
-    var targetProvider = decodeURIComponent(providerEncoded || '');
-    var targetBrand = decodeURIComponent(brandEncoded || '');
-    var targetSeries = decodeURIComponent(seriesEncoded || '');
     resolvedIndex = providersData.findIndex(function(p) {
-      return isEntityMatched(p && p.shop, targetShop) &&
-        isEntityMatched(p && p.name, targetProvider) &&
+      return isEntitySameExact(p && p.shop, targetShop) &&
+        isEntitySameExact(p && p.name, targetProvider) &&
         normalizeText(p && p.brand) === normalizeText(targetBrand) &&
         normalizeText((p && p.series) || '') === normalizeText(targetSeries);
     });
@@ -1284,11 +1291,11 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   display.innerHTML = html;
   
   document.getElementById('save-rule-btn').addEventListener('click', function() {
-    saveRuleByIndex(resolvedIndex);
+    saveRuleByIndex(resolvedIndex, targetShop, targetProvider, targetBrand, targetSeries);
   });
 }
 
-function saveRuleByIndex(globalIndex) {
+function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, targetSeries) {
   try {
     console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
     var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
@@ -1299,18 +1306,38 @@ function saveRuleByIndex(globalIndex) {
     
     var providers = localStorage.getItem('rule_library_providers');
     var providersData = providers ? JSON.parse(providers) : [];
-    if (!providersData[globalIndex]) {
+    var resolvedIndex = globalIndex;
+    var candidate = providersData[resolvedIndex];
+    var hasIdentity = !!(targetShop || targetProvider || targetBrand || targetSeries);
+    var identityMismatched = false;
+    if (candidate && hasIdentity) {
+      identityMismatched = !(
+        isEntitySameExact(candidate.shop, targetShop) &&
+        isEntitySameExact(candidate.name, targetProvider) &&
+        normalizeText(candidate.brand) === normalizeText(targetBrand) &&
+        normalizeText(candidate.series) === normalizeText(targetSeries)
+      );
+    }
+    if (!candidate || identityMismatched) {
+      resolvedIndex = providersData.findIndex(function(p) {
+        return isEntitySameExact(p && p.shop, targetShop) &&
+          isEntitySameExact(p && p.name, targetProvider) &&
+          normalizeText(p && p.brand) === normalizeText(targetBrand) &&
+          normalizeText((p && p.series) || '') === normalizeText(targetSeries);
+      });
+    }
+    if (resolvedIndex < 0 || !providersData[resolvedIndex]) {
       showToast('未找到该规则');
       return;
     }
     
-    providersData[globalIndex].split = newSplit;
-    providersData[globalIndex].pricing = newPricing;
-    providersData[globalIndex].publishTime = newPublishTime;
-    providersData[globalIndex].specialCase = newSpecialCase;
-    providersData[globalIndex].otherInfo = newOtherInfo;
+    providersData[resolvedIndex].split = newSplit;
+    providersData[resolvedIndex].pricing = newPricing;
+    providersData[resolvedIndex].publishTime = newPublishTime;
+    providersData[resolvedIndex].specialCase = newSpecialCase;
+    providersData[resolvedIndex].otherInfo = newOtherInfo;
     
-    console.log('💾 保存的数据:', providersData[globalIndex]);
+    console.log('💾 保存的数据:', providersData[resolvedIndex]);
     setData(STORAGE_KEYS.PROVIDERS, providersData);
     showToast('保存成功');
     showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
