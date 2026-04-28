@@ -98,6 +98,13 @@ function normalizeEntityKey(value) {
   return normalizeText(value).replace(/[()（）\s]/g, '');
 }
 
+function isEntityMatched(source, target) {
+  var sourceKey = normalizeEntityKey(source);
+  var targetKey = normalizeEntityKey(target);
+  if (!sourceKey || !targetKey) return false;
+  return sourceKey === targetKey || sourceKey.indexOf(targetKey) !== -1 || targetKey.indexOf(sourceKey) !== -1;
+}
+
 function hasParentheses(value) {
   return /[()（）]/.test(String(value || ''));
 }
@@ -140,12 +147,12 @@ function getAllProvidersForSearch() {
 }
 
 function isSameContextProvider(p, shopName, providerName) {
-  var targetShop = normalizeText(shopName);
+  var targetShop = normalizeEntityKey(shopName);
   var targetProvider = normalizeText(providerName);
-  var shop = normalizeText(p && p.shop);
-  var shopname = normalizeText(p && p.shopname);
+  var shop = normalizeEntityKey(p && p.shop);
+  var shopname = normalizeEntityKey(p && p.shopname);
   var provider = normalizeText(p && p.name);
-  var shopMatched = !!targetShop && (shop === targetShop || shopname === targetShop || shop.indexOf(targetShop) !== -1 || shopname.indexOf(targetShop) !== -1);
+  var shopMatched = !!targetShop && (isEntityMatched(shop, targetShop) || isEntityMatched(shopname, targetShop));
   var providerMatched = !!targetProvider && (provider === targetProvider || provider.indexOf(targetProvider) !== -1 || targetProvider.indexOf(provider) !== -1);
   return shopMatched && providerMatched;
 }
@@ -653,13 +660,13 @@ function loadBrandsByShopAndShowDropdown(shopName) {
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
-  var targetShop = String(shopName || '').trim().toLowerCase();
+  var targetShop = normalizeEntityKey(shopName);
   var matched = providersData.filter(function(p) {
     if (!targetShop) return false;
     if (providerName) return isSameContextProvider(p, shopName, providerName);
-    var shop = normalizeText(p && p.shop);
-    var shopname = normalizeText(p && p.shopname);
-    return shop === targetShop || shopname === targetShop || shop.indexOf(targetShop) !== -1 || shopname.indexOf(targetShop) !== -1;
+    var shop = normalizeEntityKey(p && p.shop);
+    var shopname = normalizeEntityKey(p && p.shopname);
+    return isEntityMatched(shop, targetShop) || isEntityMatched(shopname, targetShop);
   });
   var brands = [...new Set(matched.map(function(p) { return p.brand; }).filter(Boolean))];
   
@@ -712,7 +719,7 @@ function onBrandInput() {
   }
   if (!currentShop) currentShop = document.getElementById('shop-search-input')?.value || '';
   var currentProvider = document.getElementById('provider-search-input')?.value || '';
-  currentShop = normalizeText(currentShop);
+  currentShop = normalizeEntityKey(currentShop);
   currentProvider = normalizeText(currentProvider);
   
   // 如果没有输入，显示该店铺的所有品牌
@@ -740,10 +747,10 @@ function onBrandInput() {
     var shopFiltered = providersData;
     if (currentShop) {
       shopFiltered = providersData.filter(function(p) {
-        var shop = normalizeText(p && p.shop);
-        var shopname = normalizeText(p && p.shopname);
+        var shop = normalizeEntityKey(p && p.shop);
+        var shopname = normalizeEntityKey(p && p.shopname);
         var provider = normalizeText(p && p.name);
-        var shopMatched = shop === currentShop || shopname === currentShop || shop.indexOf(currentShop) !== -1 || shopname.indexOf(currentShop) !== -1;
+        var shopMatched = isEntityMatched(shop, currentShop) || isEntityMatched(shopname, currentShop);
         var providerMatched = !currentProvider || provider === currentProvider || provider.indexOf(currentProvider) !== -1 || currentProvider.indexOf(provider) !== -1;
         return shopMatched && providerMatched;
       });
