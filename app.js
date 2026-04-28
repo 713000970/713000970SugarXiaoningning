@@ -848,7 +848,11 @@ function showRulesByBrandAndShop(brandName, shopName) {
       var p = item.data;
       var globalIndex = item.index;
       var ruleName = (p.brand || p.name || '未命名规则') + ' · ' + ((p.series || '').trim() || '未设置系列');
-      var actionButtons = '<button class="rule-edit-btn" onclick="editRuleByIndex(' + globalIndex + ')">✏️ 修改</button>' +
+      var shopEncoded = encodeURIComponent(p.shop || '');
+      var providerEncoded = encodeURIComponent(p.name || '');
+      var brandEncoded = encodeURIComponent(p.brand || '');
+      var seriesEncoded = encodeURIComponent((p.series || '').trim());
+      var actionButtons = '<button class="rule-edit-btn" onclick="editRuleByIndex(' + globalIndex + ',\'' + shopEncoded + '\',\'' + providerEncoded + '\',\'' + brandEncoded + '\',\'' + seriesEncoded + '\')">✏️ 修改</button>' +
                        '<button class="rule-delete-btn" onclick="deleteRuleByIndex(' + globalIndex + ')">🗑️ 删除</button>';
       html += '<div class="rule-card">';
       html += '  <div class="rule-card-header">';
@@ -1235,10 +1239,25 @@ function saveEditRule() {
   onSeriesChange();
 }
 
-function editRuleByIndex(globalIndex) {
+function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded, seriesEncoded) {
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : [];
-  var rule = providersData[globalIndex];
+  var resolvedIndex = globalIndex;
+  var rule = providersData[resolvedIndex];
+
+  if (!rule) {
+    var targetShop = decodeURIComponent(shopEncoded || '');
+    var targetProvider = decodeURIComponent(providerEncoded || '');
+    var targetBrand = decodeURIComponent(brandEncoded || '');
+    var targetSeries = decodeURIComponent(seriesEncoded || '');
+    resolvedIndex = providersData.findIndex(function(p) {
+      return isEntityMatched(p && p.shop, targetShop) &&
+        isEntityMatched(p && p.name, targetProvider) &&
+        normalizeText(p && p.brand) === normalizeText(targetBrand) &&
+        normalizeText((p && p.series) || '') === normalizeText(targetSeries);
+    });
+    rule = resolvedIndex >= 0 ? providersData[resolvedIndex] : null;
+  }
   
   if (!rule) {
     showToast('未找到该规则');
@@ -1258,14 +1277,14 @@ function editRuleByIndex(globalIndex) {
   html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><input type="text" class="rule-input" id="edit-publishTime" value="' + (rule.publishTime || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">特例：</span><input type="text" class="rule-input" id="edit-specialCase" value="' + (rule.specialCase || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><input type="text" class="rule-input" id="edit-otherInfo" value="' + (rule.otherInfo || '') + '"></div>';
-  html += '    <div class="rule-row"><button class="rule-save-btn" id="save-rule-btn" data-index="' + globalIndex + '">💾 保存</button></div>';
+  html += '    <div class="rule-row"><button class="rule-save-btn" id="save-rule-btn" data-index="' + resolvedIndex + '">💾 保存</button></div>';
   html += '  </div>';
   html += '</div>';
   
   display.innerHTML = html;
   
   document.getElementById('save-rule-btn').addEventListener('click', function() {
-    saveRuleByIndex(globalIndex);
+    saveRuleByIndex(resolvedIndex);
   });
 }
 
