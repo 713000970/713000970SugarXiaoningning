@@ -1275,10 +1275,14 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   
   var html = '<div class="rule-card-edit">';
   html += '  <div class="rule-card-header">';
-  html += '    <div class="rule-card-title">编辑: ' + (rule.brand || '未命名规则') + '</div>';
+  html += '    <div class="rule-card-title">编辑: ' + (rule.brand || '未命名规则') + ' · ' + ((rule.series || '').trim() || '未设置系列') + '</div>';
   html += '    <button class="rule-edit-btn" onclick="showRulesByBrandAndShop(currentEditingBrand, currentEditingShop)">✖ 取消</button>';
   html += '  </div>';
   html += '  <div class="rule-card-body">';
+  html += '    <div class="rule-row"><span class="rule-label">店铺：</span><span class="rule-value">' + (rule.shop || '未设置店铺') + '</span></div>';
+  html += '    <div class="rule-row"><span class="rule-label">提供者：</span><span class="rule-value">' + (rule.name || '未设置提供者') + '</span></div>';
+  html += '    <div class="rule-row"><span class="rule-label">品牌：</span><span class="rule-value">' + (rule.brand || '未设置品牌') + '</span></div>';
+  html += '    <div class="rule-row"><span class="rule-label">系列：</span><span class="rule-value">' + ((rule.series || '').trim() || '未设置系列') + '</span></div>';
   html += '    <div class="rule-row"><span class="rule-label">拆分：</span><input type="text" class="rule-input" id="edit-split" value="' + (rule.split || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">定价：</span><input type="text" class="rule-input" id="edit-pricing" value="' + (rule.pricing || '') + '"></div>';
   html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><input type="text" class="rule-input" id="edit-publishTime" value="' + (rule.publishTime || '') + '"></div>';
