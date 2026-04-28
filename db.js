@@ -267,14 +267,14 @@ const presetData = {
     { shop: '北京众和永泰文化传播有限公司', name: '北京众和永泰文化传播有限公司', brand: '作文方程式', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 幼狮文化创意（山东）有限公司
-    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意（山东）有限公司', brand: '基础全刷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意（山东）有限公司', brand: '跟着课本学古文', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意（山东）有限公司', brand: '思维导图', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意（山东）有限公司', brand: '晨读计划', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意（山东）有限公司', brand: '幼狮学堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意山东有限公司', brand: '基础全刷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意山东有限公司', brand: '跟着课本学古文', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意山东有限公司', brand: '思维导图', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意山东有限公司', brand: '晨读计划', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '幼狮文化创意（山东）有限公司', name: '幼狮文化创意山东有限公司', brand: '幼狮学堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 时代天宇国际文化传媒（北京）有限公司
-    { shop: '时代天宇国际文化传媒（北京）有限公司', name: '时代天宇国际文化传媒（北京）有限公司', brand: '阿桂写作文', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '时代天宇国际文化传媒（北京）有限公司', name: '时代天宇国际文化传媒北京有限公司', brand: '阿桂写作文', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 新乡市科艺图书有限公司
     { shop: '新乡市科艺图书有限公司', name: '新乡市科艺图书有限公司', brand: '轻松计算', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -292,7 +292,7 @@ const presetData = {
     { shop: '山东舵手网络科技有限公司', name: '山东舵手网络科技有限公司', brand: '高考专家摸底卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 众相原创文化传播（陕西）有限公司
-    { shop: '众相原创文化传播（陕西）有限公司', name: '众相原创文化传播（陕西）有限公司', brand: '众相原创', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '众相原创文化传播（陕西）有限公司', name: '众相原创文化传播陕西有限公司', brand: '众相原创', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 湖北大鑫文化传媒有限公司
     { shop: '湖北大鑫文化传媒有限公司', name: '湖北大鑫文化传媒有限公司', brand: '高效考卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -715,9 +715,9 @@ const presetData = {
     { shop: '梁山儒舟文化传媒有限公司', name: '梁山儒舟文化传媒有限公司', brand: '四点格练字帖', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 华版（北京）文化有限公司
-    { shop: '华版（北京）文化有限公司', name: '华版（北京）文化有限公司', brand: '衡中课堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '华版（北京）文化有限公司', name: '华版（北京）文化有限公司', brand: '考前信息卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '华版（北京）文化有限公司', name: '华版（北京）文化有限公司', brand: '相约高考', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '华版（北京）文化有限公司', name: '华版北京文化有限公司', brand: '衡中课堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '华版（北京）文化有限公司', name: '华版北京文化有限公司', brand: '考前信息卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '华版（北京）文化有限公司', name: '华版北京文化有限公司', brand: '相约高考', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 陕西志立文化发展有限公司
     { shop: '陕西志立文化发展有限公司', name: '陕西志立文化发展有限公司', brand: '知识金典', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -849,6 +849,9 @@ const presetData = {
 
     // 云南孝全文化传播有限公司
     { shop: '云南孝全文化传播有限公司', name: '云南孝全文化传播有限公司', brand: '西南名校联盟', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+
+    // 吉林教育出版社有限责任公司
+    { shop: '吉林教育出版社有限责任公司', name: '吉林教育出版社', brand: '单元测试', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 北京五洲时代天华文化传媒有限公司
     { shop: '北京五洲时代天华文化传媒有限公司', name: '北京五洲时代天华文化传媒有限公司', brand: '七彩课堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1104,11 +1107,11 @@ const presetData = {
     { shop: '安徽大图文化传播有限公司', name: '安徽大图文化传播有限公司', brand: '安师联盟', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 众望益飞教育科技（北京）有限公司
-    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技（北京）有限公司', brand: '初中必刷题教材划重点', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技（北京）有限公司', brand: '中考必刷题', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技（北京）有限公司', brand: '中考划重点', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技（北京）有限公司', brand: '小学必刷题', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技（北京）有限公司', brand: '初中上分卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技北京有限公司', brand: '初中必刷题教材划重点', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技北京有限公司', brand: '中考必刷题', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技北京有限公司', brand: '中考划重点', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技北京有限公司', brand: '小学必刷题', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '众望益飞教育科技（北京）有限公司', name: '众望益飞教育科技北京有限公司', brand: '初中上分卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 滨州儒乾文化传媒有限公司
     { shop: '滨州儒乾文化传媒有限公司', name: '山东儒乾文化传媒有限公司', brand: '创新活页', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1179,12 +1182,12 @@ const presetData = {
     { shop: '梁山博圣图书有限公司', name: '山东博圣图书有限公司', brand: '金榜题名', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 华翰文化图书（广州）有限公司
-    { shop: '华翰文化图书（广州）有限公司', name: '华翰文化图书（广州）有限公司', brand: '中华经典素读范本', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '华翰文化图书（广州）有限公司', name: '华翰文化图书广州有限公司', brand: '中华经典素读范本', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 阅盟教育科技（广东）有限公司
-    { shop: '阅盟教育科技（广东）有限公司', name: '阅盟教育科技（广东）有限公司', brand: '多分阅读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '阅盟教育科技（广东）有限公司', name: '阅盟教育科技（广东）有限公司', brand: '零障碍', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '阅盟教育科技（广东）有限公司', name: '阅盟教育科技（广东）有限公司', brand: '喜阅阅读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '阅盟教育科技（广东）有限公司', name: '阅盟教育科技广东有限公司', brand: '多分阅读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '阅盟教育科技（广东）有限公司', name: '阅盟教育科技广东有限公司', brand: '零障碍', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '阅盟教育科技（广东）有限公司', name: '阅盟教育科技广东有限公司', brand: '喜阅阅读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 陕西中教创联文化发展有限公司
     { shop: '陕西中教创联文化发展有限公司', name: '陕西中教创联文化发展有限公司', brand: '权威测试卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1230,8 +1233,8 @@ const presetData = {
     { shop: '河北领恒图书销售有限公司', name: '河北领恒图书销售有限公司', brand: '黄冈新课堂全优卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 扬帆之星（北京）文化传媒有限责任公司
-    { shop: '扬帆之星（北京）文化传媒有限责任公司', name: '扬帆之星（北京）文化传媒有限责任公司', brand: '课程达标冲刺100分', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '扬帆之星（北京）文化传媒有限责任公司', name: '扬帆之星（北京）文化传媒有限责任公司', brand: '新课标必读经典', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '扬帆之星（北京）文化传媒有限责任公司', name: '扬帆之星北京文化传媒有限责任公司', brand: '课程达标冲刺100分', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '扬帆之星（北京）文化传媒有限责任公司', name: '扬帆之星北京文化传媒有限责任公司', brand: '新课标必读经典', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 陕西书悦文化传播有限公司
     { shop: '陕西书悦文化传播有限公司', name: '陕西书悦文化传播有限公司', brand: '畅行课堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1245,10 +1248,10 @@ const presetData = {
     { shop: '河南欢颜文化传媒有限公司', name: '河南欢颜文化传媒有限公司', brand: '一卷成名', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 呼和浩特市经纬方舟文化传播有限公司
-    { shop: '呼和浩特市经纬方舟文化传播有限公司', name: '呼和浩特市经纬方舟文化传播有限公司', brand: '决胜高考', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '呼和浩特市经纬方舟文化传播有限公司', name: '呼和浩特市经纬方舟文化传播有限公司', brand: '全能星', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '呼和浩特市经纬方舟文化传播有限公司', name: '呼和浩特市经纬方舟文化传播有限公司', brand: '中高考作文素材', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '呼和浩特市经纬方舟文化传播有限公司', name: '呼和浩特市经纬方舟文化传播有限公司', brand: '名著导读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '呼和浩特市经纬方舟文化传播有限公司', name: '经纬方舟文化传播有限公司', brand: '决胜高考', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '呼和浩特市经纬方舟文化传播有限公司', name: '经纬方舟文化传播有限公司', brand: '全能星', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '呼和浩特市经纬方舟文化传播有限公司', name: '经纬方舟文化传播有限公司', brand: '中高考作文素材', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '呼和浩特市经纬方舟文化传播有限公司', name: '经纬方舟文化传播有限公司', brand: '名著导读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 山东海知源文化传媒有限公司
     { shop: '山东海知源文化传媒有限公司', name: '山东海知源文化传媒有限公司', brand: '智慧课堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1261,7 +1264,7 @@ const presetData = {
     { shop: '陕西书雅图书文化传媒有限公司', name: '陕西书雅图书文化传媒有限公司', brand: '温雅娟', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 理想众望教育科技（北京）有限公司
-    { shop: '理想众望教育科技（北京）有限公司', name: '理想众望教育科技（北京）有限公司', brand: '高中必刷题', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '理想众望教育科技（北京）有限公司', name: '理想众望教育科技北京有限公司', brand: '高中必刷题', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 河南智熊文化科技有限公司
     { shop: '河南智熊文化科技有限公司', name: '河南智熊文化科技有限公司', brand: '1号学员', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1337,9 +1340,9 @@ const presetData = {
     { shop: '山东书品文化传媒有限公司', name: '山东书品文化传媒有限公司', brand: '一本小卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 悦读名品文化传媒（北京）有限公司
-    { shop: '悦读名品文化传媒（北京）有限公司', name: '悦读名品文化传媒（北京）有限公司', brand: '让孩子着迷的成语游戏书', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '悦读名品文化传媒（北京）有限公司', name: '悦读名品文化传媒（北京）有限公司', brand: '思维导图版', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '悦读名品文化传媒（北京）有限公司', name: '悦读名品文化传媒（北京）有限公司', brand: '五分钟奇妙科学课', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '悦读名品文化传媒（北京）有限公司', name: '悦读名品文化传媒北京有限公司', brand: '让孩子着迷的成语游戏书', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '悦读名品文化传媒（北京）有限公司', name: '悦读名品文化传媒北京有限公司', brand: '思维导图版', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '悦读名品文化传媒（北京）有限公司', name: '悦读名品文化传媒北京有限公司', brand: '五分钟奇妙科学课', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 洛阳可馨文化传播有限公司
     { shop: '洛阳可馨文化传播有限公司', name: '洛阳可馨文化传播有限公司', brand: '步步为赢', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1437,9 +1440,9 @@ const presetData = {
     { shop: '开心教辅图书', name: '山东开心图书有限公司', brand: '开心活页', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 盛世华阅文化传媒（北京）有限公司
-    { shop: '盛世华阅文化传媒（北京）有限公司', name: '盛世华阅文化传媒（北京）有限公司', brand: '三清必刷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '盛世华阅文化传媒（北京）有限公司', name: '盛世华阅文化传媒（北京）有限公司', brand: '全能测控', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '盛世华阅文化传媒（北京）有限公司', name: '盛世华阅文化传媒（北京）有限公司', brand: '一本好卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '盛世华阅文化传媒（北京）有限公司', name: '盛世华阅文化传媒北京有限公司', brand: '三清必刷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '盛世华阅文化传媒（北京）有限公司', name: '盛世华阅文化传媒北京有限公司', brand: '全能测控', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '盛世华阅文化传媒（北京）有限公司', name: '盛世华阅文化传媒北京有限公司', brand: '一本好卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 河南晨轩文化科技有限公司
     { shop: '河南晨轩文化科技有限公司', name: '河南晨轩文化科技有限公司', brand: '练到位', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1449,7 +1452,7 @@ const presetData = {
     { shop: '衡水天枢教育发展有限公司', name: '衡水天枢教育发展有限公司', brand: '衡水真题密卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 驭书斋（天津）文化传播有限公司
-    { shop: '驭书斋（天津）文化传播有限公司', name: '驭书斋（天津）文化传播有限公司', brand: '鹰击长空', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '驭书斋（天津）文化传播有限公司', name: '驭书斋天津文化传播有限公司', brand: '鹰击长空', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 沈阳刷考点教辅图书有限公司
     { shop: '沈阳刷考点教辅图书有限公司', name: '沈阳刷考点教辅图书有限公司', brand: '期末必刷卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1511,9 +1514,9 @@ const presetData = {
     { shop: '苏州大学出版社有限公司', name: '苏州大学出版社有限公司', brand: '金钥匙1+1', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 武汉华大鸿图文化发展有限责任公司
-    { shop: '武汉华大鸿图文化发展有限责任公司', name: '武汉华大鸿图文化发展有限责任公司', brand: '重难点手册', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '武汉华大鸿图文化发展有限责任公司', name: '武汉华大鸿图文化发展有限责任公司', brand: '培优竞赛超级课堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '武汉华大鸿图文化发展有限责任公司', name: '武汉华大鸿图文化发展有限责任公司', brand: '考点同步解读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '武汉华大鸿图文化发展有限责任公司', name: '华中师范大学出版社@华大鸿图', brand: '重难点手册', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '武汉华大鸿图文化发展有限责任公司', name: '华中师范大学出版社@华大鸿图', brand: '培优竞赛超级课堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '武汉华大鸿图文化发展有限责任公司', name: '华中师范大学出版社@华大鸿图', brand: '考点同步解读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 漓江出版社有限公司
     { shop: '漓江出版社有限公司', name: '漓江出版社有限公司', brand: '高考核心考点冲刺', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1523,8 +1526,8 @@ const presetData = {
     { shop: '华语教学出版社有限责任公司', name: '华语教学出版社有限责任公司', brand: '学习改变未来', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 长江少年儿童出版社(集团)有限公司
-    { shop: '长江少年儿童出版社(集团)有限公司', name: '长江少年儿童出版社(集团)有限公司', brand: '聚焦新课堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '长江少年儿童出版社(集团)有限公司', name: '长江少年儿童出版社(集团)有限公司', brand: '智慧课堂密卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '长江少年儿童出版社(集团)有限公司', name: '长江少年儿童出版社有限公司', brand: '聚焦新课堂', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '长江少年儿童出版社(集团)有限公司', name: '长江少年儿童出版社有限公司', brand: '智慧课堂密卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 北京世纪东方科技发展有限公司
     { shop: '北京世纪东方科技发展有限公司', name: '北京世纪东方科技发展有限公司', brand: '快捷英语', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1534,20 +1537,20 @@ const presetData = {
     { shop: '长春东北师范大学出版社有限责任公司', name: '长春东北师范大学出版社有限责任公司', brand: '北大绿卡', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
 // 北方联合出版传媒（集团）股份有限公司分公司
-    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '北方联合出版传媒（集团）股份有限公司分公司', brand: '学生效率手册', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '北方联合出版传媒（集团）股份有限公司分公司', brand: '郑老师讲作文', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '北方联合出版传媒（集团）股份有限公司分公司', brand: '中考大阅读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '北方联合出版传媒（集团）股份有限公司分公司', brand: '中考夺标', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '北方联合出版传媒（集团）股份有限公司分公司', brand: '中考风向标', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '北方联合出版传媒（集团）股份有限公司分公司', brand: '自主阅读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '北方联合出版传媒（集团）股份有限公司分公司', brand: '新课程能力培养', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '北方联合出版传媒（集团）股份有限公司分公司', brand: '能力拓展练习', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '辽海出版社', brand: '学生效率手册', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '辽海出版社', brand: '郑老师讲作文', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '辽海出版社', brand: '中考大阅读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '辽海出版社', brand: '中考夺标', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '辽海出版社', brand: '中考风向标', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '辽海出版社', brand: '自主阅读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '辽海出版社', brand: '新课程能力培养', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '北方联合出版传媒（集团）股份有限公司分公司', name: '辽海出版社', brand: '能力拓展练习', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 京版北教文化传媒股份有限公司
-    { shop: '京版北教文化传媒股份有限公司', name: '京版北教文化传媒股份有限公司', brand: '哈佛英语', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '京版北教文化传媒股份有限公司', name: '京版北教文化传媒股份有限公司', brand: '金题金卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '京版北教文化传媒股份有限公司', name: '京版北教文化传媒股份有限公司', brand: '轻巧夺冠', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '京版北教文化传媒股份有限公司', name: '京版北教文化传媒股份有限公司', brand: '实战北京高考', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '京版北教文化传媒股份有限公司', name: '北教传媒（北京教育出版社）', brand: '哈佛英语', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '京版北教文化传媒股份有限公司', name: '北教传媒（北京教育出版社）', brand: '金题金卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '京版北教文化传媒股份有限公司', name: '北教传媒（北京教育出版社）', brand: '轻巧夺冠', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '京版北教文化传媒股份有限公司', name: '北教传媒（北京教育出版社）', brand: '实战北京高考', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 浙江大学出版社有限责任公司
     { shop: '浙江大学出版社有限责任公司', name: '浙江大学出版社有限责任公司', brand: '浙大优学', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1557,7 +1560,7 @@ const presetData = {
     { shop: '大连理工大学出版社有限公司', name: '大连理工大学出版社有限公司', brand: '精编卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 中科东信（北京）文化传媒有限公司
-    { shop: '中科东信（北京）文化传媒有限公司', name: '中科东信（北京）文化传媒有限公司', brand: '高考一线', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '中科东信（北京）文化传媒有限公司', name: '中科东信北京文化传媒有限公司', brand: '高考一线', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 隆尧县新华路龙之阁书城
     { shop: '隆尧县新华路龙之阁书城', name: '隆尧县新华路龙之阁书城', brand: '龙门卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
@@ -1567,16 +1570,16 @@ const presetData = {
     { shop: '西安市新城区图图释道书店', name: '西安市新城区图图释道书店', brand: '小词代', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 南京市玄武区书生教育信息咨询知识铺
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '从课本到奥数培优', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '当堂反馈', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '寒假大串联', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '假期思维训练', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '暑假大串联', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '暑假复习培优', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '小题狂刷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '同步作文宝典', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '同步测试卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
-    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京市玄武区书生教育信息咨询知识铺', brand: '拓展培优', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '从课本到奥数培优', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '当堂反馈', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '寒假大串联', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '假期思维训练', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '暑假大串联', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '暑假复习培优', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '小题狂刷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '同步作文宝典', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '同步测试卷', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '南京市玄武区书生教育信息咨询知识铺', name: '南京书生教育信息咨询工作室', brand: '拓展培优', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 高智传媒科技中心
     { shop: '高智传媒科技中心', name: '高智传媒科技中心', brand: '高考DNA解码', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
