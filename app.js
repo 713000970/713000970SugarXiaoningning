@@ -94,6 +94,29 @@ function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function normalizeEntityKey(value) {
+  return normalizeText(value).replace(/[()（）\s]/g, '');
+}
+
+function hasParentheses(value) {
+  return /[()（）]/.test(String(value || ''));
+}
+
+function pickPreferredDisplayName(names, preferWithParentheses) {
+  var validNames = (names || []).map(function(name) {
+    return String(name || '').trim();
+  }).filter(Boolean);
+  if (validNames.length === 0) return '';
+
+  var withParentheses = validNames.filter(function(name) { return hasParentheses(name); });
+  var withoutParentheses = validNames.filter(function(name) { return !hasParentheses(name); });
+
+  if (preferWithParentheses) {
+    return (withParentheses[0] || validNames[0] || '');
+  }
+  return (withoutParentheses[0] || validNames[0] || '');
+}
+
 function getAllProvidersForSearch() {
   var localProviders = getData(STORAGE_KEYS.PROVIDERS);
   var presetProviders = (typeof presetData !== 'undefined' && presetData && Array.isArray(presetData.providers)) ? presetData.providers : [];
@@ -550,10 +573,22 @@ function onShopSearchInput() {
     return;
   }
   
-  var providers = localStorage.getItem('rule_library_providers');
-  var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
-  
-  var uniqueShops = [...new Set(providersData.map(function(p) { return p.shop; }).filter(Boolean))];
+  var providersData = getAllProvidersForSearch();
+  var shopMap = {};
+  providersData.forEach(function(p) {
+    [p && p.shop, p && p.shopname].forEach(function(rawName) {
+      var name = String(rawName || '').trim();
+      if (!name) return;
+      var key = normalizeEntityKey(name);
+      if (!key) return;
+      if (!shopMap[key]) shopMap[key] = [];
+      shopMap[key].push(name);
+    });
+  });
+
+  var uniqueShops = Object.keys(shopMap).map(function(key) {
+    return pickPreferredDisplayName(shopMap[key], true);
+  }).filter(Boolean);
   var matched = uniqueShops.filter(function(s) { return s.toLowerCase().indexOf(input) !== -1; });
   
   if (matched.length === 0) {
@@ -579,9 +614,32 @@ function selectShop(shopName) {
   if (input) input.value = shopName;
   if (dropdown) dropdown.style.display = 'none';
   
-  // 自动填充提供者名称（与店铺相同）
+  // 自动填充提供者名称（按店铺匹配真实提供者，不再直接复制店铺名）
   var providerInput = document.getElementById('provider-search-input');
-  if (providerInput) providerInput.value = shopName;
+  if (providerInput) {
+    var providersData = getAllProvidersForSearch();
+    var targetShop = normalizeEntityKey(shopName);
+    var providerNameMap = {};
+
+    providersData.forEach(function(p) {
+      var shop = normalizeEntityKey(p && p.shop);
+      var shopname = normalizeEntityKey(p && p.shopname);
+      if (!targetShop || (shop !== targetShop && shopname !== targetShop)) return;
+      var providerName = String((p && p.name) || '').trim();
+      if (!providerName) return;
+      var providerKey = normalizeEntityKey(providerName);
+      if (!providerNameMap[providerKey]) providerNameMap[providerKey] = [];
+      providerNameMap[providerKey].push(providerName);
+    });
+
+    var preferredProvider = pickPreferredDisplayName(
+      Object.keys(providerNameMap).map(function(key) {
+        return pickPreferredDisplayName(providerNameMap[key], false);
+      }),
+      false
+    );
+    providerInput.value = preferredProvider || '';
+  }
   
   // 存储该店铺的品牌，供品牌输入框使用
   loadBrandsByShopAndShowDropdown(shopName);
@@ -850,7 +908,18 @@ function onProviderSearchInput() {
   }
   
   var providersData = getAllProvidersForSearch();
-  var uniqueProviders = [...new Set(providersData.map(function(p) { return (p && p.name) ? String(p.name).trim() : ''; }).filter(Boolean))];
+  var providerMap = {};
+  providersData.forEach(function(p) {
+    var rawName = String((p && p.name) || '').trim();
+    if (!rawName) return;
+    var key = normalizeEntityKey(rawName);
+    if (!key) return;
+    if (!providerMap[key]) providerMap[key] = [];
+    providerMap[key].push(rawName);
+  });
+  var uniqueProviders = Object.keys(providerMap).map(function(key) {
+    return pickPreferredDisplayName(providerMap[key], false);
+  }).filter(Boolean);
   var matched = uniqueProviders.filter(function(p) {
     var normalizedName = normalizeText(p);
     return normalizedName.indexOf(input) !== -1 || input.indexOf(normalizedName) !== -1;
