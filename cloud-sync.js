@@ -118,6 +118,48 @@ function calcSnapshot(data) {
   return JSON.stringify((data || []).map(toCloudProvider));
 }
 
+function providerIdentityKey(p) {
+  var shop = String(p.shop || '').trim().toLowerCase();
+  var shopname = String(p.shopname || '').trim().toLowerCase();
+  var name = String(p.name || '').trim().toLowerCase();
+  var brand = String(p.brand || '').trim().toLowerCase();
+  var series = String(p.series || '').trim().toLowerCase();
+  return [shop, shopname, name, brand, series].join('|');
+}
+
+function mergeProviders(remoteList, localList) {
+  var mergedMap = new Map();
+
+  (remoteList || []).forEach(function(item) {
+    var normalized = toCloudProvider(item || {});
+    var key = providerIdentityKey(normalized);
+    if (!key.replace(/\|/g, '')) return;
+    mergedMap.set(key, normalized);
+  });
+
+  // 本地优先覆盖同 key，避免用户刚编辑的数据被旧云端值覆盖
+  (localList || []).forEach(function(item) {
+    var normalized = toCloudProvider(item || {});
+    var key = providerIdentityKey(normalized);
+    if (!key.replace(/\|/g, '')) return;
+    mergedMap.set(key, normalized);
+  });
+
+  return Array.from(mergedMap.values());
+}
+
+async function fetchCloudProviders() {
+  var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=*', {
+    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+  });
+  if (!res.ok) {
+    var errText = await res.text();
+    throw new Error('拉取云端失败: ' + res.status + ' ' + errText);
+  }
+  var rows = await res.json();
+  return Array.isArray(rows) ? rows : [];
+}
+
 function notifyProvidersUpdated(source) {
   window.dispatchEvent(new CustomEvent('providers-data-updated', {
     detail: { source: source || 'unknown' }
@@ -136,25 +178,7 @@ async function cloudSync() {
     const localSnapshot = calcSnapshot(localProviders);
     const localDirty = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
 
-    // 本地有待同步改动时，优先把本地推云，避免拉取覆盖本地新增
-    if (localDirty && localSnapshot !== lastCloudSnapshot) {
-      console.log('🌥️ 本地有未同步改动，优先回传云端，跳过本轮下拉覆盖');
-      queuePendingSync(localProviders);
-      markSyncSuccess('本地改动待回传');
-      return;
-    }
-    
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/providers?select=*`, {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
-    });
-    
-    if (!res.ok) {
-      console.error('请求失败:', res.status);
-      scheduleRetry();
-      return;
-    }
-    
-    const remoteData = await res.json();
+    const remoteData = await fetchCloudProviders();
     console.log('🌥️ 云端数据:', remoteData);
     
     if (!remoteData || remoteData.length === 0) {
@@ -186,11 +210,15 @@ async function cloudSync() {
       const localProvidersNow = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
       const localSnapshotNow = calcSnapshot(localProvidersNow);
 
-      // 本地有尚未上云的新数据时，不用远程覆盖本地，改为排队回传本地
+      // 本地与云端都变更时，先合并，避免任一侧数据被覆盖丢失
       if (localSnapshotNow !== lastCloudSnapshot && localSnapshotNow !== remoteSnapshot) {
-        console.log('🌥️ 检测到本地未同步的新数据，保留本地并排队回传云端');
-        queuePendingSync(localProvidersNow);
-        markSyncSuccess('检测到本地新数据，已排队回传');
+        console.log('🌥️ 检测到本地与云端并发变更，先合并后回传');
+        var mergedCloudData = mergeProviders(remoteData, localProvidersNow);
+        localStorage.setItem('rule_library_providers', JSON.stringify(mergedCloudData.map(toLocalProvider)));
+        localStorage.setItem(LOCAL_DIRTY_KEY, '1');
+        queuePendingSync(mergedCloudData);
+        notifyProvidersUpdated('cloud-merge');
+        markSyncSuccess('检测到并发变更，已合并并排队回传');
         return;
       }
 
@@ -230,8 +258,9 @@ async function syncToCloud(data) {
   try {
     console.log('🌥️ 同步到云端...', data.length, '条');
     
-    // 全量覆盖，确保删除也能同步到云端（最后写入生效）
-    const formatted = (data || []).map(toCloudProvider);
+    // 先与云端数据合并，避免本地不全时覆盖导致线上丢数据
+    const remoteBeforeSync = await fetchCloudProviders();
+    const formatted = mergeProviders(remoteBeforeSync, (data || []).map(toCloudProvider));
     const nextSnapshot = JSON.stringify(formatted);
     if (nextSnapshot === lastCloudSnapshot) {
       localStorage.setItem(LOCAL_DIRTY_KEY, '0');
