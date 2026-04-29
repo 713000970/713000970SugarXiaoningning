@@ -139,16 +139,29 @@
     <div class="page-content">
       <div class="rules-grid">
         
-        <!-- 卡片1：拆分维度 -->
+        <!-- 卡片1：预处理 -->
+        <div class="rule-card material">
+          <div class="rule-card-header">
+            <span class="icon">🧪</span>
+            <span class="title">预处理</span>
+          </div>
+          <div class="rule-card-body">
+            <div class="rule-row">预上传，测试是否重复。若有问题：</div>
+            <div class="rule-row">（1）资料缺失（兼职——晶晶——运营，在一周内给确切处理结果，若不处理，则任务挂起）</div>
+            <div class="rule-row">（2）资料重复（运营核实版权归属——晶晶——下线/退稿）涉及重复率标准，出版物/非出版</div>
+          </div>
+        </div>
+
+        <!-- 卡片2：拆分 -->
         <div class="rule-card material">
           <div class="rule-card-header">
             <span class="icon">✂️</span>
-            <span class="title">拆分维度</span>
+            <span class="title">拆分</span>
           </div>
           <div class="rule-card-body">
-            <div class="rule-row"><span class="badge badge-pdf">PDF</span>按目录，若无则按标题，<strong>杜绝单页</strong></div>
-            <div class="rule-row"><span class="badge badge-ppt">PPT</span>删除敏感信息（联系方式、二维码等），直接上传</div>
-            <div class="rule-row"><span class="badge badge-word">WORD</span>删除敏感信息（联系方式、二维码等），直接上传</div>
+            <div class="rule-row"><span class="badge badge-pdf">PDF</span>按目录，若无，按标题，<strong>杜绝单页</strong></div>
+            <div class="rule-row"><span class="badge badge-ppt">PPT</span>检查删除敏感信息（联系方式、二维码等），然后直接上传</div>
+            <div class="rule-row"><span class="badge badge-word">WORD</span>检查删除敏感信息（联系方式、二维码等），然后直接上传</div>
             <hr class="divider">
             <div class="rule-note">
               ⚠️ <strong>备注：</strong>以上三种格式有存在主书+小册子的情况，小册子拆分后，需<strong>单独建立专辑上传</strong>
@@ -156,11 +169,11 @@
           </div>
         </div>
 
-        <!-- 卡片2：命名规则 -->
+        <!-- 卡片3：命名 -->
         <div class="rule-card material">
           <div class="rule-card-header">
             <span class="icon">🏷️</span>
-            <span class="title">命名规则</span>
+            <span class="title">命名</span>
           </div>
           <div class="rule-card-body">
             <div class="rule-block">
@@ -177,7 +190,7 @@
           </div>
         </div>
 
-        <!-- 卡片3：定价 -->
+        <!-- 卡片4：定价 -->
         <div class="rule-card material">
           <div class="rule-card-header">
             <span class="icon">💰</span>
@@ -191,7 +204,7 @@
           </div>
         </div>
 
-        <!-- 卡片4：专辑规则 -->
+        <!-- 卡片5：专辑规则 -->
         <div class="rule-card album">
           <div class="rule-card-header">
             <span class="icon">📁</span>
@@ -205,16 +218,16 @@
             </div>
             <hr class="divider">
             <div class="rule-block">
-              <div class="rule-block-title">专辑简介模板</div>
+              <div class="rule-block-title">专辑简介</div>
               <div class="rule-row rule-intro-template">
-                XXXX（书籍名称）系列资料由 XXXX（提供者）提供，并授权学科网在互联网进行发布，侵权必究！
+                XXXX（书籍名称）系列资料由XXXX（提供者名称）提供，并授权学科网在互联网进行发布，侵权必究！
               </div>
             </div>
             <hr class="divider">
             <div class="rule-block">
               <div class="rule-block-title">专辑封面</div>
               <div class="rule-row">① 无封面 → 使用去年同期产品封面</div>
-              <div class="rule-row">② 去年无 → 智能平台生成，要求最下标必须写 <span class="badge badge-warn">学科网书城</span></div>
+              <div class="rule-row">② 去年无 → 智能平台生成，要求最下标必须写 <span class="badge badge-warn">学科网书城</span>，<a href="https://bar.xkw.com/cover/size" target="_blank" class="rule-link">点击制作封面 →</a></div>
             </div>
             <hr class="divider">
             <div class="rule-block">
@@ -224,7 +237,7 @@
           </div>
         </div>
 
-        <!-- 卡片5：特例 -->
+        <!-- 卡片6：特例 -->
         <div class="rule-card special">
           <div class="rule-card-header">
             <span class="icon">⚠️</span>
@@ -251,35 +264,7 @@
           </div>
         </div>
 
-        <!-- 卡片6：电子样书 -->
-        <div class="rule-card special3">
-          <div class="rule-card-header">
-            <span class="icon">📖</span>
-            <span class="title">特例 · 电子样书</span>
-          </div>
-          <div class="rule-card-body">
-            <div class="special-item purple">
-              <span class="tag-pill tag-purple">命名</span>
-              专辑名 & 资料名末尾补充 <strong>"-电子样书"</strong>
-            </div>
-            <div class="special-item purple">
-              <span class="tag-pill tag-purple">标签</span>
-              资料和专辑额外勾选 <strong>"样书"</strong>
-            </div>
-            <div class="special-item purple">
-              <span class="tag-pill tag-purple">下载</span>
-              资料额外勾选 <strong>"禁止下载"</strong>
-            </div>
-            <div class="special-item purple">
-              <span class="tag-pill tag-purple">定价</span>
-              <strong>0元</strong>
-            </div>
-            <div class="special-item purple">
-              <span class="tag-pill tag-purple">发布</span>
-              选择<strong>「立即发布」</strong>
-            </div>
-          </div>
-        </div>
+
 
       </div>
     </div>
