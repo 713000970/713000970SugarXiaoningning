@@ -6,6 +6,7 @@ var currentBrand = '';
 var currentProvider = '';
 var currentEditingBrand = '';
 var currentEditingShop = '';
+var currentEditingSeries = '';
 
 // ========================================
 // 数据存储（本地存储）
@@ -315,7 +316,7 @@ function refreshProviderViews() {
   loadBrands();
   updateStats();
   if (currentEditingBrand) {
-    showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
+    showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries);
   }
 }
 
@@ -661,6 +662,9 @@ function selectShop(shopName) {
   // 清空规则显示
   var display = document.getElementById('custom-rule-display');
   if (display) display.style.display = 'none';
+  clearSeriesTags();
+  var addSeriesBtn = document.getElementById('add-series-btn');
+  if (addSeriesBtn) addSeriesBtn.style.display = 'none';
 }
 
 function loadBrandsByShopAndShowDropdown(shopName) {
@@ -784,6 +788,53 @@ function searchBrandByInput() {
   selectBrand(input);
 }
 
+function clearSeriesTags() {
+  var container = document.getElementById('series-tag-container');
+  if (!container) return;
+  container.style.display = 'none';
+  container.innerHTML = '';
+  currentEditingSeries = '';
+}
+
+function renderSeriesTags(matched, selectedSeries) {
+  var container = document.getElementById('series-tag-container');
+  if (!container) return;
+
+  var seriesMap = {};
+  (matched || []).forEach(function(item) {
+    var p = item && item.data ? item.data : {};
+    var key = (p.series || '').trim() || '未设置系列';
+    seriesMap[key] = (seriesMap[key] || 0) + 1;
+  });
+
+  var seriesList = Object.keys(seriesMap).sort();
+  if (seriesList.length <= 1) {
+    clearSeriesTags();
+    return;
+  }
+
+  var currentSeries = String(selectedSeries || '').trim();
+  var allClass = currentSeries ? 'series-tag' : 'series-tag active';
+  var html = '<span class="series-tag-label">系列：</span>';
+  html += '<button class="' + allClass + '" type="button" onclick="selectSeriesFilter(\'\')">全部系列（' + matched.length + '）</button>';
+
+  seriesList.forEach(function(seriesName) {
+    var count = seriesMap[seriesName];
+    var isActive = currentSeries === seriesName;
+    var cls = isActive ? 'series-tag active' : 'series-tag';
+    html += '<button class="' + cls + '" type="button" onclick="selectSeriesFilter(\'' + encodeURIComponent(seriesName) + '\')">' + seriesName + '（' + count + '）</button>';
+  });
+
+  container.innerHTML = html;
+  container.style.display = 'flex';
+}
+
+function selectSeriesFilter(seriesEncoded) {
+  var seriesName = seriesEncoded ? decodeURIComponent(seriesEncoded) : '';
+  currentEditingSeries = seriesName;
+  showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, seriesName);
+}
+
 function selectBrand(brandName) {
   console.log('selectBrand called:', brandName);
   var input = document.getElementById('brand-input');
@@ -796,17 +847,24 @@ function selectBrand(brandName) {
   
   currentEditingBrand = brandName;
   currentEditingShop = shopName;
+  currentEditingSeries = '';
+  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
+  var addSeriesBtn = document.getElementById('add-series-btn');
+  if (addSeriesBtn) {
+    addSeriesBtn.style.display = (shopName && providerName && brandName) ? 'inline-flex' : 'none';
+  }
   
   console.log('calling showRulesByBrandAndShop with:', brandName, shopName);
-  showRulesByBrandAndShop(brandName, shopName);
+  showRulesByBrandAndShop(brandName, shopName, '');
 }
 
-function showRulesByBrandAndShop(brandName, shopName) {
+function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
   console.log('showRulesByBrandAndShop called:', brandName, shopName);
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
   var targetBrand = normalizeText(brandName);
   var targetShop = normalizeText(shopName);
+  var targetSeries = normalizeText(seriesFilter || '');
   
   // 过滤：匹配特定店铺+品牌
   var matched = [];
@@ -834,12 +892,28 @@ function showRulesByBrandAndShop(brandName, shopName) {
   if (!display) return;
   
   if (matched.length === 0) {
+    clearSeriesTags();
     if (targetBrand && targetShop) {
       display.style.display = 'block';
       display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">当前店铺下未找到该品牌规则，已保持店铺上下文，不会回退到其他店铺。</span></div>';
     } else {
       display.style.display = 'none';
     }
+    return;
+  }
+
+  var matchedBeforeSeriesFilter = matched.slice();
+  if (targetSeries) {
+    matched = matched.filter(function(item) {
+      var p = item && item.data ? item.data : {};
+      return normalizeText((p.series || '').trim() || '未设置系列') === targetSeries;
+    });
+  }
+
+  renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '');
+  if (matched.length === 0) {
+    display.style.display = 'block';
+    display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">该品牌下未找到所选系列，请切换其他系列查看。</span></div>';
     return;
   }
   
@@ -997,6 +1071,9 @@ function selectProvider(providerName) {
   var input = document.getElementById('provider-search-input');
   if (input) input.value = providerName;
   currentProvider = providerName;
+  clearSeriesTags();
+  var addSeriesBtn = document.getElementById('add-series-btn');
+  if (addSeriesBtn) addSeriesBtn.style.display = 'none';
   
   var normalizedProvider = normalizeEntityKey(providerName);
   var providersData = getAllProvidersForSearch();
@@ -1291,7 +1368,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   var html = '<div class="rule-card-edit">';
   html += '  <div class="rule-card-header">';
   html += '    <div class="rule-card-title">编辑: ' + (rule.brand || '未命名规则') + ' · ' + ((rule.series || '').trim() || '未设置系列') + '</div>';
-  html += '    <button class="rule-edit-btn" onclick="showRulesByBrandAndShop(currentEditingBrand, currentEditingShop)">✖ 取消</button>';
+  html += '    <button class="rule-edit-btn" onclick="showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries)">✖ 取消</button>';
   html += '  </div>';
   html += '  <div class="rule-card-body">';
   html += '    <div class="rule-row"><span class="rule-label">店铺：</span><span class="rule-value">' + (rule.shop || '未设置店铺') + '</span></div>';
@@ -1361,7 +1438,7 @@ function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, t
     console.log('💾 保存的数据:', providersData[resolvedIndex]);
     setData(STORAGE_KEYS.PROVIDERS, providersData);
     showToast('保存成功');
-    showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
+    showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries);
   } catch (err) {
     console.error('saveRuleByIndex 失败:', err);
     showToast('保存失败，请重试');
@@ -1381,7 +1458,7 @@ function deleteRuleByIndex(globalIndex) {
   providersData.splice(globalIndex, 1);
   setData(STORAGE_KEYS.PROVIDERS, providersData);
   showToast('删除成功');
-  showRulesByBrandAndShop(currentEditingBrand, currentEditingShop);
+  showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries);
 }
 
 function showManualInput() {
@@ -2602,6 +2679,32 @@ extraStyles.textContent = `
   }
   .rule-delete-btn:hover {
     background: #ff6b7a;
+  }
+  .series-tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: -6px;
+    margin-bottom: 8px;
+  }
+  .series-tag-label {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .series-tag {
+    border: 1px solid var(--border-color);
+    background: #fff;
+    color: var(--text-primary);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .series-tag.active {
+    border-color: var(--primary-cyan);
+    color: var(--primary-cyan);
+    background: rgba(34, 211, 238, 0.08);
   }
 `;
 document.head.appendChild(extraStyles);
