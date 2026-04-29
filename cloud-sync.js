@@ -149,15 +149,33 @@ function mergeProviders(remoteList, localList) {
 }
 
 async function fetchCloudProviders() {
-  var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=*', {
-    headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
-  });
-  if (!res.ok) {
-    var errText = await res.text();
-    throw new Error('拉取云端失败: ' + res.status + ' ' + errText);
+  var pageSize = 1000;
+  var from = 0;
+  var all = [];
+
+  while (true) {
+    var to = from + pageSize - 1;
+    var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=*', {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Range-Unit': 'items',
+        'Range': from + '-' + to
+      }
+    });
+    if (!res.ok) {
+      var errText = await res.text();
+      throw new Error('拉取云端失败: ' + res.status + ' ' + errText);
+    }
+
+    var rows = await res.json();
+    var list = Array.isArray(rows) ? rows : [];
+    all = all.concat(list);
+    if (list.length < pageSize) break;
+    from += pageSize;
   }
-  var rows = await res.json();
-  return Array.isArray(rows) ? rows : [];
+
+  return all;
 }
 
 function notifyProvidersUpdated(source) {
