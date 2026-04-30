@@ -2357,7 +2357,7 @@ function getAIRules() {
       sections: [
         {
           title: '高考真题',
-          content: '<p><span class="sc-action green">不处理，直接上传</span></p>'
+          content: '<p><span class="sc-action green">不处理上传</span></p>'
         },
         {
           title: '中考/小升初真题',
