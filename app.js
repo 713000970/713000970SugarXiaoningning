@@ -300,12 +300,34 @@ function cleanupBlankPlaceholderProviders() {
   }
 
   var meaningfulGroupMap = {};
+  var hasShopByBrandSeriesKey = {};
   providers.forEach(function(p) {
     if (!hasMeaningfulRule(p)) return;
     meaningfulGroupMap[groupKey(p)] = true;
   });
+  providers.forEach(function(p) {
+    var providerKey = [
+      normalizeEntityKey(p && p.name),
+      normalizeText(p && p.brand),
+      normalizeText((p && p.series) || '')
+    ].join('|');
+    var hasShop = !!(String((p && p.shop) || '').trim() || String((p && p.shopname) || '').trim());
+    if (hasShop) hasShopByBrandSeriesKey[providerKey] = true;
+  });
 
   var next = providers.filter(function(p) {
+    var noSeries = !String((p && p.series) || '').trim();
+    var isBlank = !hasMeaningfulRule(p);
+    if (noSeries && isBlank) return false;
+
+    var providerKey = [
+      normalizeEntityKey(p && p.name),
+      normalizeText(p && p.brand),
+      normalizeText((p && p.series) || '')
+    ].join('|');
+    var hasShop = !!(String((p && p.shop) || '').trim() || String((p && p.shopname) || '').trim());
+    if (!hasShop && hasShopByBrandSeriesKey[providerKey]) return false;
+
     if (hasMeaningfulRule(p)) return true;
     var key = groupKey(p);
     return !meaningfulGroupMap[key];
@@ -2420,6 +2442,31 @@ function aiQuery() {
     }
   });
   matchedProviders = Array.from(dedupedMap.values());
+
+  // AI 端最终兜底：过滤未设置系列的纯空白卡，以及“同品牌同系列已有店铺版本”时的无店铺孤立卡
+  var aiHasShopByBrandSeriesKey = {};
+  matchedProviders.forEach(function(p) {
+    var key = [
+      normalizeEntityKey(p && p.name),
+      normalizeText(p && p.brand),
+      normalizeText((p && p.series) || '')
+    ].join('|');
+    var hasShop = !!(String((p && p.shop) || '').trim() || String((p && p.shopname) || '').trim());
+    if (hasShop) aiHasShopByBrandSeriesKey[key] = true;
+  });
+  matchedProviders = matchedProviders.filter(function(p) {
+    var noSeries = !String((p && p.series) || '').trim();
+    var isBlank = !hasMeaningfulRuleForAi(p);
+    if (noSeries && isBlank) return false;
+    var key = [
+      normalizeEntityKey(p && p.name),
+      normalizeText(p && p.brand),
+      normalizeText((p && p.series) || '')
+    ].join('|');
+    var hasShop = !!(String((p && p.shop) || '').trim() || String((p && p.shopname) || '').trim());
+    if (!hasShop && aiHasShopByBrandSeriesKey[key]) return false;
+    return true;
+  });
   
   if (matchedProviders.length > 0) {
     // 一条规则一张卡片，提升可读性（避免同卡片内信息过密）
