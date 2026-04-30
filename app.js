@@ -1741,6 +1741,14 @@ function openAddBrand() {
   saveBrand(name);
 }
 
+function openDeleteBrand() {
+  var inputEl = document.getElementById('brand-input');
+  var defaultBrand = (inputEl ? inputEl.value : '').trim();
+  var brandName = window.prompt('请输入要删除的品牌名称', defaultBrand);
+  if (brandName == null) return;
+  deleteBrand(brandName);
+}
+
 function openAddSeries() {
   var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
@@ -1872,6 +1880,52 @@ function saveBrand(nameInput) {
   } else {
     showToast(brandExists ? '品牌已存在，已新增当前店铺/提供者关联' : '品牌添加成功');
   }
+}
+
+function deleteBrand(nameInput) {
+  var name = String(nameInput || '').trim();
+  if (!name) {
+    showToast('请输入品牌名称');
+    return;
+  }
+
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var inUseCount = providers.filter(function(p) {
+    return normalizeText(p && p.brand) === normalizeText(name);
+  }).length;
+
+  if (inUseCount > 0) {
+    showToast('该品牌已被录入规则使用，无法删除');
+    return;
+  }
+
+  var brands = getData(STORAGE_KEYS.BRANDS);
+  var nextBrands = brands.filter(function(b) {
+    return normalizeText((b && b.name) || b) !== normalizeText(name);
+  });
+
+  if (nextBrands.length === brands.length) {
+    showToast('未找到该品牌');
+    return;
+  }
+
+  if (!confirm('确定删除品牌「' + name + '」吗？')) return;
+
+  setData(STORAGE_KEYS.BRANDS, nextBrands);
+
+  var brandInputEl = document.getElementById('brand-input');
+  if (brandInputEl && normalizeText(brandInputEl.value) === normalizeText(name)) {
+    brandInputEl.value = '';
+  }
+
+  var brandDropdown = document.getElementById('brand-dropdown');
+  if (brandDropdown) {
+    brandDropdown.style.display = 'none';
+  }
+
+  loadBrands();
+  updateStats();
+  showToast('品牌删除成功');
 }
 
 function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, providerInput) {
