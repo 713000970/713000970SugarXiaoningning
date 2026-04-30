@@ -1091,9 +1091,25 @@ function selectProvider(providerName) {
   hideManualInput();
     
   if (matched.length > 0) {
-    // 获取该提供者关联的所有店铺（兼容 shop/shopname）
-    var uniqueShops = matched.map(function(p) { return (p && (p.shop || p.shopname)) || ''; }).filter(Boolean);
-    uniqueShops = [...new Set(uniqueShops)];
+    // 获取该提供者关联的所有店铺（兼容历史字段）
+    var shopMap = {};
+    matched.forEach(function(p) {
+      var candidates = [
+        p && p.shop,
+        p && p.shopname,
+        p && p.shopName,
+        p && p.store,
+        p && p.storeName
+      ];
+      candidates.forEach(function(rawShop) {
+        var shopText = String(rawShop || '').trim();
+        if (!shopText) return;
+        var key = normalizeEntityKey(shopText);
+        if (!key || shopMap[key]) return;
+        shopMap[key] = shopText;
+      });
+    });
+    var uniqueShops = Object.keys(shopMap).map(function(key) { return shopMap[key]; });
     
     // 自动填充店铺时优先保留当前上下文，避免跳到其他店铺
     var shopInput = document.getElementById('shop-search-input');
@@ -1105,8 +1121,13 @@ function selectProvider(providerName) {
     if (!preferredShop) {
       preferredShop = uniqueShops[0] || '';
     }
-    if (shopInput && preferredShop) {
-      shopInput.value = preferredShop;
+    if (shopInput) {
+      if (preferredShop) {
+        shopInput.value = preferredShop;
+      } else {
+        shopInput.value = '';
+        showToast('该提供者未关联店铺信息，请先补录店铺');
+      }
     }
     
     // 存储品牌供品牌搜索使用
