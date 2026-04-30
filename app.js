@@ -17,6 +17,7 @@ const STORAGE_KEYS = {
   SERIES: 'rule_library_series'
 };
 const APP_LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
+const DELETED_BRANDS_KEY = 'rule_library_deleted_brands';
 
  
 
@@ -93,6 +94,32 @@ function getData(key) {
 
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function getDeletedBrandSet() {
+  var arr = JSON.parse(localStorage.getItem(DELETED_BRANDS_KEY) || '[]');
+  return new Set((arr || []).map(function(name) { return normalizeText(name); }).filter(Boolean));
+}
+
+function saveDeletedBrandSet(setObj) {
+  localStorage.setItem(DELETED_BRANDS_KEY, JSON.stringify(Array.from(setObj || [])));
+}
+
+function markBrandDeleted(name) {
+  var normalized = normalizeText(name);
+  if (!normalized) return;
+  var setObj = getDeletedBrandSet();
+  setObj.add(normalized);
+  saveDeletedBrandSet(setObj);
+}
+
+function unmarkBrandDeleted(name) {
+  var normalized = normalizeText(name);
+  if (!normalized) return;
+  var setObj = getDeletedBrandSet();
+  if (!setObj.has(normalized)) return;
+  setObj.delete(normalized);
+  saveDeletedBrandSet(setObj);
 }
 
 function normalizeEntityKey(value) {
@@ -469,6 +496,7 @@ function loadProviders() {
 function loadBrands() {
   var brands = getData(STORAGE_KEYS.BRANDS);
   var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var deletedBrandSet = getDeletedBrandSet();
 
   // 保证品牌库与提供者数据一致：如果提供者里出现新品牌，自动补齐到品牌库
   var normalizedBrands = (brands || []).map(function(b) {
@@ -486,6 +514,7 @@ function loadBrands() {
     (providers || [])
       .map(function(p) { return p && p.brand ? String(p.brand).trim() : ''; })
       .filter(Boolean)
+      .filter(function(name) { return !deletedBrandSet.has(normalizeText(name)); })
   )];
   var hasBrandChanges = false;
 
@@ -523,6 +552,7 @@ function loadBrands() {
     if (brands && brands.length > 0) {
       optionsHtml += brands.map(function(b) {
         var name = b.name || b;
+        if (deletedBrandSet.has(normalizeText(name))) return '';
         var id = b.id || name;
         return '<option value="' + id + '">' + name + '</option>';
       }).join('');
@@ -679,7 +709,10 @@ function loadBrandsByShopAndShowDropdown(shopName) {
     var shopname = normalizeEntityKey(p && p.shopname);
     return isEntityMatched(shop, targetShop) || isEntityMatched(shopname, targetShop);
   });
-  var brands = [...new Set(matched.map(function(p) { return p.brand; }).filter(Boolean))];
+  var deletedBrandSet = getDeletedBrandSet();
+  var brands = [...new Set(matched.map(function(p) { return p.brand; }).filter(Boolean))].filter(function(name) {
+    return !deletedBrandSet.has(normalizeText(name));
+  });
   
   var brandInput = document.getElementById('brand-input');
   
@@ -863,6 +896,16 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
   var targetBrand = normalizeText(brandName);
+  var deletedBrandSet = getDeletedBrandSet();
+  if (deletedBrandSet.has(targetBrand)) {
+    var deletedDisplay = document.getElementById('custom-rule-display');
+    if (deletedDisplay) {
+      deletedDisplay.style.display = 'block';
+      deletedDisplay.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">该品牌已删除，不再展示规则。</span></div>';
+    }
+    clearSeriesTags();
+    return;
+  }
   var targetShop = normalizeText(shopName);
   var targetSeries = normalizeText(seriesFilter || '');
   
@@ -940,6 +983,13 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
     var key = groupIdentityKey(p);
     if (!meaningfulGroupMap[key]) return true;
     return hasMeaningfulRule(p);
+  });
+  // 纯占位卡片（未设置系列+全待录入）默认隐藏
+  matched = matched.filter(function(item) {
+    var p = item && item.data ? item.data : {};
+    var noSeries = !String((p.series || '')).trim();
+    var isBlank = !hasMeaningfulRule(p);
+    return !(noSeries && isBlank);
   });
 
   renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '');
@@ -1878,6 +1928,7 @@ function saveBrand(nameInput) {
     showToast('请输入品牌名称');
     return;
   }
+  unmarkBrandDeleted(name);
 
   var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
@@ -1944,6 +1995,7 @@ function deleteBrand(nameInput) {
     showToast('请输入品牌名称');
     return;
   }
+  markBrandDeleted(name);
 
   var providers = getData(STORAGE_KEYS.PROVIDERS);
   var currentShop = (document.getElementById('shop-search-input')?.value || '').trim();
