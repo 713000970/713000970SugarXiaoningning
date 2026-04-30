@@ -2455,6 +2455,9 @@ function aiQuery() {
     if (hasShop) aiHasShopByBrandSeriesKey[key] = true;
   });
   matchedProviders = matchedProviders.filter(function(p) {
+    var hasShop = !!(String((p && p.shop) || '').trim() || String((p && p.shopname) || '').trim());
+    if (!hasShop) return false;
+
     var noSeries = !String((p && p.series) || '').trim();
     var isBlank = !hasMeaningfulRuleForAi(p);
     if (noSeries && isBlank) return false;
@@ -2463,9 +2466,34 @@ function aiQuery() {
       normalizeText(p && p.brand),
       normalizeText((p && p.series) || '')
     ].join('|');
-    var hasShop = !!(String((p && p.shop) || '').trim() || String((p && p.shopname) || '').trim());
     if (!hasShop && aiHasShopByBrandSeriesKey[key]) return false;
     return true;
+  });
+
+  // 强一致：仅保留“在提供者查询口径下可展示”的卡片，其他一律删除
+  var providerVisibleKey = function(p) {
+    return [
+      normalizeEntityKey(p && p.shop),
+      normalizeEntityKey(p && p.shopname),
+      normalizeEntityKey(p && p.name),
+      normalizeText(p && p.brand),
+      normalizeText((p && p.series) || '')
+    ].join('|');
+  };
+  var providerCandidatesForVisible = localProviders
+    .filter(function(p) {
+      var brand = normalizeText(p && p.brand);
+      if (deletedBrandSet.has(brand)) return false;
+      var hasShop = !!(String((p && p.shop) || '').trim() || String((p && p.shopname) || '').trim());
+      if (!hasShop) return false;
+      var noSeries = !String((p && p.series) || '').trim();
+      var isBlank = !hasMeaningfulRuleForAi(p);
+      if (noSeries && isBlank) return false;
+      return true;
+    });
+  var providerVisibleSet = new Set(providerCandidatesForVisible.map(function(p) { return providerVisibleKey(p); }));
+  matchedProviders = matchedProviders.filter(function(p) {
+    return providerVisibleSet.has(providerVisibleKey(p));
   });
   
   if (matchedProviders.length > 0) {
