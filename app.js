@@ -2309,7 +2309,7 @@ function aiQuery() {
     .sort(function(a, b) { return b.score - a.score; })
     .map(function(item) { return item.data; });
 
-  // AI 查询与提供者查询保持一致：隐藏“未设置系列 + 全待录入”的纯占位卡
+  // AI 查询与提供者查询保持一致：仅删除“同组已有有效规则”下的空白占位卡
   var hasMeaningfulRuleForAi = function(p) {
     if (!p) return false;
     return !!(
@@ -2320,10 +2320,23 @@ function aiQuery() {
       String(p.otherInfo || '').trim()
     );
   };
+  var aiGroupIdentityKey = function(p) {
+    return [
+      normalizeEntityKey(p && p.shop),
+      normalizeEntityKey(p && p.name),
+      normalizeText(p && p.brand),
+      normalizeText((p && p.series) || '')
+    ].join('|');
+  };
+  var aiMeaningfulGroupMap = {};
+  matchedProviders.forEach(function(p) {
+    var key = aiGroupIdentityKey(p);
+    if (hasMeaningfulRuleForAi(p)) aiMeaningfulGroupMap[key] = true;
+  });
   matchedProviders = matchedProviders.filter(function(p) {
-    var noSeries = !String((p && p.series) || '').trim();
-    var isBlank = !hasMeaningfulRuleForAi(p);
-    return !(noSeries && isBlank);
+    var key = aiGroupIdentityKey(p);
+    if (!aiMeaningfulGroupMap[key]) return true;
+    return hasMeaningfulRuleForAi(p);
   });
 
   // 当查询词与品牌存在精确匹配时，仅保留该品牌结果，避免返回“包含但不一致”的品牌卡片
