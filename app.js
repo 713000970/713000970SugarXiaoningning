@@ -2233,6 +2233,7 @@ function aiQuery() {
   
   // 首先搜索提供者/品牌/系列数据 - 只搜索 localStorage 中的用户保存数据
   var localProviders = getData(STORAGE_KEYS.PROVIDERS);
+  var deletedBrandSet = getDeletedBrandSet();
   
   // 只搜索本地数据（用户保存的规则），不使用 presetData
   var providerCandidates = localProviders
