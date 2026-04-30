@@ -276,9 +276,8 @@ async function syncToCloud(data) {
   try {
     console.log('🌥️ 同步到云端...', data.length, '条');
     
-    // 先与云端数据合并，避免本地不全时覆盖导致线上丢数据
-    const remoteBeforeSync = await fetchCloudProviders();
-    const formatted = mergeProviders(remoteBeforeSync, (data || []).map(toCloudProvider));
+    // 以当前本地数据为准回传，确保删除操作能正确同步到云端
+    const formatted = (data || []).map(toCloudProvider);
     const nextSnapshot = JSON.stringify(formatted);
     if (nextSnapshot === lastCloudSnapshot) {
       localStorage.setItem(LOCAL_DIRTY_KEY, '0');
