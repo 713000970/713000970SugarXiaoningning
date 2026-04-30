@@ -996,7 +996,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
   renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '');
   if (matched.length === 0) {
     display.style.display = 'block';
-    display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">该品牌下未找到所选系列，请切换其他系列查看。</span></div>';
+    display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">该品牌下未找到所选系列，请点 +新增系列添加。</span></div>';
     return;
   }
   
@@ -2347,6 +2347,35 @@ function aiQuery() {
   if (exactBrandMatches.length > 0) {
     matchedProviders = exactBrandMatches;
   }
+
+  // AI 查询结果去重：同一店铺/提供者/品牌/系列只保留一张卡，优先保留信息更完整的
+  var dedupedMap = new Map();
+  matchedProviders.forEach(function(p) {
+    var key = aiGroupIdentityKey(p);
+    var existing = dedupedMap.get(key);
+    if (!existing) {
+      dedupedMap.set(key, p);
+      return;
+    }
+    var existingScore = (
+      (String(existing.split || '').trim() ? 1 : 0) +
+      (String(existing.pricing || '').trim() ? 1 : 0) +
+      (String(existing.publishTime || '').trim() ? 1 : 0) +
+      (String(existing.specialCase || '').trim() ? 1 : 0) +
+      (String(existing.otherInfo || '').trim() ? 1 : 0)
+    );
+    var currentScore = (
+      (String(p.split || '').trim() ? 1 : 0) +
+      (String(p.pricing || '').trim() ? 1 : 0) +
+      (String(p.publishTime || '').trim() ? 1 : 0) +
+      (String(p.specialCase || '').trim() ? 1 : 0) +
+      (String(p.otherInfo || '').trim() ? 1 : 0)
+    );
+    if (currentScore > existingScore) {
+      dedupedMap.set(key, p);
+    }
+  });
+  matchedProviders = Array.from(dedupedMap.values());
   
   if (matchedProviders.length > 0) {
     // 一条规则一张卡片，提升可读性（避免同卡片内信息过密）
