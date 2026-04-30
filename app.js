@@ -273,8 +273,52 @@ function forceRefreshData() {
     location.reload();
   }, 100);
 }
+
+// 全量清理：若同组已存在有效规则，则删除纯空白占位卡
+function cleanupBlankPlaceholderProviders() {
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  if (!Array.isArray(providers) || providers.length === 0) return;
+
+  function hasMeaningfulRule(p) {
+    return !!(
+      String((p && p.split) || '').trim() ||
+      String((p && p.pricing) || '').trim() ||
+      String((p && p.publishTime) || '').trim() ||
+      String((p && p.specialCase) || '').trim() ||
+      String((p && p.otherInfo) || '').trim()
+    );
+  }
+
+  function groupKey(p) {
+    return [
+      normalizeEntityKey(p && p.shop),
+      normalizeEntityKey(p && p.shopname),
+      normalizeEntityKey(p && p.name),
+      normalizeText(p && p.brand),
+      normalizeText((p && p.series) || '')
+    ].join('|');
+  }
+
+  var meaningfulGroupMap = {};
+  providers.forEach(function(p) {
+    if (!hasMeaningfulRule(p)) return;
+    meaningfulGroupMap[groupKey(p)] = true;
+  });
+
+  var next = providers.filter(function(p) {
+    if (hasMeaningfulRule(p)) return true;
+    var key = groupKey(p);
+    return !meaningfulGroupMap[key];
+  });
+
+  if (next.length !== providers.length) {
+    setData(STORAGE_KEYS.PROVIDERS, next);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initData();
+  cleanupBlankPlaceholderProviders();
   if (typeof initCollapsibles === 'function') initCollapsibles();
   loadProviderSelect();
   loadProviders();
