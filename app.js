@@ -2219,6 +2219,14 @@ function aiQuery() {
   var matchedProviders = providerCandidates
     .sort(function(a, b) { return b.score - a.score; })
     .map(function(item) { return item.data; });
+
+  // 当查询词与品牌存在精确匹配时，仅保留该品牌结果，避免返回“包含但不一致”的品牌卡片
+  var exactBrandMatches = matchedProviders.filter(function(p) {
+    return normalizeForSearch(p && p.brand) === normalizedQuery;
+  });
+  if (exactBrandMatches.length > 0) {
+    matchedProviders = exactBrandMatches;
+  }
   
   if (matchedProviders.length > 0) {
     // 一条规则一张卡片，提升可读性（避免同卡片内信息过密）
