@@ -1127,6 +1127,9 @@ function selectProvider(providerName) {
       } else {
         shopInput.value = '';
         showToast('该提供者未关联店铺信息，请先补录店铺');
+        if (confirm('该提供者暂无店铺信息，是否现在补录？')) {
+          openAddProviderDirect(providerName);
+        }
       }
     }
     
