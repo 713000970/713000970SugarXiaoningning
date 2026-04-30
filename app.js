@@ -910,6 +910,38 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
     });
   }
 
+  // 删除空白规则卡片：同一店铺/提供者/品牌/系列已存在有效规则时，隐藏纯空白占位记录
+  var hasMeaningfulRule = function(p) {
+    if (!p) return false;
+    return !!(
+      String(p.split || '').trim() ||
+      String(p.pricing || '').trim() ||
+      String(p.publishTime || '').trim() ||
+      String(p.specialCase || '').trim() ||
+      String(p.otherInfo || '').trim()
+    );
+  };
+  var groupIdentityKey = function(p) {
+    return [
+      normalizeEntityKey(p && p.shop),
+      normalizeEntityKey(p && p.name),
+      normalizeText(p && p.brand),
+      normalizeText((p && p.series) || '')
+    ].join('|');
+  };
+  var meaningfulGroupMap = {};
+  matched.forEach(function(item) {
+    var p = item && item.data ? item.data : {};
+    var key = groupIdentityKey(p);
+    if (hasMeaningfulRule(p)) meaningfulGroupMap[key] = true;
+  });
+  matched = matched.filter(function(item) {
+    var p = item && item.data ? item.data : {};
+    var key = groupIdentityKey(p);
+    if (!meaningfulGroupMap[key]) return true;
+    return hasMeaningfulRule(p);
+  });
+
   renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '');
   if (matched.length === 0) {
     display.style.display = 'block';
