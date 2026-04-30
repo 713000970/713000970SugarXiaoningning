@@ -1890,26 +1890,53 @@ function deleteBrand(nameInput) {
   }
 
   var providers = getData(STORAGE_KEYS.PROVIDERS);
-  var inUseCount = providers.filter(function(p) {
-    return normalizeText(p && p.brand) === normalizeText(name);
-  }).length;
+  var currentShop = (document.getElementById('shop-search-input')?.value || '').trim();
+  var currentProvider = (document.getElementById('provider-search-input')?.value || '').trim();
+  var normalizedBrand = normalizeText(name);
 
-  if (inUseCount > 0) {
-    showToast('该品牌已被录入规则使用，无法删除');
-    return;
+  var matchedRecords = providers.filter(function(p) {
+    if (normalizeText(p && p.brand) !== normalizedBrand) return false;
+    if (currentShop && currentProvider) {
+      return isSameContextProvider(p, currentShop, currentProvider);
+    }
+    return true;
+  });
+
+  if (matchedRecords.length > 0) {
+    var scopeText = (currentShop && currentProvider)
+      ? '当前店铺/提供者下'
+      : '所有店铺/提供者下';
+    var confirmDeleteRules = confirm(
+      '品牌「' + name + '」在' + scopeText + '有 ' + matchedRecords.length + ' 条已录入规则。\n确定同时删除这些规则吗？'
+    );
+    if (!confirmDeleteRules) return;
+    providers = providers.filter(function(p) {
+      if (normalizeText(p && p.brand) !== normalizedBrand) return true;
+      if (currentShop && currentProvider) {
+        return !isSameContextProvider(p, currentShop, currentProvider);
+      }
+      return false;
+    });
+    setData(STORAGE_KEYS.PROVIDERS, providers);
   }
 
   var brands = getData(STORAGE_KEYS.BRANDS);
-  var nextBrands = brands.filter(function(b) {
+  var hasBrandInUse = providers.some(function(p) {
+    return normalizeText(p && p.brand) === normalizedBrand;
+  });
+
+  var nextBrands = hasBrandInUse ? brands : brands.filter(function(b) {
     return normalizeText((b && b.name) || b) !== normalizeText(name);
   });
 
-  if (nextBrands.length === brands.length) {
+  if (nextBrands.length === brands.length && matchedRecords.length === 0) {
     showToast('未找到该品牌');
     return;
   }
 
-  if (!confirm('确定删除品牌「' + name + '」吗？')) return;
+  if (matchedRecords.length === 0) {
+    if (!confirm('确定删除品牌「' + name + '」吗？')) return;
+  }
 
   setData(STORAGE_KEYS.BRANDS, nextBrands);
 
@@ -1925,7 +1952,11 @@ function deleteBrand(nameInput) {
 
   loadBrands();
   updateStats();
-  showToast('品牌删除成功');
+  if (hasBrandInUse) {
+    showToast('已删除当前关联规则；该品牌在其他规则中仍在使用');
+  } else {
+    showToast('品牌删除成功');
+  }
 }
 
 function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, providerInput) {
