@@ -2510,11 +2510,15 @@ function getAIRules() {
     {
       keyword: '定价',
       icon: '💰',
-      title: '定价参考规则',
+      title: '上传规则',
       sections: [
         {
-          title: '定价文档',
+          title: '1、定价',
           content: '<p>参考定价文档：<a href="https://docs.qq.com/doc/DUVNLeVZ0TXl5S1VT" target="_blank">查看定价文档 →</a></p>'
+        },
+        {
+          title: '2、发布时间',
+          content: '<p>（1）专辑：立即发布</p><p>（2）资料：立即发布1/10，剩余按教学进度发布，一般以月为颗粒度同步</p><p>教学中高考进度统计表：<a href="https://docs.qq.com/sheet/DQW1jb2FtaGVGbHZr?nlc=1&tab=m5junw" target="_blank">点击查看 →</a></p>'
         }
       ]
     },
