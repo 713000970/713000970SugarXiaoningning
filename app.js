@@ -161,6 +161,7 @@ function pickPreferredDisplayName(names, preferWithParentheses) {
 
 function getAllProvidersForSearch() {
   var localProviders = getData(STORAGE_KEYS.PROVIDERS);
+  var deletedBrandSet = getDeletedBrandSet();
   var presetProviders = (typeof presetData !== 'undefined' && presetData && Array.isArray(presetData.providers)) ? presetData.providers : [];
   var merged = [].concat(localProviders || [], presetProviders || []);
   var seen = new Set();
@@ -2235,6 +2236,10 @@ function aiQuery() {
   
   // 只搜索本地数据（用户保存的规则），不使用 presetData
   var providerCandidates = localProviders
+    .filter(function(p) {
+      var brand = normalizeText(p && p.brand);
+      return !deletedBrandSet.has(brand);
+    })
     .map(function(p) {
       var identityText = [
         p.name || '',
@@ -2303,6 +2308,23 @@ function aiQuery() {
   var matchedProviders = providerCandidates
     .sort(function(a, b) { return b.score - a.score; })
     .map(function(item) { return item.data; });
+
+  // AI 查询与提供者查询保持一致：隐藏“未设置系列 + 全待录入”的纯占位卡
+  var hasMeaningfulRuleForAi = function(p) {
+    if (!p) return false;
+    return !!(
+      String(p.split || '').trim() ||
+      String(p.pricing || '').trim() ||
+      String(p.publishTime || '').trim() ||
+      String(p.specialCase || '').trim() ||
+      String(p.otherInfo || '').trim()
+    );
+  };
+  matchedProviders = matchedProviders.filter(function(p) {
+    var noSeries = !String((p && p.series) || '').trim();
+    var isBlank = !hasMeaningfulRuleForAi(p);
+    return !(noSeries && isBlank);
+  });
 
   // 当查询词与品牌存在精确匹配时，仅保留该品牌结果，避免返回“包含但不一致”的品牌卡片
   var exactBrandMatches = matchedProviders.filter(function(p) {
