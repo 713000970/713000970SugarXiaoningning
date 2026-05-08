@@ -115,7 +115,14 @@ function toCloudProvider(p) {
 }
 
 function calcSnapshot(data) {
-  return JSON.stringify((data || []).map(toCloudProvider));
+  var list = (data || []).map(function(item) {
+    return toCloudProvider(item || {});
+  });
+  // 按业务主键排序后再序列化，避免仅顺序不同却误判为「本地/云端不一致」
+  list.sort(function(a, b) {
+    return providerIdentityKey(a).localeCompare(providerIdentityKey(b), 'zh-Hans-CN');
+  });
+  return JSON.stringify(list);
 }
 
 function providerIdentityKey(p) {
@@ -228,8 +235,13 @@ async function cloudSync() {
       const localProvidersNow = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
       const localSnapshotNow = calcSnapshot(localProvidersNow);
 
-      // 本地与云端都变更时，先合并，避免任一侧数据被覆盖丢失
-      if (localSnapshotNow !== lastCloudSnapshot && localSnapshotNow !== remoteSnapshot) {
+      // lastCloudSnapshot 仅在内存中，刷新后会清空；须结合 localDirty，否则会每次打开都误判「并发」并全量回传
+      var localEdited =
+        localDirty ||
+        (lastCloudSnapshot !== '' && localSnapshotNow !== lastCloudSnapshot);
+
+      // 确有本地待同步的变更，且与云端不一致时，才合并回传
+      if (localEdited && localSnapshotNow !== remoteSnapshot) {
         console.log('🌥️ 检测到本地与云端并发变更，先合并后回传');
         var mergedCloudData = mergeProviders(remoteData, localProvidersNow);
         localStorage.setItem('rule_library_providers', JSON.stringify(mergedCloudData.map(toLocalProvider)));
