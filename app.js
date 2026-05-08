@@ -487,25 +487,18 @@ window.addEventListener('cloud-sync-status', function(evt) {
 function updateStats() {
   const providers = getData(STORAGE_KEYS.PROVIDERS);
   const brands = getData(STORAGE_KEYS.BRANDS);
-  
+  const shopCount = [...new Set(providers.map(function(p) {
+    return p && p.shop;
+  }).filter(Boolean))].length;
+
   const statProviders = document.getElementById('stat-providers');
   const statBrands = document.getElementById('stat-brands');
-  
-  if (statProviders) animateNumber(statProviders, providers.length);
-  if (statBrands) animateNumber(statBrands, brands.length);
-}
+  const statShops = document.getElementById('stat-shops');
 
-function animateNumber(element, target) {
-  let current = 0;
-  const step = Math.ceil(target / 20);
-  const interval = setInterval(() => {
-    current += step;
-    if (current >= target) {
-      current = target;
-      clearInterval(interval);
-    }
-    element.textContent = current;
-  }, 50);
+  // 直接写入数字，避免动画从 0 递增与云同步后重复触发造成的计数抖动、重叠定时器
+  if (statProviders) statProviders.textContent = String(providers.length);
+  if (statBrands) statBrands.textContent = String(brands.length);
+  if (statShops) statShops.textContent = String(shopCount);
 }
 
 // ========================================
