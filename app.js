@@ -2967,18 +2967,26 @@ extraStyles.textContent = `
   }
   .rule-item {
     display: flex;
+    align-items: flex-start;
+    gap: 8px;
     padding: 8px 0;
     border-bottom: 1px solid rgba(79, 140, 255, 0.1);
   }
   .rule-item .label {
     width: 80px;
+    flex-shrink: 0;
     color: var(--text-muted);
     font-size: 13px;
   }
   .rule-item .value {
+    min-width: 0;
+    flex: 1;
     color: var(--text-dark);
     font-size: 13px;
     font-weight: 500;
+    line-height: 1.5;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
   .rule-card {
     background: white;
@@ -2986,19 +2994,27 @@ extraStyles.textContent = `
     border-radius: 8px;
     margin-bottom: 12px;
     overflow: hidden;
+    min-width: 0;
   }
   .rule-card-header {
     background: linear-gradient(135deg, rgba(79, 140, 255, 0.1) 0%, rgba(124, 92, 246, 0.1) 100%);
     padding: 12px 16px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
     border-bottom: 1px solid var(--border-light);
   }
   .rule-card-title {
     font-weight: 600;
     color: var(--primary-blue);
     font-size: 15px;
+    min-width: 0;
+    flex: 1;
+    line-height: 1.45;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
   .rule-edit-btn {
     background: var(--primary-cyan);
@@ -3017,24 +3033,35 @@ extraStyles.textContent = `
   }
   .rule-row {
     display: flex;
+    align-items: flex-start;
+    gap: 8px;
     padding: 8px 0;
     border-bottom: 1px solid var(--border-light);
+    min-width: 0;
   }
   .rule-row:last-child {
     border-bottom: none;
   }
   .rule-label {
     width: 80px;
+    flex-shrink: 0;
     color: var(--text-muted);
     font-size: 13px;
   }
   .rule-value {
+    min-width: 0;
+    flex: 1 1 0;
     color: var(--text-dark);
     font-size: 13px;
     font-weight: 500;
+    line-height: 1.5;
+    word-break: break-word;
+    overflow-wrap: break-word;
   }
   .rule-input {
     flex: 1;
+    min-width: 0;
+    width: 100%;
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -3053,6 +3080,7 @@ extraStyles.textContent = `
   .rule-card-actions {
     display: flex;
     gap: 8px;
+    flex-shrink: 0;
   }
   .rule-delete-btn {
     background: #ff4757;

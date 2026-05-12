@@ -2356,6 +2356,7 @@ body::before {
   overflow: hidden;
   box-shadow: var(--card-shadow);
   transition: var(--transition);
+  min-width: 0;
 }
 
 .rule-card:hover {
@@ -2364,8 +2365,10 @@ body::before {
 
 .rule-card-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   padding: 14px 16px;
   background: var(--bg-section);
   border-bottom: 1px solid var(--border-light);
@@ -2375,11 +2378,17 @@ body::before {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
+  min-width: 0;
+  flex: 1;
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .rule-card-actions {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .rule-edit-btn {
@@ -2423,6 +2432,7 @@ body::before {
   gap: 8px;
   margin-bottom: 10px;
   font-size: 14px;
+  min-width: 0;
 }
 
 .rule-row:last-child {
@@ -2432,11 +2442,16 @@ body::before {
 .rule-label {
   color: var(--text-muted);
   min-width: 60px;
+  flex-shrink: 0;
 }
 
 .rule-value {
   color: var(--text-primary);
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* ========================================
@@ -2490,6 +2505,11 @@ body::before {
 
 .rule-card-edit .rule-card-title {
   color: white;
+  min-width: 0;
+  flex: 1;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.45;
 }
 
 .rule-card-edit .rule-card-actions {
@@ -2498,6 +2518,7 @@ body::before {
 
 .rule-input {
   width: 100%;
+  min-width: 0;
   background: var(--bg-input);
   border: 1px solid var(--border-color);
   padding: 8px 12px;
