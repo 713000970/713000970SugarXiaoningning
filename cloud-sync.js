@@ -137,19 +137,21 @@ function providerIdentityKey(p) {
 function mergeProviders(remoteList, localList) {
   var mergedMap = new Map();
 
-  (remoteList || []).forEach(function(item) {
+  // 必须先写入本地：同 key 下以本地为准；本地已删除的记录不会出现在 Map 中，
+  // 若先写远程再写本地，则「仅存在于远程」的旧行永远无法被删掉（用户删卡后刷新又出现）。
+  (localList || []).forEach(function(item) {
     var normalized = toCloudProvider(item || {});
     var key = providerIdentityKey(normalized);
     if (!key.replace(/\|/g, '')) return;
     mergedMap.set(key, normalized);
   });
 
-  // 本地优先覆盖同 key，避免用户刚编辑的数据被旧云端值覆盖
-  (localList || []).forEach(function(item) {
+  // 再补远程：仅添加「本地尚不存在」的主键（他人新增的规则）
+  (remoteList || []).forEach(function(item) {
     var normalized = toCloudProvider(item || {});
     var key = providerIdentityKey(normalized);
     if (!key.replace(/\|/g, '')) return;
-    mergedMap.set(key, normalized);
+    if (!mergedMap.has(key)) mergedMap.set(key, normalized);
   });
 
   return Array.from(mergedMap.values());
