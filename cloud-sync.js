@@ -134,27 +134,16 @@ function providerIdentityKey(p) {
   return [shop, shopname, name, brand, series].join('|');
 }
 
-function mergeProviders(remoteList, localList) {
-  var mergedMap = new Map();
-
-  // 必须先写入本地：同 key 下以本地为准；本地已删除的记录不会出现在 Map 中，
-  // 若先写远程再写本地，则「仅存在于远程」的旧行永远无法被删掉（用户删卡后刷新又出现）。
-  (localList || []).forEach(function(item) {
-    var normalized = toCloudProvider(item || {});
-    var key = providerIdentityKey(normalized);
+/** 将当前内存中的规则列表转为上传用行，并按主键去重（后者覆盖前者） */
+function toCloudProviderListForUpload(data) {
+  var map = new Map();
+  (data || []).forEach(function(item) {
+    var c = toCloudProvider(item || {});
+    var key = providerIdentityKey(c);
     if (!key.replace(/\|/g, '')) return;
-    mergedMap.set(key, normalized);
+    map.set(key, c);
   });
-
-  // 再补远程：仅添加「本地尚不存在」的主键（他人新增的规则）
-  (remoteList || []).forEach(function(item) {
-    var normalized = toCloudProvider(item || {});
-    var key = providerIdentityKey(normalized);
-    if (!key.replace(/\|/g, '')) return;
-    if (!mergedMap.has(key)) mergedMap.set(key, normalized);
-  });
-
-  return Array.from(mergedMap.values());
+  return Array.from(map.values());
 }
 
 async function fetchCloudProviders() {
@@ -242,15 +231,25 @@ async function cloudSync() {
         localDirty ||
         (lastCloudSnapshot !== '' && localSnapshotNow !== lastCloudSnapshot);
 
-      // 确有本地待同步的变更，且与云端不一致时，才合并回传
+      // 本地有未对齐云端的修改（含删除）：必须以本地列表为准。
+      // 与远程做「并集」会把「本地已删、云端仍在」的行再次写回，导致删卡后刷新又出现。
       if (localEdited && localSnapshotNow !== remoteSnapshot) {
-        console.log('🌥️ 检测到本地与云端并发变更，先合并后回传');
-        var mergedCloudData = mergeProviders(remoteData, localProvidersNow);
-        localStorage.setItem('rule_library_providers', JSON.stringify(mergedCloudData.map(toLocalProvider)));
+        console.log('🌥️ 检测到本地与云端不一致，以本地为准排队回传');
+        localStorage.setItem('rule_library_providers', JSON.stringify(localProvidersNow));
         localStorage.setItem(LOCAL_DIRTY_KEY, '1');
-        queuePendingSync(mergedCloudData);
+        queuePendingSync(localProvidersNow);
         notifyProvidersUpdated('cloud-merge');
-        markSyncSuccess('检测到并发变更，已合并并排队回传');
+        markSyncSuccess('检测到本地变更，已排队回传云端');
+        return;
+      }
+
+      // 仍有 dirty 标记但快照与云端一致（极少见）：也不要用远程整表覆盖本地，以免冲掉刚写入尚未反映到快照的变更
+      if (localDirty) {
+        console.log('🌥️ 本地有待同步标记，保留本地数据并排队回传');
+        localStorage.setItem(LOCAL_DIRTY_KEY, '1');
+        queuePendingSync(localProvidersNow);
+        notifyProvidersUpdated('cloud-local-dirty');
+        markSyncSuccess('本地待同步，已排队回传云端');
         return;
       }
 
@@ -288,12 +287,10 @@ async function syncToCloud(data) {
   clearRetryTimers();
   emitSyncStatus('syncing', '同步中...');
   try {
-    console.log('🌥️ 同步到云端...', data.length, '条');
+    console.log('🌥️ 同步到云端...', (data || []).length, '条');
     
-    // 多人并发编辑场景：回传前先与云端最新数据合并，避免互相覆盖
-    // 同 key 下本地优先，保证当前操作者刚保存的内容生效
-    const remoteBeforeSync = await fetchCloudProviders();
-    const formatted = mergeProviders(remoteBeforeSync, (data || []).map(toCloudProvider));
+    // 整表替换上传：必须以本次传入的本地列表为准，否则与云端 merge 会把「仅云端仍有」的已删行再次 POST 上去
+    const formatted = toCloudProviderListForUpload(data);
     const nextSnapshot = JSON.stringify(formatted);
     if (nextSnapshot === lastCloudSnapshot) {
       localStorage.setItem(LOCAL_DIRTY_KEY, '0');
