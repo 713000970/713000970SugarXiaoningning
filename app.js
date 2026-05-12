@@ -92,6 +92,42 @@ function getData(key) {
   return JSON.parse(localStorage.getItem(key) || '[]');
 }
 
+/** 用于 innerHTML 文本节点，避免 < 等破坏结构；换行仍保留为 \n，配合 white-space:pre-wrap 显示 */
+function escapeHtmlText(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** 在可编辑框光标处插入文本（支持 Alt+空格 手动换行） */
+function insertTextAtCaret(el, text) {
+  if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
+  if (el.readOnly || el.disabled) return;
+  if (el.type === 'number' || el.type === 'email' || el.type === 'url' || el.type === 'date') return;
+  var start = el.selectionStart;
+  var end = el.selectionEnd;
+  if (typeof start !== 'number' || typeof end !== 'number') return;
+  var val = el.value;
+  el.value = val.slice(0, start) + text + val.slice(end);
+  var pos = start + text.length;
+  try {
+    el.setSelectionRange(pos, pos);
+  } catch (err) {
+    /* ignore */
+  }
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function isAltSpaceNewlineField(el) {
+  if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return false;
+  if (el.readOnly || el.disabled) return false;
+  if (el.classList.contains('alt-space-newline')) return true;
+  if (el.tagName === 'TEXTAREA' && el.classList.contains('rule-input')) return true;
+  return false;
+}
+
 function normalizeText(value) {
   return String(value || '').trim().toLowerCase();
 }
@@ -407,6 +443,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   updateSyncStatusBadge('idle', '等待同步');
+
+  // Alt + 空格：在规则编辑、带 alt-space-newline 的录入框中插入换行
+  document.addEventListener('keydown', function(e) {
+    if (!e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.code !== 'Space' && e.key !== ' ') return;
+    var el = e.target;
+    if (!isAltSpaceNewlineField(el)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.repeat) insertTextAtCaret(el, '\n');
+  }, true);
 });
 
 function refreshProviderViews() {
@@ -1090,16 +1137,16 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
                        '<button class="rule-delete-btn" onclick="deleteRuleByIndex(' + globalIndex + ')">🗑️ 删除</button>';
       html += '<div class="rule-card">';
       html += '  <div class="rule-card-header">';
-      html += '    <div class="rule-card-title">' + ruleName + '</div>';
+      html += '    <div class="rule-card-title">' + escapeHtmlText(ruleName) + '</div>';
       html += '    <div class="rule-card-actions">' + actionButtons + '</div>';
       html += '  </div>';
       html += '  <div class="rule-card-body">';
-      html += '    <div class="rule-row"><span class="rule-label">系列：</span><span class="rule-value">' + ((p.series || '').trim() || '未设置系列') + '</span></div>';
-      html += '    <div class="rule-row"><span class="rule-label">拆分：</span><span class="rule-value">' + (p.split || '待录入') + '</span></div>';
-      html += '    <div class="rule-row"><span class="rule-label">定价：</span><span class="rule-value">' + (p.pricing || '待录入') + '</span></div>';
-      html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><span class="rule-value">' + (p.publishTime || '待录入') + '</span></div>';
-      html += '    <div class="rule-row"><span class="rule-label">特例：</span><span class="rule-value">' + (p.specialCase || '待录入') + '</span></div>';
-      html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><span class="rule-value">' + (p.otherInfo || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">系列：</span><span class="rule-value">' + escapeHtmlText((p.series || '').trim() || '未设置系列') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">拆分：</span><span class="rule-value">' + escapeHtmlText(p.split || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">定价：</span><span class="rule-value">' + escapeHtmlText(p.pricing || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><span class="rule-value">' + escapeHtmlText(p.publishTime || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">特例：</span><span class="rule-value">' + escapeHtmlText(p.specialCase || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><span class="rule-value">' + escapeHtmlText(p.otherInfo || '待录入') + '</span></div>';
       html += '  </div>';
       html += '</div>';
     });
@@ -1421,21 +1468,29 @@ function onSeriesChange() {
         '<button class="btn-edit-rule" onclick="editRule()">✏️ 修改</button>' +
       '</div>' +
       '<div class="rule-display-content" id="rule-content">' +
-        '<div class="rule-item"><span class="label">拆分：</span><span class="value" id="rule-split">' + (currentRule.split || '待录入') + '</span></div>' +
-        '<div class="rule-item"><span class="label">定价：</span><span class="value" id="rule-pricing">' + (currentRule.pricing || '待录入') + '</span></div>' +
-        '<div class="rule-item"><span class="label">发布时间：</span><span class="value" id="rule-publishTime">' + (currentRule.publishTime || '待录入') + '</span></div>' +
-        '<div class="rule-item"><span class="label">特例：</span><span class="value" id="rule-specialCase">' + (currentRule.specialCase || '待录入') + '</span></div>' +
+        '<div class="rule-item"><span class="label">拆分：</span><span class="value" id="rule-split">' + escapeHtmlText(currentRule.split || '待录入') + '</span></div>' +
+        '<div class="rule-item"><span class="label">定价：</span><span class="value" id="rule-pricing">' + escapeHtmlText(currentRule.pricing || '待录入') + '</span></div>' +
+        '<div class="rule-item"><span class="label">发布时间：</span><span class="value" id="rule-publishTime">' + escapeHtmlText(currentRule.publishTime || '待录入') + '</span></div>' +
+        '<div class="rule-item"><span class="label">特例：</span><span class="value" id="rule-specialCase">' + escapeHtmlText(currentRule.specialCase || '待录入') + '</span></div>' +
       '</div>' +
       '<div class="rule-edit-content" id="rule-edit" style="display:none;">' +
-        '<div class="rule-item"><span class="label">拆分：</span><input type="text" id="edit-split" value="' + (currentRule.split || '') + '" class="rule-input"></div>' +
-        '<div class="rule-item"><span class="label">定价：</span><input type="text" id="edit-pricing" value="' + (currentRule.pricing || '') + '" class="rule-input"></div>' +
-        '<div class="rule-item"><span class="label">发布时间：</span><input type="text" id="edit-publishTime" value="' + (currentRule.publishTime || '') + '" class="rule-input"></div>' +
-        '<div class="rule-item"><span class="label">特例：</span><input type="text" id="edit-specialCase" value="' + (currentRule.specialCase || '') + '" class="rule-input"></div>' +
+        '<div class="rule-item"><span class="label">拆分：</span><textarea rows="2" id="edit-split" class="rule-input alt-space-newline"></textarea></div>' +
+        '<div class="rule-item"><span class="label">定价：</span><textarea rows="2" id="edit-pricing" class="rule-input alt-space-newline"></textarea></div>' +
+        '<div class="rule-item"><span class="label">发布时间：</span><textarea rows="2" id="edit-publishTime" class="rule-input alt-space-newline"></textarea></div>' +
+        '<div class="rule-item"><span class="label">特例：</span><textarea rows="2" id="edit-specialCase" class="rule-input alt-space-newline"></textarea></div>' +
         '<div class="rule-btn-wrap">' +
           '<button class="btn-cancel" onclick="cancelEdit()">取消</button>' +
           '<button class="btn-save" onclick="saveEditRule()">保存</button>' +
         '</div>' +
       '</div>';
+    var splitEl = document.getElementById('edit-split');
+    if (splitEl) splitEl.value = currentRule.split || '';
+    var prEl = document.getElementById('edit-pricing');
+    if (prEl) prEl.value = currentRule.pricing || '';
+    var pubEl = document.getElementById('edit-publishTime');
+    if (pubEl) pubEl.value = currentRule.publishTime || '';
+    var spEl = document.getElementById('edit-specialCase');
+    if (spEl) spEl.value = currentRule.specialCase || '';
   }
 }
 
@@ -1538,24 +1593,30 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   
   var html = '<div class="rule-card-edit">';
   html += '  <div class="rule-card-header">';
-  html += '    <div class="rule-card-title">编辑: ' + (rule.brand || '未命名规则') + ' · ' + ((rule.series || '').trim() || '未设置系列') + '</div>';
+  html += '    <div class="rule-card-title">编辑: ' + escapeHtmlText((rule.brand || '未命名规则') + ' · ' + ((rule.series || '').trim() || '未设置系列')) + '</div>';
   html += '    <button class="rule-edit-btn" onclick="showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries)">✖ 取消</button>';
   html += '  </div>';
   html += '  <div class="rule-card-body">';
-  html += '    <div class="rule-row"><span class="rule-label">店铺：</span><span class="rule-value">' + (rule.shop || '未设置店铺') + '</span></div>';
-  html += '    <div class="rule-row"><span class="rule-label">提供者：</span><span class="rule-value">' + (rule.name || '未设置提供者') + '</span></div>';
-  html += '    <div class="rule-row"><span class="rule-label">品牌：</span><span class="rule-value">' + (rule.brand || '未设置品牌') + '</span></div>';
-  html += '    <div class="rule-row"><span class="rule-label">系列：</span><span class="rule-value">' + ((rule.series || '').trim() || '未设置系列') + '</span></div>';
-  html += '    <div class="rule-row"><span class="rule-label">拆分：</span><input type="text" class="rule-input" id="edit-split" value="' + (rule.split || '') + '"></div>';
-  html += '    <div class="rule-row"><span class="rule-label">定价：</span><input type="text" class="rule-input" id="edit-pricing" value="' + (rule.pricing || '') + '"></div>';
-  html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><input type="text" class="rule-input" id="edit-publishTime" value="' + (rule.publishTime || '') + '"></div>';
-  html += '    <div class="rule-row"><span class="rule-label">特例：</span><input type="text" class="rule-input" id="edit-specialCase" value="' + (rule.specialCase || '') + '"></div>';
-  html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><input type="text" class="rule-input" id="edit-otherInfo" value="' + (rule.otherInfo || '') + '"></div>';
+  html += '    <p class="rule-edit-hint">提示：在输入框中按 <strong>Alt + 空格</strong> 可插入换行。</p>';
+  html += '    <div class="rule-row"><span class="rule-label">店铺：</span><span class="rule-value">' + escapeHtmlText(rule.shop || '未设置店铺') + '</span></div>';
+  html += '    <div class="rule-row"><span class="rule-label">提供者：</span><span class="rule-value">' + escapeHtmlText(rule.name || '未设置提供者') + '</span></div>';
+  html += '    <div class="rule-row"><span class="rule-label">品牌：</span><span class="rule-value">' + escapeHtmlText(rule.brand || '未设置品牌') + '</span></div>';
+  html += '    <div class="rule-row"><span class="rule-label">系列：</span><span class="rule-value">' + escapeHtmlText((rule.series || '').trim() || '未设置系列') + '</span></div>';
+  html += '    <div class="rule-row"><span class="rule-label">拆分：</span><textarea class="rule-input alt-space-newline" rows="3" id="edit-split"></textarea></div>';
+  html += '    <div class="rule-row"><span class="rule-label">定价：</span><textarea class="rule-input alt-space-newline" rows="3" id="edit-pricing"></textarea></div>';
+  html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><textarea class="rule-input alt-space-newline" rows="2" id="edit-publishTime"></textarea></div>';
+  html += '    <div class="rule-row"><span class="rule-label">特例：</span><textarea class="rule-input alt-space-newline" rows="2" id="edit-specialCase"></textarea></div>';
+  html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><textarea class="rule-input alt-space-newline" rows="2" id="edit-otherInfo"></textarea></div>';
   html += '    <div class="rule-row"><button class="rule-save-btn" id="save-rule-btn" data-index="' + resolvedIndex + '">💾 保存</button></div>';
   html += '  </div>';
   html += '</div>';
   
   display.innerHTML = html;
+  document.getElementById('edit-split').value = rule.split || '';
+  document.getElementById('edit-pricing').value = rule.pricing || '';
+  document.getElementById('edit-publishTime').value = rule.publishTime || '';
+  document.getElementById('edit-specialCase').value = rule.specialCase || '';
+  document.getElementById('edit-otherInfo').value = rule.otherInfo || '';
   
   document.getElementById('save-rule-btn').addEventListener('click', function() {
     saveRuleByIndex(resolvedIndex, targetShop, targetProvider, targetBrand, targetSeries);
@@ -2987,6 +3048,7 @@ extraStyles.textContent = `
     line-height: 1.5;
     word-break: break-word;
     overflow-wrap: break-word;
+    white-space: pre-wrap;
   }
   .rule-card {
     background: white;
@@ -3015,6 +3077,7 @@ extraStyles.textContent = `
     line-height: 1.45;
     word-break: break-word;
     overflow-wrap: break-word;
+    white-space: pre-wrap;
   }
   .rule-edit-btn {
     background: var(--primary-cyan);
@@ -3057,6 +3120,7 @@ extraStyles.textContent = `
     line-height: 1.5;
     word-break: break-word;
     overflow-wrap: break-word;
+    white-space: pre-wrap;
   }
   .rule-input {
     flex: 1;
@@ -3066,6 +3130,12 @@ extraStyles.textContent = `
     border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 13px;
+    box-sizing: border-box;
+  }
+  textarea.rule-input {
+    min-height: 4.5rem;
+    resize: vertical;
+    line-height: 1.45;
   }
   .rule-save-btn {
     background: var(--primary-cyan);
@@ -3119,6 +3189,16 @@ extraStyles.textContent = `
     border-color: var(--primary-cyan);
     color: var(--primary-cyan);
     background: rgba(34, 211, 238, 0.08);
+  }
+  .rule-edit-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 0 0 12px;
+    line-height: 1.5;
+  }
+  .rule-edit-hint strong {
+    color: var(--text-primary);
+    font-weight: 600;
   }
 `;
 document.head.appendChild(extraStyles);

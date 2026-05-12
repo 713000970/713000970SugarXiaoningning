@@ -6,7 +6,7 @@
   <title>教辅店铺个性化生产规则库</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='48'%3E📚%3C/text%3E%3C/svg%3E">
   <!-- 不使用 Google Fonts，避免国内网络 ERR_CONNECTION_TIMED_OUT -->
-  <link rel="stylesheet" href="style.css?v=20260512-04">
+  <link rel="stylesheet" href="style.css?v=20260512-05">
 </head>
 <body>
 
@@ -386,24 +386,24 @@
           <input type="text" id="new-provider-series" class="form-input" placeholder="例如：中考冲刺卷">
         </div>
         <div class="form-group">
-          <label>拆分规则</label>
-          <input type="text" id="new-provider-split" class="form-input">
+          <label>拆分规则 <span class="form-hint">（Alt+空格 换行）</span></label>
+          <textarea id="new-provider-split" class="form-input alt-space-newline" rows="2" placeholder="多条可换行"></textarea>
         </div>
         <div class="form-group">
-          <label>定价规则</label>
-          <input type="text" id="new-provider-pricing" class="form-input">
+          <label>定价规则 <span class="form-hint">（Alt+空格 换行）</span></label>
+          <textarea id="new-provider-pricing" class="form-input alt-space-newline" rows="2"></textarea>
         </div>
         <div class="form-group">
-          <label>发布时间</label>
-          <input type="text" id="new-provider-publishtime" class="form-input">
+          <label>发布时间 <span class="form-hint">（Alt+空格 换行）</span></label>
+          <textarea id="new-provider-publishtime" class="form-input alt-space-newline" rows="2"></textarea>
         </div>
         <div class="form-group">
-          <label>特例</label>
-          <input type="text" id="new-provider-special" class="form-input">
+          <label>特例 <span class="form-hint">（Alt+空格 换行）</span></label>
+          <textarea id="new-provider-special" class="form-input alt-space-newline" rows="2"></textarea>
         </div>
         <div class="form-group">
-          <label>其他信息</label>
-          <input type="text" id="new-provider-otherinfo" class="form-input">
+          <label>其他信息 <span class="form-hint">（Alt+空格 换行）</span></label>
+          <textarea id="new-provider-otherinfo" class="form-input alt-space-newline" rows="2"></textarea>
         </div>
       </div>
       <div class="modal-footer">
@@ -518,6 +518,6 @@ function goHome() {
       }
     })();
   </script>
-  <script src="app.js?v=20260512-04"></script>
+  <script src="app.js?v=20260512-05"></script>
 </body>
 </html>

@@ -1857,6 +1857,12 @@ body::before {
   margin-bottom: 8px;
 }
 
+.form-group .form-hint {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 .form-group input,
 .form-group select,
 .form-group textarea {
@@ -1878,7 +1884,7 @@ body::before {
 }
 
 .form-group textarea {
-  min-height: 100px;
+  min-height: 72px;
   resize: vertical;
 }
 
@@ -2383,6 +2389,7 @@ body::before {
   line-height: 1.45;
   word-break: break-word;
   overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .rule-card-actions {
@@ -2452,6 +2459,7 @@ body::before {
   line-height: 1.5;
   word-break: break-word;
   overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 /* ========================================
