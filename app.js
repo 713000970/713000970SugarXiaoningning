@@ -101,6 +101,14 @@ function escapeHtmlText(value) {
     .replace(/"/g, '&quot;');
 }
 
+/** AI / 列表展示：空或纯空白显示为「无」，否则保留原文（含换行） */
+function formatAiFieldDisplay(raw) {
+  if (raw === undefined || raw === null) return '无';
+  var s = String(raw);
+  if (s.trim() === '') return '无';
+  return s;
+}
+
 /** 在可编辑框光标处插入文本（支持 Alt+空格 手动换行） */
 function insertTextAtCaret(el, text) {
   if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
@@ -2564,19 +2572,19 @@ function aiQuery() {
       return '<div class="ai-result-card">' +
         '<div class="ai-result-header">' +
           '<span class="ai-result-icon">📌</span>' +
-          '<span class="ai-result-title">' + providerName + ' · ' + brandName + ' · ' + seriesName + '</span>' +
+          '<span class="ai-result-title">' + escapeHtmlText(providerName + ' · ' + brandName + ' · ' + seriesName) + '</span>' +
         '</div>' +
         '<div class="ai-result-body">' +
           '<div class="ai-result-section">' +
-            '<p><strong>店铺：</strong>' + shopName + '</p>' +
-            '<p><strong>提供者：</strong>' + providerName + '</p>' +
-            '<p><strong>品牌：</strong>' + brandName + '</p>' +
-            '<p><strong>系列：</strong>' + seriesName + '</p>' +
-            '<p><strong>拆分：</strong>' + (rule.split || '无') + '</p>' +
-            '<p><strong>定价：</strong>' + (rule.pricing || '无') + '</p>' +
-            '<p><strong>发布时间：</strong>' + (rule.publishTime || '无') + '</p>' +
-            '<p><strong>特例：</strong>' + (rule.specialCase || '无') + '</p>' +
-            '<p><strong>其他信息：</strong>' + (rule.otherInfo || '无') + '</p>' +
+            '<div class="ai-result-row"><span class="ai-result-label">店铺</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(shopName)) + '</span></div>' +
+            '<div class="ai-result-row"><span class="ai-result-label">提供者</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(providerName)) + '</span></div>' +
+            '<div class="ai-result-row"><span class="ai-result-label">品牌</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(brandName)) + '</span></div>' +
+            '<div class="ai-result-row"><span class="ai-result-label">系列</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(seriesName)) + '</span></div>' +
+            '<div class="ai-result-row"><span class="ai-result-label">拆分</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.split)) + '</span></div>' +
+            '<div class="ai-result-row"><span class="ai-result-label">定价</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.pricing)) + '</span></div>' +
+            '<div class="ai-result-row"><span class="ai-result-label">发布时间</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.publishTime)) + '</span></div>' +
+            '<div class="ai-result-row"><span class="ai-result-label">特例</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.specialCase)) + '</span></div>' +
+            '<div class="ai-result-row"><span class="ai-result-label">其他信息</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.otherInfo)) + '</span></div>' +
           '</div>' +
         '</div>' +
       '</div>';
@@ -2628,36 +2636,39 @@ function aiQuery() {
     .map(function(item) { return item.rule; });
   
   if (matched.length === 0) {
-    resultBox.innerHTML = `
-      <div class="ai-result-card">
-        <div class="ai-result-header">
-          <span class="ai-result-icon">🔍</span>
-          <span class="ai-result-title">未找到匹配规则</span>
-        </div>
-        <div class="ai-result-body">
-          <p>未找到与「${query}」直接相关的规则。请尝试其他关键词，或查看通用规则页面获取完整信息。</p>
-        </div>
-      </div>
-    `;
+    resultBox.innerHTML =
+      '<div class="ai-result-card">' +
+        '<div class="ai-result-header">' +
+          '<span class="ai-result-icon">🔍</span>' +
+          '<span class="ai-result-title">未找到匹配规则</span>' +
+        '</div>' +
+        '<div class="ai-result-body">' +
+          '<p class="ai-result-empty-msg">未找到与「' + escapeHtmlText(query) + '」直接相关的规则。请尝试其他关键词，或查看通用规则页面获取完整信息。</p>' +
+        '</div>' +
+      '</div>';
     return;
   }
   
-  resultBox.innerHTML = matched.map(rule => `
-    <div class="ai-result-card">
-      <div class="ai-result-header">
-        <span class="ai-result-icon">${rule.icon}</span>
-        <span class="ai-result-title">${rule.title}</span>
-      </div>
-      <div class="ai-result-body">
-        ${rule.sections.map(s => `
-          <div class="ai-result-section">
-            <h5>${s.title}</h5>
-            ${s.content}
-          </div>
-        `).join('')}
-      </div>
-    </div>
-  `).join('');
+  resultBox.innerHTML = matched.map(function(rule) {
+    return (
+      '<div class="ai-result-card">' +
+        '<div class="ai-result-header">' +
+          '<span class="ai-result-icon">' + escapeHtmlText(rule.icon) + '</span>' +
+          '<span class="ai-result-title">' + escapeHtmlText(rule.title) + '</span>' +
+        '</div>' +
+        '<div class="ai-result-body">' +
+          rule.sections.map(function(s) {
+            return (
+              '<div class="ai-result-section">' +
+                '<h5>' + escapeHtmlText(s.title) + '</h5>' +
+                '<div class="ai-result-html">' + (s.content || '') + '</div>' +
+              '</div>'
+            );
+          }).join('') +
+        '</div>' +
+      '</div>'
+    );
+  }).join('');
 }
 
 function stripHtmlTags(html) {

@@ -1699,6 +1699,7 @@ body::before {
   overflow: hidden;
   animation: fadeIn 0.3s ease;
   box-shadow: var(--card-shadow);
+  min-width: 0;
 }
 
 @keyframes fadeIn {
@@ -1711,26 +1712,37 @@ body::before {
   background: linear-gradient(135deg, rgba(124, 58, 237, 0.08), rgba(147, 51, 234, 0.05));
   border-bottom: 1px solid var(--border-light);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
 .ai-result-icon {
   font-size: 26px;
+  flex-shrink: 0;
+  line-height: 1.2;
 }
 
 .ai-result-title {
   font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
+  min-width: 0;
+  flex: 1;
+  line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .ai-result-body {
   padding: 24px;
+  min-width: 0;
 }
 
 .ai-result-section {
   margin-bottom: 20px;
+  min-width: 0;
 }
 
 .ai-result-section:last-child {
@@ -1742,6 +1754,67 @@ body::before {
   color: var(--primary-purple);
   margin-bottom: 10px;
   font-weight: 600;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.ai-result-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  min-width: 0;
+}
+
+.ai-result-row:last-child {
+  margin-bottom: 0;
+}
+
+.ai-result-label {
+  flex-shrink: 0;
+  min-width: 5em;
+  max-width: 40%;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.ai-result-label::after {
+  content: '：';
+}
+
+.ai-result-value {
+  flex: 1 1 0;
+  min-width: 0;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.ai-result-empty-msg {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.ai-result-html {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  min-width: 0;
+}
+
+.ai-result-html ul,
+.ai-result-html ol {
+  padding-left: 1.25em;
 }
 
 .ai-result-section p,
@@ -1749,6 +1822,9 @@ body::before {
   font-size: 14px;
   color: var(--text-secondary);
   line-height: 1.7;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 .ai-result-section ul {
