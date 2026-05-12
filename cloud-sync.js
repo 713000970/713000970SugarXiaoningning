@@ -291,6 +291,20 @@ async function syncToCloud(data) {
     
     // 整表替换上传：必须以本次传入的本地列表为准，否则与云端 merge 会把「仅云端仍有」的已删行再次 POST 上去
     const formatted = toCloudProviderListForUpload(data);
+    // 首屏 cleanup 等竞态可能把本地写成 [] 后立即同步，会 DELETE 掉云端上千条；若云端仍大量有数据则中止并拉回本地
+    if (formatted.length === 0) {
+      const remoteRows = await fetchCloudProviders();
+      const remoteCount = (remoteRows && remoteRows.length) || 0;
+      if (remoteCount > 200) {
+        console.error('🌥️ 已阻止用空列表覆盖云端（云端 ' + remoteCount + ' 条），疑为误清空，已从云端恢复本地。');
+        localStorage.setItem('rule_library_providers', JSON.stringify(remoteRows.map(toLocalProvider)));
+        localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+        lastCloudSnapshot = calcSnapshot(remoteRows.map(toLocalProvider));
+        notifyProvidersUpdated('cloud-recovered-from-empty-sync');
+        markSyncSuccess('已阻止误清空，已从云端恢复');
+        return;
+      }
+    }
     const nextSnapshot = JSON.stringify(formatted);
     if (nextSnapshot === lastCloudSnapshot) {
       localStorage.setItem(LOCAL_DIRTY_KEY, '0');

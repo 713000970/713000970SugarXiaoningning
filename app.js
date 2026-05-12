@@ -334,6 +334,11 @@ function cleanupBlankPlaceholderProviders() {
   });
 
   if (next.length !== providers.length) {
+    // 预置数据多为「无系列 + 全空白」占位行，本清理会全部滤掉 → 若写回 [] 会触发 setData 同步 0 条并误清空云端（与 cloudSync 竞态）
+    if (next.length === 0 && providers.length > 0) {
+      console.warn('[cleanupBlankPlaceholderProviders] 已跳过：清理结果为空，避免误删全书目并同步清空云端。');
+      return;
+    }
     setData(STORAGE_KEYS.PROVIDERS, next);
   }
 }
