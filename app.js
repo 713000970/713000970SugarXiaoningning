@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-19';
+var RULE_LIBRARY_BUILD = '20260512-20';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -331,32 +331,28 @@ function isSameContextProvider(p, shopName, providerName) {
   return shopMatched && providerMatched;
 }
 
-function setData(key, data) {
+function setData(key, data, options) {
+  options = options || {};
   localStorage.setItem(key, JSON.stringify(data));
-  // 记录本地有变更，避免被云端旧数据短时间覆盖
-  localStorage.setItem(APP_LOCAL_DIRTY_KEY, '1');
-  window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'local' } }));
-  
-  // 如果是 providers 数据，自动同步到云端
-  if (key === STORAGE_KEYS.PROVIDERS && typeof syncToCloud === 'function') {
-    console.log('📤 setData 开始同步...');
-    var formatted = data.map(function(p) {
-      return {
-        shop: p.shop || '',
-        shopname: p.shopname || '',
-        name: p.name || '',
-        brand: p.brand || '',
-        series: p.series || '',
-        split: p.split || '',
-        pricing: p.pricing || '',
-        publishtime: p.publishTime || '',
-        specialcase: p.specialCase || '',
-        otherinfo: p.otherInfo || ''
-      };
-    });
-    console.log('📤 格式化数据:', formatted.length, '条');
-    syncToCloud(formatted);
+
+  var suppressProviders =
+    key === STORAGE_KEYS.PROVIDERS &&
+    (options.skipCloudSync ||
+      (typeof window !== 'undefined' && window.__RULE_LIB_SUPPRESS_PROVIDER_SYNC));
+
+  if (!suppressProviders) {
+    localStorage.setItem(APP_LOCAL_DIRTY_KEY, '1');
   }
+
+  window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'local' } }));
+
+  if (key !== STORAGE_KEYS.PROVIDERS || typeof syncToCloud !== 'function' || suppressProviders) {
+    return;
+  }
+
+  console.log('📤 setData 开始同步...');
+  console.log('📤 格式化数据:', (data || []).length, '条');
+  syncToCloud(data);
 }
 
 // ========================================
@@ -483,7 +479,9 @@ function cleanupBlankPlaceholderProviders() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initData();
-  cleanupBlankPlaceholderProviders();
+  if (typeof cloudSync !== 'function') {
+    cleanupBlankPlaceholderProviders();
+  }
   if (typeof initCollapsibles === 'function') initCollapsibles();
   loadProviderSelect();
   loadProviders();

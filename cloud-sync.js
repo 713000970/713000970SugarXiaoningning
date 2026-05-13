@@ -389,6 +389,9 @@ async function cloudSync(opts) {
 
   if (isCloudSyncing) return;
   isCloudSyncing = true;
+  if (typeof window !== 'undefined') {
+    window.__RULE_LIB_SUPPRESS_PROVIDER_SYNC = true;
+  }
   clearRetryTimers();
   emitSyncStatus('syncing', '同步中...');
   try {
@@ -424,21 +427,7 @@ async function cloudSync(opts) {
       const localData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
 
       if (localData.length > 0) {
-        const formatted = localData.map(function(p) {
-          return {
-            shop: p.shop || '',
-            shopname: p.shopname || '',
-            name: p.name || '',
-            brand: p.brand || '',
-            series: p.series || '',
-            split: p.split || '',
-            pricing: p.pricing || '',
-            publishtime: p.publishTime || '',
-            specialcase: p.specialCase || '',
-            otherinfo: p.otherInfo || ''
-          };
-        });
-        await syncToCloud(formatted);
+        await syncToCloud(localData);
       }
     } else {
       // 远程有数据，转回驼峰后更新本地
@@ -446,10 +435,12 @@ async function cloudSync(opts) {
       const remoteSnapshot = calcSnapshot(formatted);
       const localProvidersNow = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
       const localSnapshotNow = calcSnapshot(localProvidersNow);
+      /** fetch 期间 DOMContentLoaded 可能已 setData，必须在拉取结束后再读 dirty */
+      var localDirtyAfterFetch = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
 
       // lastCloudSnapshot 仅在内存中，刷新后会清空；须结合 localDirty，否则会每次打开都误判「并发」并全量回传
       var localEdited =
-        localDirty ||
+        localDirtyAfterFetch ||
         (lastCloudSnapshot !== '' && localSnapshotNow !== lastCloudSnapshot);
 
       // 本地有未对齐云端的修改（含删除）：必须以本地列表为准。
@@ -465,7 +456,7 @@ async function cloudSync(opts) {
       }
 
       // 仍有 dirty 标记但快照与云端一致（极少见）：也不要用远程整表覆盖本地，以免冲掉刚写入尚未反映到快照的变更
-      if (localDirty) {
+      if (localDirtyAfterFetch) {
         console.log('🌥️ 本地有待同步标记，保留本地数据并排队回传');
         localStorage.setItem(LOCAL_DIRTY_KEY, '1');
         queuePendingSync(localProvidersNow);
@@ -493,6 +484,9 @@ async function cloudSync(opts) {
     scheduleRetry();
   } finally {
     isCloudSyncing = false;
+    if (typeof window !== 'undefined') {
+      window.__RULE_LIB_SUPPRESS_PROVIDER_SYNC = false;
+    }
     flushPendingSync();
     try {
       if (localStorage.getItem(LOCAL_DIRTY_KEY) !== '1') {
