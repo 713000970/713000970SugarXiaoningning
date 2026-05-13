@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-11';
+var RULE_LIBRARY_BUILD = '20260512-12';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -173,6 +173,15 @@ function isEntitySameExact(source, target) {
   var targetKey = normalizeEntityKey(target);
   if (!sourceKey || !targetKey) return false;
   return sourceKey === targetKey;
+}
+
+/** 品牌下拉/搜索与行内品牌：严格相等或模糊一致（避免不可见字符、简写差异） */
+function brandMatchesUi(pBrand, selectedBrand) {
+  var a = normalizeText(pBrand);
+  var b = normalizeText(selectedBrand);
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return isEntityMatched(pBrand, selectedBrand);
 }
 
 function hasParentheses(value) {
@@ -1063,7 +1072,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
   var matched = [];
   providersData.forEach(function(p, i) {
     var itemBrand = normalizeText(p && p.brand);
-    var brandMatched = itemBrand === targetBrand;
+    var brandMatched = brandMatchesUi(p && p.brand, brandName);
     var shopMatched = !targetShopTrim || rowShopMatchesSearch(p, shopName);
     var providerMatched = !providerName || isEntityMatched(p && p.name, providerName);
     if (brandMatched && shopMatched && providerMatched) {
@@ -1074,7 +1083,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
   // 仅在“未选择店铺”时才允许按品牌兜底，避免跨店铺串数据
   if (matched.length === 0 && !targetShopTrim) {
     providersData.forEach(function(p, i) {
-      if (normalizeText(p && p.brand) === targetBrand) {
+      if (brandMatchesUi(p && p.brand, brandName)) {
         matched.push({ data: p, index: i });
       }
     });
@@ -1134,13 +1143,18 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
     if (!meaningfulGroupMap[key]) return true;
     return hasMeaningfulRule(p);
   });
-  // 纯占位卡片（未设置系列+全待录入）默认隐藏
-  matched = matched.filter(function(item) {
-    var p = item && item.data ? item.data : {};
-    var noSeries = !String((p.series || '')).trim();
-    var isBlank = !hasMeaningfulRule(p);
-    return !(noSeries && isBlank);
+  // 纯占位（无系列+规则全空）：仅当本列表中已存在至少一条「有内容」的规则时才隐藏，否则保留占位便于录入（洛阳朝霞等仅有骨架卡时否则会 0 条）
+  var hasAnyMeaningfulInView = matched.some(function(item) {
+    return hasMeaningfulRule(item && item.data);
   });
+  if (hasAnyMeaningfulInView) {
+    matched = matched.filter(function(item) {
+      var p = item && item.data ? item.data : {};
+      var noSeries = !String((p.series || '')).trim();
+      var isBlank = !hasMeaningfulRule(p);
+      return !(noSeries && isBlank);
+    });
+  }
 
   renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '');
   if (matched.length === 0) {
