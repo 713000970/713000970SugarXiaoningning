@@ -372,32 +372,49 @@ function startCloudAutoSync() {
 }
 
 /**
- * 清除「待同步」状态并从云端重新拉取全表（慎用：本机未回传的修改可能丢失）。
- * 典型场景：本机仅几十条、云端应有数百条，且本地四条字段都搜不到某出版社关键字。
+ * 直接把云端 providers 全表写入本机（绕过 cloudSync 的分支判断，避免一直合并不了远程全量）。
+ * 慎用：本机未上传的修改会丢失。
  */
 window.forcePullProvidersFromCloud = async function() {
-  if (typeof cloudSync !== 'function') {
-    if (typeof alert === 'function') alert('同步模块未加载');
-    return;
-  }
   if (isCloudSyncing) {
     if (typeof showToast === 'function') showToast('正在同步中，请稍候再试');
     return;
   }
   if (typeof confirm === 'function' && !confirm(
-    '将清除「本地待同步」标记，并从云端重新下载完整书目列表。\n\n若本机尚有未成功上传的修改，可能丢失。\n\n仅在确认云端数据更完整时继续。确定？'
+    '将把 Supabase 里 providers 表的<strong>全部行</strong>下载并覆盖写入本机浏览器存储。\n\n本机未上传的修改会丢失。\n\n确定继续？'
   )) {
     return;
   }
-  localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-  lastCloudSnapshot = '';
-  pendingSyncData = null;
-  clearRetryTimers();
+  isCloudSyncing = true;
+  emitSyncStatus('syncing', '正在从云端强制拉取…');
   try {
-    await cloudSync();
-    if (typeof showToast === 'function') showToast('已从云端拉取，请核对首页「规则卡片」数量');
+    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+    lastCloudSnapshot = '';
+    pendingSyncData = null;
+    clearRetryTimers();
+
+    var remoteData = await fetchCloudProviders();
+    var cnt = (remoteData && remoteData.length) || 0;
+    if (cnt === 0) {
+      markSyncSuccess('云端为 0 条');
+      if (typeof alert === 'function') {
+        alert('Supabase 返回 0 条。请到 Supabase 控制台检查表 providers 是否有数据，或 Row Level Security 是否禁止当前密钥读取。');
+      }
+      return;
+    }
+    var formatted = remoteData.map(toLocalProvider);
+    localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
+    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+    lastCloudSnapshot = calcSnapshot(formatted);
+    notifyProvidersUpdated('cloud-force-pull');
+    markSyncSuccess('已从云端写入本地 ' + cnt + ' 条');
     if (typeof updateStats === 'function') updateStats();
+    if (typeof showToast === 'function') showToast('已写入 ' + cnt + ' 条，请核对首页数字');
   } catch (e) {
+    emitSyncStatus('error', String((e && e.message) || e));
     if (typeof alert === 'function') alert(String((e && e.message) || e));
+  } finally {
+    isCloudSyncing = false;
+    flushPendingSync();
   }
 };
