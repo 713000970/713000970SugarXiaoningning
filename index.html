@@ -18,7 +18,7 @@
         <span class="brand-text">教辅店铺生产规则库</span>
       </div>
       <div class="topbar-meta">
-        <span class="version-badge">V1.0</span>
+        <span class="version-badge" id="app-build-badge" title="与控制台 [规则库] build 一致即为最新脚本">加载中…</span>
         <button id="manual-sync-btn" class="sync-btn" type="button">立即同步</button>
         <span class="status-indicator" id="sync-status-indicator">
           <span class="status-dot" id="sync-status-dot"></span>
@@ -38,7 +38,7 @@
         <div class="hero-stats">
           <div class="stat-item">
             <span class="stat-num" id="stat-providers">0</span>
-            <span class="stat-label">提供者</span>
+            <span class="stat-label">规则卡片</span>
           </div>
           <div class="stat-divider"></div>
           <div class="stat-item">
@@ -469,9 +469,10 @@ function goHome() {
 }
   </script>
   <script src="db.js"></script>
-<script src="cloud-sync.js?v=20260512-03"></script>
+  <script src="cloud-sync.js?v=20260512-03"></script>
+  <script src="app.js?v=20260512-11"></script>
   <script>
-    // 云同步加载 + 初始化
+    // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (async function() {
       console.log('🚀 开始初始化...');
       
@@ -491,10 +492,8 @@ function goHome() {
         var providers = presetData.providers;
         var brands = presetData.brands;
         
-        // 检查是否已有本地数据
         var existingProviders = localStorage.getItem('rule_library_providers');
         
-        // 只有当没有数据时才用预设
         if (!existingProviders || existingProviders === '[]') {
           console.log('Initializing data from presetData');
           localStorage.setItem('rule_library_providers', JSON.stringify(providers));
@@ -502,22 +501,18 @@ function goHome() {
         } else {
           console.log('Keeping existing data, not overwriting');
         }
-        
-        // 更新首页显示 - 始终使用实际存储的数据
-        var existingData = localStorage.getItem('rule_library_providers');
-        var displayProviders = existingData ? JSON.parse(existingData) : providers;
-        
-        document.getElementById('stat-providers').textContent = displayProviders.length;
-        var localBrands = JSON.parse(localStorage.getItem('rule_library_brands') || '[]');
-        document.getElementById('stat-brands').textContent = localBrands.length;
-        
-        var shops = [...new Set(displayProviders.map(function(p) { return p.shop; }).filter(Boolean))];
-        document.getElementById('stat-shops').textContent = shops.length;
-        
-        console.log('Display providers: ' + displayProviders.length);
       }
+      
+      if (typeof updateStats === 'function') {
+        updateStats();
+      }
+      var badge = document.getElementById('app-build-badge');
+      if (badge && window.RULE_LIBRARY_BUILD) {
+        badge.textContent = 'build ' + window.RULE_LIBRARY_BUILD;
+      }
+      var sp = document.getElementById('stat-providers');
+      if (sp) console.log('🚀 首页规则卡片数: ' + sp.textContent + ' | build=' + (window.RULE_LIBRARY_BUILD || '?'));
     })();
   </script>
-  <script src="app.js?v=20260512-06"></script>
 </body>
 </html>
