@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-13';
+var RULE_LIBRARY_BUILD = '20260512-14';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -124,7 +124,13 @@ function isAltSpaceNewlineField(el) {
 }
 
 function normalizeText(value) {
-  return String(value || '')
+  var s = String(value || '');
+  try {
+    if (typeof s.normalize === 'function') s = s.normalize('NFKC');
+  } catch (e) {
+    /* ignore */
+  }
+  return s
     .replace(/\u00a0/g, ' ')
     .replace(/\u3000/g, ' ')
     .trim()
@@ -161,11 +167,13 @@ function normalizeEntityKey(value) {
   return normalizeText(value).replace(/[()（）\s]/g, '');
 }
 
-/** 公司/店铺名对齐：常见「文化」与「文化传媒」混用导致无法匹配 */
+/** 公司/店铺名对齐：常见「文化」与「文化传媒」混用；「洛阳市」与「洛阳」工商/点评差异 */
 function alignCompanyMatchKey(value) {
   var k = normalizeEntityKey(value);
   if (!k) return '';
-  return k.replace(/文化传媒/g, '文化');
+  return k
+    .replace(/文化传媒/g, '文化')
+    .replace(/^洛阳市/, '洛阳');
 }
 
 function isEntityMatched(source, target) {
@@ -192,7 +200,13 @@ function brandMatchesUi(pBrand, selectedBrand) {
   var b = normalizeText(selectedBrand);
   if (a === b) return true;
   if (!a || !b) return false;
-  return isEntityMatched(pBrand, selectedBrand);
+  if (isEntityMatched(pBrand, selectedBrand)) return true;
+  var ak = normalizeEntityKey(pBrand);
+  var bk = normalizeEntityKey(selectedBrand);
+  if (ak && bk && Math.min(ak.length, bk.length) >= 3) {
+    if (ak.indexOf(bk) !== -1 || bk.indexOf(ak) !== -1) return true;
+  }
+  return false;
 }
 
 function hasParentheses(value) {
@@ -248,6 +262,12 @@ function rowShopMatchesSearch(p, shopName) {
   var shopname = p && p.shopname;
   if (isEntityMatched(shop, shopName) || isEntityMatched(shopname, shopName)) return true;
   if (isEntityMatched(p && p.name, shopName)) return true;
+  // 合并店铺/别名/提供者后做实体键包含（处理字段拆错、点评名与工商名混填）
+  var blob = normalizeEntityKey(
+    String(shop || '') + String(shopname || '') + String((p && p.name) || '')
+  );
+  var nd = normalizeEntityKey(shopName);
+  if (blob && nd && (blob.indexOf(nd) !== -1 || nd.indexOf(blob) !== -1)) return true;
   return false;
 }
 
@@ -1062,6 +1082,8 @@ function selectBrand(brandName) {
 
 function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
   console.log('showRulesByBrandAndShop called:', brandName, shopName);
+  brandName = String(brandName || '').trim();
+  shopName = String(shopName || '').trim();
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
   var targetBrand = normalizeText(brandName);
@@ -1120,8 +1142,29 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
   if (matched.length === 0) {
     clearSeriesTags();
     if (targetBrand && targetShopTrim) {
+      var shopHit = 0;
+      var brandHit = 0;
+      var bothHit = 0;
+      providersData.forEach(function(p) {
+        var s = rowShopMatchesSearch(p, shopName);
+        var b = brandMatchesUi(p && p.brand, brandName);
+        if (s) shopHit += 1;
+        if (b) brandHit += 1;
+        if (s && b) bothHit += 1;
+      });
       display.style.display = 'block';
-      display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">当前店铺下未找到该品牌规则，已保持店铺上下文，不会回退到其他店铺。</span></div>';
+      display.innerHTML =
+        '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">当前店铺下未找到该品牌规则。</span></div>' +
+        '<div class="match-hint" style="margin-top:8px;font-size:13px;color:#64748b;line-height:1.5;">' +
+        '本地共 <strong>' + providersData.length + '</strong> 条卡片；按当前规则粗算：店铺语境约 <strong>' + shopHit + '</strong> 条，品牌「' +
+        escapeHtmlText(brandName) + '」约 <strong>' + brandHit + '</strong> 条，两者同时约 <strong>' + bothHit + '</strong> 条。' +
+        (bothHit === 0 && brandHit === 0
+          ? ' 若品牌为 0，多半是<strong>品牌名字与库里不一致</strong>（可在「AI 智能查询」搜王朝霞核对）。'
+          : '') +
+        (bothHit === 0 && shopHit === 0
+          ? ' 若店铺为 0，请核对库里「店铺/店铺别名/提供者」是否含「洛阳」「朝霞」等关键字。'
+          : '') +
+        '</div>';
     } else {
       display.style.display = 'none';
     }
