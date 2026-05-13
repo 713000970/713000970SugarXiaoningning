@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-14';
+var RULE_LIBRARY_BUILD = '20260512-15';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -207,6 +207,48 @@ function brandMatchesUi(pBrand, selectedBrand) {
     if (ak.indexOf(bk) !== -1 || bk.indexOf(ak) !== -1) return true;
   }
   return false;
+}
+
+/** 在 shop/shopname/name/brand 拼接串中粗搜 needle（实体键），用于 0 条时的对照提示 */
+function providersRoughFieldMatch(providersData, needleRaw) {
+  var needle = normalizeEntityKey(needleRaw);
+  if (!needle || needle.length < 2) return [];
+  var out = [];
+  (providersData || []).forEach(function(p, i) {
+    if (!p) return;
+    var blob = normalizeEntityKey(
+      [p.shop, p.shopname, p.name, p.brand].map(function(x) { return String(x || ''); }).join('|')
+    );
+    if (blob.indexOf(needle) === -1) return;
+    out.push({ data: p, index: i });
+  });
+  return out;
+}
+
+function buildRoughMatchSamplesHtml(providersData, needles) {
+  var seenKey = new Set();
+  var samples = [];
+  (needles || []).forEach(function(nw) {
+    providersRoughFieldMatch(providersData, nw).forEach(function(item) {
+      var p = item.data;
+      var k = normalizeEntityKey([p.shop, p.shopname, p.name, p.brand].join('|'));
+      if (seenKey.has(k)) return;
+      seenKey.add(k);
+      samples.push(p);
+    });
+  });
+  if (!samples.length) {
+    var n = (providersData && providersData.length) || 0;
+    return '<div class="match-hint" style="margin-top:10px;font-size:13px;color:#64748b;line-height:1.55;">在现有 ' + n + ' 条卡片中，未在「店铺/别名/提供者/品牌」里搜到「朝霞」「王朝霞」。说明<strong>本机当前数据里很可能没有该校书目</strong>，请先点顶部<strong>立即同步</strong>，或换曾成功拉取云数据的浏览器/设备。</div>';
+  }
+  var lis = samples.slice(0, 5).map(function(p) {
+    return '<li style="margin:6px 0;word-break:break-all;">店铺「' + escapeHtmlText(p.shop || '') + '」· 别名「' +
+      escapeHtmlText(p.shopname || '') + '」· 提供者「' + escapeHtmlText(p.name || '') + '」· 品牌「' +
+      escapeHtmlText(p.brand || '') + '」</li>';
+  }).join('');
+  return '<div class="match-hint" style="margin-top:10px;background:rgba(14,165,233,0.08);border-color:rgba(14,165,233,0.35);">' +
+    '<span class="match-icon">🔎</span><span class="match-text"><strong>在现有卡片中按关键字反查</strong>：下列为库中实际出现的「含朝霞/王朝霞」写法，请把<strong>店铺框</strong>改成与之一致（或改品牌框与品牌列一致）：</span>' +
+    '<ul style="margin:8px 0 0;padding-left:18px;">' + lis + '</ul></div>';
 }
 
 function hasParentheses(value) {
@@ -1164,7 +1206,8 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
         (bothHit === 0 && shopHit === 0
           ? ' 若店铺为 0，请核对库里「店铺/店铺别名/提供者」是否含「洛阳」「朝霞」等关键字。'
           : '') +
-        '</div>';
+        '</div>' +
+        buildRoughMatchSamplesHtml(providersData, ['朝霞', '王朝霞', '洛阳朝霞']);
     } else {
       display.style.display = 'none';
     }
