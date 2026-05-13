@@ -146,11 +146,79 @@ function toCloudProviderListForUpload(data) {
   return Array.from(map.values());
 }
 
+/** 解析 PostgREST Content-Range，例如 0-99/5000 或 items 0-99/5000；total 为 * 时返回 null */
+function parseContentRangeItems(header) {
+  if (!header || typeof header !== 'string') return null;
+  var m = header.trim().match(/(\d+)\s*-\s*(\d+)\s*\/\s*(\d+|\*)/);
+  if (!m) return null;
+  return {
+    start: parseInt(m[1], 10),
+    end: parseInt(m[2], 10),
+    total: m[3] === '*' ? null : parseInt(m[3], 10)
+  };
+}
+
+/** 轻量请求：用 Prefer:count=exact 取 providers 总行数（与 RLS 下可见行数一致） */
+async function fetchCloudProvidersDeclaredTotal() {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=id', {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Range-Unit': 'items',
+        'Range': '0-0',
+        'Prefer': 'count=exact'
+      }
+    });
+    if (!res.ok) return null;
+    await res.json().catch(function() { return []; });
+    var cr = res.headers.get('content-range') || res.headers.get('Content-Range');
+    var parsed = parseContentRangeItems(cr);
+    if (parsed && typeof parsed.total === 'number' && !isNaN(parsed.total)) return parsed.total;
+  } catch (e) {
+    console.warn('🌥️ 无法获取 providers 精确总数:', e);
+  }
+  return null;
+}
+
 async function fetchCloudProviders() {
   var pageSize = 1000;
-  var from = 0;
+  var totalHint = await fetchCloudProvidersDeclaredTotal();
   var all = [];
 
+  if (totalHint === 0) return [];
+
+  if (typeof totalHint === 'number' && totalHint > 0) {
+    while (all.length < totalHint) {
+      var from = all.length;
+      var to = Math.min(from + pageSize - 1, totalHint - 1);
+      var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=*', {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Range-Unit': 'items',
+          'Range': from + '-' + to,
+          'Prefer': 'count=exact'
+        }
+      });
+      if (!res.ok) {
+        var errText = await res.text();
+        throw new Error('拉取云端失败: ' + res.status + ' ' + errText);
+      }
+      var rows = await res.json();
+      var list = Array.isArray(rows) ? rows : [];
+      if (list.length === 0) {
+        console.warn('🌥️ Content-Range 声明 ' + totalHint + ' 条，但从下标 ' + from + ' 起无行，提前结束（请检查 max-rows / 代理截断）');
+        break;
+      }
+      all = all.concat(list);
+    }
+    return all;
+  }
+
+  /** 拿不到总数时：用每页 Content-Range，避免「本页未满 1000」误判为已拉完（服务端 max-rows 小于请求的 Range 时会发生） */
+  var from = 0;
+  var declaredTotal = null;
   while (true) {
     var to = from + pageSize - 1;
     var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=*', {
@@ -158,7 +226,8 @@ async function fetchCloudProviders() {
         'apikey': SUPABASE_KEY,
         'Authorization': 'Bearer ' + SUPABASE_KEY,
         'Range-Unit': 'items',
-        'Range': from + '-' + to
+        'Range': from + '-' + to,
+        'Prefer': 'count=exact'
       }
     });
     if (!res.ok) {
@@ -168,8 +237,21 @@ async function fetchCloudProviders() {
 
     var rows = await res.json();
     var list = Array.isArray(rows) ? rows : [];
+    var cr = res.headers.get('content-range') || res.headers.get('Content-Range');
+    var parsed = parseContentRangeItems(cr);
+    if (parsed && typeof parsed.total === 'number' && !isNaN(parsed.total)) {
+      declaredTotal = parsed.total;
+    }
+
     all = all.concat(list);
-    if (list.length < pageSize) break;
+
+    if (typeof declaredTotal === 'number' && declaredTotal >= 0) {
+      if (all.length >= declaredTotal || list.length === 0) break;
+      from = all.length;
+      continue;
+    }
+
+    if (list.length < pageSize || list.length === 0) break;
     from += pageSize;
   }
 
