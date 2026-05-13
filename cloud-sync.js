@@ -370,3 +370,34 @@ function startCloudAutoSync() {
     cloudSync();
   }, CLOUD_SYNC_INTERVAL_MS);
 }
+
+/**
+ * 清除「待同步」状态并从云端重新拉取全表（慎用：本机未回传的修改可能丢失）。
+ * 典型场景：本机仅几十条、云端应有数百条，且本地四条字段都搜不到某出版社关键字。
+ */
+window.forcePullProvidersFromCloud = async function() {
+  if (typeof cloudSync !== 'function') {
+    if (typeof alert === 'function') alert('同步模块未加载');
+    return;
+  }
+  if (isCloudSyncing) {
+    if (typeof showToast === 'function') showToast('正在同步中，请稍候再试');
+    return;
+  }
+  if (typeof confirm === 'function' && !confirm(
+    '将清除「本地待同步」标记，并从云端重新下载完整书目列表。\n\n若本机尚有未成功上传的修改，可能丢失。\n\n仅在确认云端数据更完整时继续。确定？'
+  )) {
+    return;
+  }
+  localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+  lastCloudSnapshot = '';
+  pendingSyncData = null;
+  clearRetryTimers();
+  try {
+    await cloudSync();
+    if (typeof showToast === 'function') showToast('已从云端拉取，请核对首页「规则卡片」数量');
+    if (typeof updateStats === 'function') updateStats();
+  } catch (e) {
+    if (typeof alert === 'function') alert(String((e && e.message) || e));
+  }
+};

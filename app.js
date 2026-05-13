@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-15';
+var RULE_LIBRARY_BUILD = '20260512-16';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -239,7 +239,17 @@ function buildRoughMatchSamplesHtml(providersData, needles) {
   });
   if (!samples.length) {
     var n = (providersData && providersData.length) || 0;
-    return '<div class="match-hint" style="margin-top:10px;font-size:13px;color:#64748b;line-height:1.55;">在现有 ' + n + ' 条卡片中，未在「店铺/别名/提供者/品牌」里搜到「朝霞」「王朝霞」。说明<strong>本机当前数据里很可能没有该校书目</strong>，请先点顶部<strong>立即同步</strong>，或换曾成功拉取云数据的浏览器/设备。</div>';
+    var pullBtn =
+      n < 400
+        ? '<p style="margin:10px 0 0;"><button type="button" class="sync-btn" style="cursor:pointer;padding:8px 14px;border-radius:8px;border:none;background:var(--primary-cyan, #22d3ee);color:#0f172a;font-weight:600;" onclick="if(typeof window.forcePullProvidersFromCloud===\'function\'){window.forcePullProvidersFromCloud();}else{alert(\'请刷新页面后重试\');}">从云端重新拉取完整书目</button> ' +
+          '<span style="font-size:12px;">（会清除「待同步」标记；仅在确认<strong>云端</strong>数据更全时使用）</span></p>'
+        : '';
+    return (
+      '<div class="match-hint" style="margin-top:10px;font-size:13px;color:#64748b;line-height:1.55;">在现有 ' +
+      n +
+      ' 条卡片中，未在「店铺/别名/提供者/品牌」里搜到「朝霞」「王朝霞」。说明<strong>本机当前数据里很可能没有该校书目</strong>；若你曾在云端录入过大量规则，可点击下方按钮尝试<strong>强制以云端为准</strong>重新下载。</div>' +
+      pullBtn
+    );
   }
   var lis = samples.slice(0, 5).map(function(p) {
     return '<li style="margin:6px 0;word-break:break-all;">店铺「' + escapeHtmlText(p.shop || '') + '」· 别名「' +
@@ -2554,7 +2564,8 @@ function aiQuery() {
         p.name || '',
         p.brand || '',
         p.series || '',
-        p.shop || ''
+        p.shop || '',
+        p.shopname || ''
       ].join(' ');
       var normalizedIdentity = normalizeForSearch(identityText);
       var searchableText = [
@@ -2562,6 +2573,7 @@ function aiQuery() {
         p.brand || '',
         p.series || '',
         p.shop || '',
+        p.shopname || '',
         p.split || '',
         p.pricing || '',
         p.publishTime || '',
@@ -2580,6 +2592,7 @@ function aiQuery() {
         p.brand || '',
         p.series || '',
         p.shop || '',
+        p.shopname || '',
         p.split || '',
         p.pricing || '',
         p.publishTime || '',
