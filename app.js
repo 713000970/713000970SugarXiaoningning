@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-12';
+var RULE_LIBRARY_BUILD = '20260512-13';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -161,11 +161,22 @@ function normalizeEntityKey(value) {
   return normalizeText(value).replace(/[()（）\s]/g, '');
 }
 
+/** 公司/店铺名对齐：常见「文化」与「文化传媒」混用导致无法匹配 */
+function alignCompanyMatchKey(value) {
+  var k = normalizeEntityKey(value);
+  if (!k) return '';
+  return k.replace(/文化传媒/g, '文化');
+}
+
 function isEntityMatched(source, target) {
   var sourceKey = normalizeEntityKey(source);
   var targetKey = normalizeEntityKey(target);
   if (!sourceKey || !targetKey) return false;
-  return sourceKey === targetKey || sourceKey.indexOf(targetKey) !== -1 || targetKey.indexOf(sourceKey) !== -1;
+  if (sourceKey === targetKey || sourceKey.indexOf(targetKey) !== -1 || targetKey.indexOf(sourceKey) !== -1) return true;
+  var sa = alignCompanyMatchKey(source);
+  var ta = alignCompanyMatchKey(target);
+  if (!sa || !ta) return false;
+  return sa === ta || sa.indexOf(ta) !== -1 || ta.indexOf(sa) !== -1;
 }
 
 function isEntitySameExact(source, target) {
@@ -1067,11 +1078,11 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
   var targetShopTrim = String(shopName || '').trim();
   var targetSeries = normalizeText(seriesFilter || '');
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
+  var relaxedHintHtml = '';
   
   // 过滤：品牌 + 店铺语境 + 提供者（与 loadBrandsByShopAndShowDropdown 一致，避免「有品牌名、规则卡片为 0」）
   var matched = [];
   providersData.forEach(function(p, i) {
-    var itemBrand = normalizeText(p && p.brand);
     var brandMatched = brandMatchesUi(p && p.brand, brandName);
     var shopMatched = !targetShopTrim || rowShopMatchesSearch(p, shopName);
     var providerMatched = !providerName || isEntityMatched(p && p.name, providerName);
@@ -1079,6 +1090,20 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
       matched.push({ data: p, index: i });
     }
   });
+
+  // 有店铺、有品牌，但因「提供者」框填错导致 0 条时：忽略提供者再筛一次（常见：框里仍是上一家主体）
+  if (matched.length === 0 && providerName && targetShopTrim) {
+    var retry = [];
+    providersData.forEach(function(p, i) {
+      if (!brandMatchesUi(p && p.brand, brandName)) return;
+      if (!rowShopMatchesSearch(p, shopName)) return;
+      retry.push({ data: p, index: i });
+    });
+    if (retry.length > 0) {
+      matched = retry;
+      relaxedHintHtml = '<div class="match-hint" style="margin-bottom:12px;"><span class="match-icon">⚠️</span><span class="match-text">已忽略「提供者」筛选（框内名称与该公司规则不一致），共显示 ' + retry.length + ' 条。请清空或改为规则卡片上的公司名称。</span></div>';
+    }
+  }
   
   // 仅在“未选择店铺”时才允许按品牌兜底，避免跨店铺串数据
   if (matched.length === 0 && !targetShopTrim) {
@@ -1172,7 +1197,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
     grouped[seriesKey].push(item);
   });
 
-  var html = '<div class="rule-result-list">';
+  var html = (relaxedHintHtml || '') + '<div class="rule-result-list">';
   Object.keys(grouped).sort().forEach(function(seriesName) {
     var seriesItems = grouped[seriesName];
     html += '<div class="rule-group-header" style="margin:10px 0 8px;color:#0f766e;font-weight:600;">📚 系列：' + seriesName + '（' + seriesItems.length + '）</div>';
