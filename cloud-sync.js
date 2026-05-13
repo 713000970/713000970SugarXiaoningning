@@ -1,14 +1,22 @@
 // 云同步配置
 const SUPABASE_URL = 'https://wsrbjgiscfxsyucsgzof.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EenxYjB0VmulAQRr24IyDw_mj1AxX38';
-const CLOUD_SYNC_INTERVAL_MS = 10000;
+/** 定时同步间隔：万级数据下全量拉取成本高，适当拉长 */
+const CLOUD_SYNC_INTERVAL_MS = 45000;
 const CLOUD_RETRY_DELAY_MS = 5000;
 const LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
+/** 行数超过此值且基线可用时，尽量走增量上传（避免 DELETE 全表 + POST 上万行） */
+const INCREMENTAL_SYNC_MIN_ROWS = 400;
+/** 变更条数超过此值仍回退为整表替换（大批量导入等） */
+const INCREMENTAL_MAX_CHANGES = 2000;
+const SYNC_HTTP_CHUNK = 400;
 
 let onCloudSyncReady = null;
 let cloudSyncTimer = null;
 let isCloudSyncing = false;
 let lastCloudSnapshot = '';
+/** 上次与云端对齐后的本地 providers JSON（用于增量 diff）；与 localStorage 内容格式一致 */
+let lastSyncedRawProvidersStr = null;
 let retryTimer = null;
 let retryCountdownTimer = null;
 let retryRemainSec = 0;
@@ -87,7 +95,7 @@ function toLocalProvider(p) {
   return {
     id: p.id,
     shop: p.shop || '',
-    shopname: p.shopname || '',
+    shopname: p.shopname || p.shop_name || '',
     name: p.name || '',
     brand: p.brand || '',
     series: p.series || '',
@@ -134,16 +142,125 @@ function providerIdentityKey(p) {
   return [shop, shopname, name, brand, series].join('|');
 }
 
-/** 将当前内存中的规则列表转为上传用行，并按主键去重（后者覆盖前者） */
+/** 将当前内存中的规则列表转为上传用行，并按主键去重（后者覆盖前者）；保留数据库 id 供增量同步 */
+function isPositiveIntId(id) {
+  if (id === undefined || id === null || id === '') return false;
+  var n = typeof id === 'number' ? id : parseInt(String(id), 10);
+  return Number.isFinite(n) && n > 0 && n < 2147483647;
+}
+
 function toCloudProviderListForUpload(data) {
   var map = new Map();
   (data || []).forEach(function(item) {
     var c = toCloudProvider(item || {});
     var key = providerIdentityKey(c);
     if (!key.replace(/\|/g, '')) return;
-    map.set(key, c);
+    var row = Object.assign({}, c);
+    if (isPositiveIntId(item && item.id)) row.id = Number(item.id);
+    map.set(key, row);
   });
   return Array.from(map.values());
+}
+
+function providerRowForDb(p) {
+  var o = toCloudProvider(p || {});
+  if (isPositiveIntId(p && p.id)) o.id = Number(p.id);
+  return o;
+}
+
+function providerContentSignature(p) {
+  return JSON.stringify(toCloudProvider(p || {}));
+}
+
+function computeProviderSyncDelta(prevFormatted, nextFormatted) {
+  var prevById = new Map();
+  (prevFormatted || []).forEach(function(p) {
+    if (isPositiveIntId(p && p.id)) prevById.set(Number(p.id), p);
+  });
+  var nextIds = new Set();
+  var upserts = [];
+  var insertsNoId = [];
+  (nextFormatted || []).forEach(function(p) {
+    if (isPositiveIntId(p && p.id)) {
+      var id = Number(p.id);
+      nextIds.add(id);
+      var prevP = prevById.get(id);
+      if (!prevP) {
+        upserts.push(p);
+      } else if (providerContentSignature(prevP) !== providerContentSignature(p)) {
+        upserts.push(p);
+      }
+    } else {
+      insertsNoId.push(p);
+    }
+  });
+  var deletes = [];
+  prevById.forEach(function(_p, id) {
+    if (!nextIds.has(id)) deletes.push(id);
+  });
+  return { upserts: upserts, insertsNoId: insertsNoId, deletes: deletes };
+}
+
+function captureSyncBaselineFromStorage() {
+  try {
+    lastSyncedRawProvidersStr = localStorage.getItem('rule_library_providers');
+  } catch (e) {
+    lastSyncedRawProvidersStr = null;
+  }
+}
+
+async function httpPostProvidersJson(pathSuffix, bodyArray, preferPrefer) {
+  var headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': preferPrefer || 'return=minimal'
+  };
+  var res = await fetch(SUPABASE_URL + '/rest/v1/providers' + (pathSuffix || ''), {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(bodyArray)
+  });
+  if (!res.ok) {
+    var errText = await res.text();
+    throw new Error(errText || String(res.status));
+  }
+}
+
+/**
+ * 按 id 删除 / upsert / 纯插入，避免全表 DELETE + 整包 POST。
+ */
+async function syncProvidersIncrementalApply(delta) {
+  var i;
+  for (i = 0; i < delta.deletes.length; i += SYNC_HTTP_CHUNK) {
+    var delChunk = delta.deletes.slice(i, i + SYNC_HTTP_CHUNK);
+    var inList = delChunk.join(',');
+    var delRes = await fetch(SUPABASE_URL + '/rest/v1/providers?id=in.(' + inList + ')', {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY
+      }
+    });
+    if (!delRes.ok) {
+      var delErr = await delRes.text();
+      throw new Error(delErr || String(delRes.status));
+    }
+  }
+  for (i = 0; i < delta.upserts.length; i += SYNC_HTTP_CHUNK) {
+    var upChunk = delta.upserts.slice(i, i + SYNC_HTTP_CHUNK).map(providerRowForDb);
+    await httpPostProvidersJson(
+      '?on_conflict=id',
+      upChunk,
+      'resolution=merge-duplicates,return=minimal'
+    );
+  }
+  for (i = 0; i < delta.insertsNoId.length; i += SYNC_HTTP_CHUNK) {
+    var insChunk = delta.insertsNoId.slice(i, i + SYNC_HTTP_CHUNK).map(function(p) {
+      return toCloudProvider(p || {});
+    });
+    await httpPostProvidersJson('', insChunk, 'return=minimal');
+  }
 }
 
 /** 解析 PostgREST Content-Range，例如 0-99/5000 或 items 0-99/5000；total 为 * 时返回 null */
@@ -265,7 +382,11 @@ function notifyProvidersUpdated(source) {
 }
 
 // 云同步API - 加载时拉取数据
-async function cloudSync() {
+// opts.fromTimer：定时触发时，本地有未传则不再 GET 全表；本地干净时先比对行数，一致则跳过万级拉取
+async function cloudSync(opts) {
+  opts = opts || {};
+  var fromTimer = !!opts.fromTimer;
+
   if (isCloudSyncing) return;
   isCloudSyncing = true;
   clearRetryTimers();
@@ -273,17 +394,35 @@ async function cloudSync() {
   try {
     console.log('🌥️ 开始同步云端数据...');
     const localProviders = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
-    const localSnapshot = calcSnapshot(localProviders);
     const localDirty = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
 
+    if (fromTimer && localDirty) {
+      const localProvidersNow = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+      localStorage.setItem(LOCAL_DIRTY_KEY, '1');
+      queuePendingSync(localProvidersNow);
+      notifyProvidersUpdated('cloud-timer-skip-pull');
+      markSyncSuccess('本地有待回传（已跳过定时拉取）');
+      return;
+    }
+
+    if (fromTimer && !localDirty) {
+      var rc = await fetchCloudProvidersDeclaredTotal();
+      var localLen = (localProviders && localProviders.length) || 0;
+      if (typeof rc === 'number' && rc === localLen) {
+        markSyncSuccess('已是最新');
+        return;
+      }
+    }
+
+    const localSnapshot = calcSnapshot(localProviders);
     const remoteData = await fetchCloudProviders();
     console.log('🌥️ 云端数据:', remoteData);
-    
+
     if (!remoteData || remoteData.length === 0) {
       // 远程为空，从本地上传
       console.log('🌥️ 云端无数据，从本地上传...');
       const localData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
-      
+
       if (localData.length > 0) {
         const formatted = localData.map(function(p) {
           return {
@@ -344,18 +483,122 @@ async function cloudSync() {
       markSyncSuccess('已同步');
       console.log('🌥️ 已从云端同步数据，本地更新');
     }
-    
+
     // 同步完成回调
     if (typeof onCloudSyncReady === 'function') {
       onCloudSyncReady();
     }
-  } catch(e) {
+  } catch (e) {
     console.error('🌥️ 同步失败:', e);
     scheduleRetry();
   } finally {
     isCloudSyncing = false;
     flushPendingSync();
+    try {
+      if (localStorage.getItem(LOCAL_DIRTY_KEY) !== '1') {
+        captureSyncBaselineFromStorage();
+      }
+    } catch (e3) {}
   }
+}
+
+/**
+ * 整表 DELETE + POST（大批量变更或增量失败时回退）
+ */
+async function syncProvidersFullTableReplace(data) {
+  const formatted = toCloudProviderListForUpload(data);
+  const nextSnapshot = calcSnapshot(formatted);
+
+  const deleteRes = await fetch(SUPABASE_URL + '/rest/v1/providers?id=gt.0', {
+    method: 'DELETE',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': 'Bearer ' + SUPABASE_KEY
+    }
+  });
+  if (!deleteRes.ok) {
+    const deleteErrText = await deleteRes.text();
+    console.error('🌥️ 清空云端失败:', deleteRes.status, deleteErrText);
+    scheduleRetry();
+    return false;
+  }
+
+  if (formatted.length === 0) {
+    lastCloudSnapshot = nextSnapshot;
+    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+    lastSyncedRawProvidersStr = JSON.stringify(data);
+    markSyncSuccess('已同步');
+    console.log('🌥️ 已同步到云端');
+    return true;
+  }
+
+  for (var off = 0; off < formatted.length; off += SYNC_HTTP_CHUNK) {
+    var chunk = formatted.slice(off, off + SYNC_HTTP_CHUNK).map(providerRowForDb);
+    var res = await fetch(SUPABASE_URL + '/rest/v1/providers', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(chunk)
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('🌥️ 同步失败:', res.status, errText);
+      scheduleRetry();
+      return false;
+    }
+  }
+
+  lastCloudSnapshot = nextSnapshot;
+  localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+  lastSyncedRawProvidersStr = JSON.stringify(data);
+  markSyncSuccess('已同步');
+  console.log('🌥️ 已同步到云端');
+  return true;
+}
+
+/**
+ * 与基线对比，仅推送删除/变更/新增行。返回 true 表示已处理完毕。
+ */
+async function trySyncToCloudIncremental(data, formatted) {
+  var baselineStr = lastSyncedRawProvidersStr;
+  if (!baselineStr || formatted.length < INCREMENTAL_SYNC_MIN_ROWS) {
+    return false;
+  }
+  var baselineFormatted;
+  try {
+    baselineFormatted = toCloudProviderListForUpload(JSON.parse(baselineStr));
+  } catch (e) {
+    return false;
+  }
+  var delta = computeProviderSyncDelta(baselineFormatted, formatted);
+  var opCount = delta.deletes.length + delta.upserts.length + delta.insertsNoId.length;
+  if (opCount <= 0) {
+    lastCloudSnapshot = calcSnapshot(formatted);
+    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+    lastSyncedRawProvidersStr = JSON.stringify(data);
+    markSyncSuccess('已同步');
+    return true;
+  }
+  if (opCount > INCREMENTAL_MAX_CHANGES || opCount >= formatted.length * 0.95) {
+    return false;
+  }
+  await syncProvidersIncrementalApply(delta);
+  if (delta.insertsNoId.length > 0) {
+    var remoteList = await fetchCloudProviders();
+    var locFmt = remoteList.map(toLocalProvider);
+    localStorage.setItem('rule_library_providers', JSON.stringify(locFmt));
+    notifyProvidersUpdated('cloud-incremental-refresh');
+  }
+  var stored = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+  var storedFmt = toCloudProviderListForUpload(stored);
+  lastCloudSnapshot = calcSnapshot(storedFmt);
+  lastSyncedRawProvidersStr = JSON.stringify(stored);
+  localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+  markSyncSuccess('已增量同步（' + opCount + ' 项）');
+  return true;
 }
 
 // 保存数据后自动同步到云端
@@ -370,10 +613,9 @@ async function syncToCloud(data) {
   emitSyncStatus('syncing', '同步中...');
   try {
     console.log('🌥️ 同步到云端...', (data || []).length, '条');
-    
-    // 整表替换上传：必须以本次传入的本地列表为准，否则与云端 merge 会把「仅云端仍有」的已删行再次 POST 上去
+
     const formatted = toCloudProviderListForUpload(data);
-    // 首屏 cleanup 等竞态可能把本地写成 [] 后立即同步，会 DELETE 掉云端上千条；若云端仍大量有数据则中止并拉回本地
+
     if (formatted.length === 0) {
       const remoteRows = await fetchCloudProviders();
       const remoteCount = (remoteRows && remoteRows.length) || 0;
@@ -384,60 +626,35 @@ async function syncToCloud(data) {
         lastCloudSnapshot = calcSnapshot(remoteRows.map(toLocalProvider));
         notifyProvidersUpdated('cloud-recovered-from-empty-sync');
         markSyncSuccess('已阻止误清空，已从云端恢复');
+        captureSyncBaselineFromStorage();
         return;
       }
     }
-    const nextSnapshot = JSON.stringify(formatted);
+
+    const nextSnapshot = calcSnapshot(formatted);
     if (nextSnapshot === lastCloudSnapshot) {
       localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+      lastSyncedRawProvidersStr = JSON.stringify(data);
       markSyncSuccess('已同步');
       return;
     }
 
-    const deleteRes = await fetch(`${SUPABASE_URL}/rest/v1/providers?id=gt.0`, {
-      method: 'DELETE',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
-      }
-    });
-    if (!deleteRes.ok) {
-      const deleteErrText = await deleteRes.text();
-      console.error('🌥️ 清空云端失败:', deleteRes.status, deleteErrText);
-      scheduleRetry();
-      return;
+    var didInc = false;
+    try {
+      didInc = await trySyncToCloudIncremental(data, formatted);
+    } catch (incErr) {
+      console.warn('🌥️ 增量同步失败，回退整表替换:', incErr);
     }
-    
-    if (formatted.length === 0) {
-      lastCloudSnapshot = nextSnapshot;
-      localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-      markSyncSuccess('已同步');
-      console.log('🌥️ 已同步到云端');
+    if (didInc) {
+      console.log('🌥️ 增量同步完成');
       return;
     }
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/providers`, {
-      method: 'POST',
-      headers: { 
-        'apikey': SUPABASE_KEY, 
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(formatted)
-    });
-    
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error('🌥️ 同步失败:', res.status, errText);
-      scheduleRetry();
+    var ok = await syncProvidersFullTableReplace(data);
+    if (!ok) {
       return;
     }
-
-    lastCloudSnapshot = nextSnapshot;
-    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-    markSyncSuccess('已同步');
-    console.log('🌥️ 已同步到云端');
-  } catch(e) {
+  } catch (e) {
     console.error('🌥️ 同步失败:', e);
     scheduleRetry();
   } finally {
@@ -449,7 +666,7 @@ async function syncToCloud(data) {
 function startCloudAutoSync() {
   if (cloudSyncTimer) return;
   cloudSyncTimer = setInterval(function() {
-    cloudSync();
+    cloudSync({ fromTimer: true });
   }, CLOUD_SYNC_INTERVAL_MS);
 }
 
@@ -492,6 +709,7 @@ window.forcePullProvidersFromCloud = async function() {
     markSyncSuccess('已从云端写入本地 ' + cnt + ' 条');
     if (typeof updateStats === 'function') updateStats();
     if (typeof showToast === 'function') showToast('已写入 ' + cnt + ' 条，请核对首页数字');
+    captureSyncBaselineFromStorage();
   } catch (e) {
     emitSyncStatus('error', String((e && e.message) || e));
     if (typeof alert === 'function') alert(String((e && e.message) || e));
