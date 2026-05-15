@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-21';
+var RULE_LIBRARY_BUILD = '20260512-23';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -10,6 +10,9 @@ var currentProvider = '';
 var currentEditingBrand = '';
 var currentEditingShop = '';
 var currentEditingSeries = '';
+var aiSeriesFilter = '';
+var aiLastMatchedProviders = [];
+var showRulesDebounceTimer = null;
 
 // ========================================
 // 数据存储（本地存储）
@@ -79,6 +82,12 @@ function getData(key) {
   return JSON.parse(localStorage.getItem(key) || '[]');
 }
 
+/** db.js 未加载或失败时避免整页崩溃 */
+function getPresetProvidersSafe() {
+  if (typeof presetData === 'undefined' || !presetData || !Array.isArray(presetData.providers)) return [];
+  return presetData.providers;
+}
+
 /** 用于 innerHTML 文本节点，避免 < 等破坏结构；换行仍保留为 \n，配合 white-space:pre-wrap 显示 */
 function escapeHtmlText(value) {
   return String(value || '')
@@ -86,6 +95,16 @@ function escapeHtmlText(value) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/** 写入 HTML 属性（data-* 等），避免品牌/系列名含引号导致脚本中断 */
+function escapeHtmlAttr(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 
 /** AI / 列表展示：空或纯空白显示为「无」，否则保留原文（含换行） */
@@ -534,10 +553,41 @@ document.addEventListener('DOMContentLoaded', () => {
     if (shopDropdown && !shopDropdown.contains(e.target) && (!shopInput || !shopInput.contains(e.target))) {
       shopDropdown.style.display = 'none';
     }
-    if (brandDropdown && !brandDropdown.contains(e.target) && (!brandInput || !brandInput.contains(e.target))) {
+    var seriesTagContainer = document.getElementById('series-tag-container');
+    if (brandDropdown && !brandDropdown.contains(e.target) && (!brandInput || !brandInput.contains(e.target)) &&
+        (!seriesTagContainer || !seriesTagContainer.contains(e.target))) {
       brandDropdown.style.display = 'none';
     }
   });
+
+  var brandDropdownEl = document.getElementById('brand-dropdown');
+  if (brandDropdownEl) {
+    brandDropdownEl.addEventListener('mousedown', function(e) {
+      var item = e.target.closest('[data-brand-name]');
+      if (!item) return;
+      e.preventDefault();
+      selectBrand(item.getAttribute('data-brand-name') || '');
+    });
+  }
+
+  var seriesTagEl = document.getElementById('series-tag-container');
+  if (seriesTagEl) {
+    seriesTagEl.addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-series-filter]');
+      if (!btn) return;
+      e.stopPropagation();
+      selectSeriesFilter(btn.getAttribute('data-series-filter') || '');
+    });
+  }
+
+  var aiSeriesTagEl = document.getElementById('ai-series-tag-container');
+  if (aiSeriesTagEl) {
+    aiSeriesTagEl.addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-ai-series-filter]');
+      if (!btn) return;
+      selectAiSeriesFilter(btn.getAttribute('data-ai-series-filter') || '');
+    });
+  }
 
   // 多标签/多人场景：本地变化和云端拉取后都刷新当前页面
   window.addEventListener('storage', function(evt) {
@@ -580,8 +630,18 @@ function refreshProviderViews() {
   loadBrands();
   updateStats();
   if (currentEditingBrand) {
-    showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries);
+    scheduleShowRulesByBrandAndShop();
   }
+}
+
+function scheduleShowRulesByBrandAndShop() {
+  if (showRulesDebounceTimer) clearTimeout(showRulesDebounceTimer);
+  showRulesDebounceTimer = setTimeout(function() {
+    showRulesDebounceTimer = null;
+    if (currentEditingBrand) {
+      showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries);
+    }
+  }, 120);
 }
 
 function updateSyncStatusBadge(status, message) {
@@ -989,7 +1049,7 @@ function showBrandList(e) {
   
   if (shopBrands.length > 0) {
     dropdown.innerHTML = shopBrands.slice(0, 80).map(function(b) { 
-      return '<div class="dropdown-item" onclick="selectBrand(&quot;' + b + '&quot;)">' + b + '</div>';
+      return '<div class="dropdown-item" data-brand-name="' + escapeHtmlAttr(b) + '">' + escapeHtmlText(b) + '</div>';
     }).join('');
     dropdown.style.display = 'block';
   }
@@ -1029,7 +1089,7 @@ function onBrandInput() {
   if (!input) {
     if (shopBrands.length > 0) {
       dropdown.innerHTML = shopBrands.slice(0, 80).map(function(b) { 
-        return '<div class="dropdown-item" onmousedown="event.preventDefault();selectBrand(\'' + b + '\')">' + b + '</div>';
+        return '<div class="dropdown-item" data-brand-name="' + escapeHtmlAttr(b) + '">' + escapeHtmlText(b) + '</div>';
       }).join('');
       dropdown.style.display = 'block';
     } else {
@@ -1065,7 +1125,7 @@ function onBrandInput() {
   }
   
   dropdown.innerHTML = uniqueBrands.slice(0, 40).map(function(b) { 
-    return '<div class="dropdown-item" onmousedown="event.preventDefault();selectBrand(\'' + b + '\')">' + b + '</div>';
+    return '<div class="dropdown-item" data-brand-name="' + escapeHtmlAttr(b) + '">' + escapeHtmlText(b) + '</div>';
   }).join('');
   dropdown.style.display = 'block';
 }
@@ -1096,7 +1156,7 @@ function renderSeriesTags(matched, selectedSeries) {
   });
 
   var seriesList = Object.keys(seriesMap).sort();
-  if (seriesList.length <= 1) {
+  if (seriesList.length === 0) {
     clearSeriesTags();
     return;
   }
@@ -1104,17 +1164,112 @@ function renderSeriesTags(matched, selectedSeries) {
   var currentSeries = String(selectedSeries || '').trim();
   var allClass = currentSeries ? 'series-tag' : 'series-tag active';
   var html = '<span class="series-tag-label">系列：</span>';
-  html += '<button class="' + allClass + '" type="button" onclick="selectSeriesFilter(\'\')">全部系列（' + matched.length + '）</button>';
+  html += '<button class="' + allClass + '" type="button" data-series-filter="">全部系列（' + matched.length + '）</button>';
 
   seriesList.forEach(function(seriesName) {
     var count = seriesMap[seriesName];
     var isActive = currentSeries === seriesName;
     var cls = isActive ? 'series-tag active' : 'series-tag';
-    html += '<button class="' + cls + '" type="button" onclick="selectSeriesFilter(\'' + encodeURIComponent(seriesName) + '\')">' + seriesName + '（' + count + '）</button>';
+    html += '<button class="' + cls + '" type="button" data-series-filter="' + escapeHtmlAttr(encodeURIComponent(seriesName)) + '">' +
+      escapeHtmlText(seriesName) + '（' + count + '）</button>';
   });
 
   container.innerHTML = html;
   container.style.display = 'flex';
+}
+
+function renderAiSeriesTags(matchedProviders, selectedSeries) {
+  var container = document.getElementById('ai-series-tag-container');
+  if (!container) return;
+
+  var seriesMap = {};
+  (matchedProviders || []).forEach(function(p) {
+    var key = String((p && p.series) || '').trim() || '未设置系列';
+    seriesMap[key] = (seriesMap[key] || 0) + 1;
+  });
+  var seriesList = Object.keys(seriesMap).sort();
+  if (seriesList.length === 0) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  var currentSeries = String(selectedSeries || '').trim();
+  var allClass = currentSeries ? 'series-tag' : 'series-tag active';
+  var total = (matchedProviders || []).length;
+  var html = '<span class="series-tag-label">系列：</span>';
+  html += '<button class="' + allClass + '" type="button" data-ai-series-filter="">全部系列（' + total + '）</button>';
+  seriesList.forEach(function(seriesName) {
+    var count = seriesMap[seriesName];
+    var isActive = currentSeries === seriesName;
+    var cls = isActive ? 'series-tag active' : 'series-tag';
+    html += '<button class="' + cls + '" type="button" data-ai-series-filter="' + escapeHtmlAttr(encodeURIComponent(seriesName)) + '">' +
+      escapeHtmlText(seriesName) + '（' + count + '）</button>';
+  });
+  container.innerHTML = html;
+  container.style.display = 'flex';
+}
+
+function selectAiSeriesFilter(seriesEncoded) {
+  aiSeriesFilter = seriesEncoded ? decodeURIComponent(seriesEncoded) : '';
+  if (!aiLastMatchedProviders.length) return;
+  aiRenderProviderResults(aiLastMatchedProviders);
+}
+
+function aiRenderProviderResults(fullList) {
+  var resultBox = document.getElementById('ai-result');
+  if (!resultBox) return;
+
+  aiLastMatchedProviders = fullList || [];
+  renderAiSeriesTags(aiLastMatchedProviders, aiSeriesFilter);
+
+  var list = aiLastMatchedProviders;
+  if (aiSeriesFilter) {
+    list = list.filter(function(rule) {
+      var key = String((rule && rule.series) || '').trim() || '未设置系列';
+      return key === aiSeriesFilter;
+    });
+  }
+
+  if (list.length === 0) {
+    resultBox.innerHTML =
+      '<div class="ai-result-card">' +
+        '<div class="ai-result-header">' +
+          '<span class="ai-result-icon">ℹ️</span>' +
+          '<span class="ai-result-title">该系列下暂无规则</span>' +
+        '</div>' +
+        '<div class="ai-result-body">' +
+          '<p class="ai-result-empty-msg">请点上方「全部系列」查看该品牌下所有规则。</p>' +
+        '</div>' +
+      '</div>';
+    return;
+  }
+
+  resultBox.innerHTML = list.map(function(rule) {
+    var providerName = rule.name || '未命名提供者';
+    var brandName = rule.brand || '未设置品牌';
+    var seriesName = (rule.series || '').trim() || '未设置系列';
+    var shopName = rule.shop || rule.shopname || '未设置店铺';
+    return '<div class="ai-result-card">' +
+      '<div class="ai-result-header">' +
+        '<span class="ai-result-icon">📌</span>' +
+        '<span class="ai-result-title">' + escapeHtmlText(providerName + ' · ' + brandName + ' · ' + seriesName) + '</span>' +
+      '</div>' +
+      '<div class="ai-result-body">' +
+        '<div class="ai-result-section">' +
+          '<div class="ai-result-row"><span class="ai-result-label">店铺</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(shopName)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">提供者</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(providerName)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">品牌</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(brandName)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">系列</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(seriesName)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">拆分</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.split)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">定价</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.pricing)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">发布时间</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.publishTime)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">特例</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.specialCase)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">其他信息</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.otherInfo)) + '</span></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
 }
 
 function selectSeriesFilter(seriesEncoded) {
@@ -1575,7 +1730,7 @@ function onBrandChange() {
   
   // 从预置数据和本地存储中匹配
   var localProviders = getData(STORAGE_KEYS.PROVIDERS);
-  var allProviders = [...presetData.providers, ...localProviders];
+  var allProviders = [...getPresetProvidersSafe(), ...localProviders];
   
   var matched;
   if (providerName && providerName.trim() !== '') {
@@ -1604,7 +1759,7 @@ function displayBrandRule(brandName) {
   
   if (!brandName) return;
   
-  var matched = presetData.providers.filter(function(p) { 
+  var matched = getPresetProvidersSafe().filter(function(p) {
     if (providerName) {
       return p.brand === brandName && p.name === providerName;
     }
@@ -1651,7 +1806,7 @@ function onSeriesChange() {
   
   // 检查 presetData 和 localStorage
   var localProviders = getData(STORAGE_KEYS.PROVIDERS);
-  var allProviders = [...presetData.providers, ...localProviders];
+  var allProviders = [...getPresetProvidersSafe(), ...localProviders];
   
   // 获取匹配的规则数据：宽松匹配（包含关系）
   var matched = allProviders.filter(function(p) {
@@ -1726,14 +1881,17 @@ function saveEditRule() {
   var providerInput = document.getElementById('provider-search-input');
   var providerName = providerInput ? providerInput.value : '';
   
-  var newSplit = document.getElementById('edit-split').value.trim();
-  var newPricing = document.getElementById('edit-pricing').value.trim();
-  var newPublishTime = document.getElementById('edit-publishTime').value.trim();
-  var newSpecialCase = document.getElementById('edit-specialCase').value.trim();
-  
+  var elSplit = document.getElementById('edit-split');
+  var elPricing = document.getElementById('edit-pricing');
+  var elPub = document.getElementById('edit-publishTime');
+  var elSpec = document.getElementById('edit-specialCase');
+  var newSplit = elSplit ? elSplit.value.trim() : '';
+  var newPricing = elPricing ? elPricing.value.trim() : '';
+  var newPublishTime = elPub ? elPub.value.trim() : '';
+  var newSpecialCase = elSpec ? elSpec.value.trim() : '';
+
   // 获取当前数据
   var localProviders = getData(STORAGE_KEYS.PROVIDERS);
-  var allProviders = [...presetData.providers, ...localProviders];
   
   // 查找匹配项
   var matchedIndex = -1;
@@ -2549,8 +2707,13 @@ function aiQuery() {
   
   if (!query) {
     resultBox.innerHTML = '';
+    aiSeriesFilter = '';
+    aiLastMatchedProviders = [];
+    renderAiSeriesTags([], '');
     return;
   }
+
+  aiSeriesFilter = '';
   
   const queryLower = query.toLowerCase();
   const normalizedQuery = normalizeForSearch(query);
@@ -2760,37 +2923,13 @@ function aiQuery() {
   });
   
   if (matchedProviders.length > 0) {
-    // 一条规则一张卡片，提升可读性（避免同卡片内信息过密）
-    var html = matchedProviders.map(function(rule) {
-      var providerName = rule.name || '未命名提供者';
-      var brandName = rule.brand || '未设置品牌';
-      var seriesName = (rule.series || '').trim() || '未设置系列';
-      var shopName = rule.shop || rule.shopname || '未设置店铺';
-      return '<div class="ai-result-card">' +
-        '<div class="ai-result-header">' +
-          '<span class="ai-result-icon">📌</span>' +
-          '<span class="ai-result-title">' + escapeHtmlText(providerName + ' · ' + brandName + ' · ' + seriesName) + '</span>' +
-        '</div>' +
-        '<div class="ai-result-body">' +
-          '<div class="ai-result-section">' +
-            '<div class="ai-result-row"><span class="ai-result-label">店铺</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(shopName)) + '</span></div>' +
-            '<div class="ai-result-row"><span class="ai-result-label">提供者</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(providerName)) + '</span></div>' +
-            '<div class="ai-result-row"><span class="ai-result-label">品牌</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(brandName)) + '</span></div>' +
-            '<div class="ai-result-row"><span class="ai-result-label">系列</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(seriesName)) + '</span></div>' +
-            '<div class="ai-result-row"><span class="ai-result-label">拆分</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.split)) + '</span></div>' +
-            '<div class="ai-result-row"><span class="ai-result-label">定价</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.pricing)) + '</span></div>' +
-            '<div class="ai-result-row"><span class="ai-result-label">发布时间</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.publishTime)) + '</span></div>' +
-            '<div class="ai-result-row"><span class="ai-result-label">特例</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.specialCase)) + '</span></div>' +
-            '<div class="ai-result-row"><span class="ai-result-label">其他信息</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.otherInfo)) + '</span></div>' +
-          '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-    
-    resultBox.innerHTML = html;
+    aiRenderProviderResults(matchedProviders);
     return;
   }
-  
+
+  aiLastMatchedProviders = [];
+  renderAiSeriesTags([], '');
+
   // 如果没有匹配到提供者/品牌/系列，搜索通用规则
   const rules = getAIRules();
   var ruleCandidates = rules
