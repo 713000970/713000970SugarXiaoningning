@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-20';
+var RULE_LIBRARY_BUILD = '20260512-21';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -190,8 +190,24 @@ function isEntityMatched(source, target) {
 function isEntitySameExact(source, target) {
   var sourceKey = normalizeEntityKey(source);
   var targetKey = normalizeEntityKey(target);
+  /** 两边都无店铺/实体键时视为一致（否则「店名为空」与 encode 出的空串永远对不上，编辑/保存会报未找到） */
+  if (!sourceKey && !targetKey) return true;
   if (!sourceKey || !targetKey) return false;
   return sourceKey === targetKey;
+}
+
+/**
+ * 与「规则卡片」展示条件一致：店铺框可为空；非空时用 rowShopMatchesSearch（含 name 兜底）。
+ */
+function ruleRowMatchesEditIdentity(p, targetShop, targetProvider, targetBrand, targetSeries) {
+  var ts = String(targetShop || '').trim();
+  var tp = String(targetProvider || '').trim();
+  var shopLeg = !ts || rowShopMatchesSearch(p, ts);
+  var nameLeg = !tp || isEntityMatched(p && p.name, tp);
+  return shopLeg &&
+    nameLeg &&
+    normalizeText(p && p.brand) === normalizeText(targetBrand) &&
+    normalizeText((p && p.series) || '') === normalizeText(targetSeries);
 }
 
 /** 品牌下拉/搜索与行内品牌：严格相等或模糊一致（避免不可见字符、简写差异） */
@@ -1300,7 +1316,8 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
       var p = item.data;
       var globalIndex = item.index;
       var ruleName = (p.brand || p.name || '未命名规则') + ' · ' + ((p.series || '').trim() || '未设置系列');
-      var shopEncoded = encodeURIComponent(p.shop || '');
+      var shopForEdit = String(shopName || '').trim() || (p.shop || '');
+      var shopEncoded = encodeURIComponent(shopForEdit);
       var providerEncoded = encodeURIComponent(p.name || '');
       var brandEncoded = encodeURIComponent(p.brand || '');
       var seriesEncoded = encodeURIComponent((p.series || '').trim());
@@ -1766,12 +1783,13 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   var targetBrand = decodeURIComponent(brandEncoded || '');
   var targetSeries = decodeURIComponent(seriesEncoded || '');
 
+  if (rule && !ruleRowMatchesEditIdentity(rule, targetShop, targetProvider, targetBrand, targetSeries)) {
+    rule = null;
+  }
+
   if (!rule) {
     resolvedIndex = providersData.findIndex(function(p) {
-      return isEntitySameExact(p && p.shop, targetShop) &&
-        isEntitySameExact(p && p.name, targetProvider) &&
-        normalizeText(p && p.brand) === normalizeText(targetBrand) &&
-        normalizeText((p && p.series) || '') === normalizeText(targetSeries);
+      return ruleRowMatchesEditIdentity(p, targetShop, targetProvider, targetBrand, targetSeries);
     });
     rule = resolvedIndex >= 0 ? providersData[resolvedIndex] : null;
   }
@@ -1831,19 +1849,11 @@ function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, t
     var hasIdentity = !!(targetShop || targetProvider || targetBrand || targetSeries);
     var identityMismatched = false;
     if (candidate && hasIdentity) {
-      identityMismatched = !(
-        isEntitySameExact(candidate.shop, targetShop) &&
-        isEntitySameExact(candidate.name, targetProvider) &&
-        normalizeText(candidate.brand) === normalizeText(targetBrand) &&
-        normalizeText(candidate.series) === normalizeText(targetSeries)
-      );
+      identityMismatched = !ruleRowMatchesEditIdentity(candidate, targetShop, targetProvider, targetBrand, targetSeries);
     }
     if (!candidate || identityMismatched) {
       resolvedIndex = providersData.findIndex(function(p) {
-        return isEntitySameExact(p && p.shop, targetShop) &&
-          isEntitySameExact(p && p.name, targetProvider) &&
-          normalizeText(p && p.brand) === normalizeText(targetBrand) &&
-          normalizeText((p && p.series) || '') === normalizeText(targetSeries);
+        return ruleRowMatchesEditIdentity(p, targetShop, targetProvider, targetBrand, targetSeries);
       });
     }
     if (resolvedIndex < 0 || !providersData[resolvedIndex]) {
