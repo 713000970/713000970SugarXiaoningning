@@ -20,6 +20,7 @@
       <div class="topbar-meta">
         <span class="version-badge" id="app-build-badge" title="与控制台 [规则库] build 一致即为最新脚本">加载中…</span>
         <button id="manual-sync-btn" class="sync-btn" type="button">立即同步</button>
+        <button id="force-pull-btn" class="sync-btn sync-btn-alt" type="button" title="用 Supabase 全表覆盖本机（云端 2357 条时用）">以云端为准</button>
         <span class="status-indicator" id="sync-status-indicator">
           <span class="status-dot" id="sync-status-dot"></span>
           <span class="status-text" id="sync-status-text">等待同步</span>
@@ -307,6 +308,8 @@
             <input type="text" id="shop-search-input" class="filter-input" placeholder="输入店铺名称搜索..." oninput="onShopSearchInput()">
             <button class="btn-search" onclick="searchShopByInput()">搜索</button>
             <button class="btn-add-sm" onclick="openAddShop()">＋ 新增店铺名称</button>
+            <button class="btn-add-sm btn-muted-sm" type="button" onclick="renameShopInContext()">✎ 修改</button>
+            <button class="btn-add-sm btn-danger-sm" type="button" onclick="deleteShopInContext()">－ 删除</button>
           </div>
           <div id="shop-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>
@@ -321,6 +324,8 @@
             <input type="text" id="provider-search-input" class="filter-input" placeholder="输入提供者名称搜索..." oninput="onProviderSearchInput()">
             <button class="btn-search" onclick="searchProviderByInput()">搜索</button>
             <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增提供者</button>
+            <button class="btn-add-sm btn-muted-sm" type="button" onclick="renameProviderInContext()">✎ 修改</button>
+            <button class="btn-add-sm btn-danger-sm" type="button" onclick="deleteProviderInContext()">－ 删除</button>
           </div>
           <div id="provider-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>
@@ -375,7 +380,10 @@
         <div class="form-group">
           <label>店铺</label>
           <input type="text" id="new-provider-shop" class="form-input">
-          <input type="hidden" id="new-provider-shopname">
+        </div>
+        <div class="form-group">
+          <label>店铺别名</label>
+          <input type="text" id="new-provider-shopname" class="form-input" placeholder="可与店铺相同，或填工商全称">
         </div>
         <div class="form-group">
           <label>品牌</label>
@@ -470,8 +478,8 @@ function goHome() {
 }
   </script>
   <script src="db.js"></script>
-  <script src="cloud-sync.js?v=20260512-23"></script>
-  <script src="app.js?v=20260512-23"></script>
+  <script src="cloud-sync.js?v=20260512-25"></script>
+  <script src="app.js?v=20260512-25"></script>
   <script>
     // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (async function() {

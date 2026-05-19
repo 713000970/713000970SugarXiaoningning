@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-23';
+var RULE_LIBRARY_BUILD = '20260512-25';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -560,6 +560,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  var shopDropdownEl = document.getElementById('shop-dropdown');
+  if (shopDropdownEl) {
+    shopDropdownEl.addEventListener('mousedown', function(e) {
+      var item = e.target.closest('[data-shop-pick]');
+      if (!item) return;
+      e.preventDefault();
+      selectShop(item.getAttribute('data-shop-pick') || '');
+    });
+  }
+
+  var providerDropdownEl = document.getElementById('provider-dropdown');
+  if (providerDropdownEl) {
+    providerDropdownEl.addEventListener('mousedown', function(e) {
+      var item = e.target.closest('[data-provider-pick]');
+      if (!item) return;
+      e.preventDefault();
+      selectProvider(item.getAttribute('data-provider-pick') || '');
+    });
+  }
+
   var brandDropdownEl = document.getElementById('brand-dropdown');
   if (brandDropdownEl) {
     brandDropdownEl.addEventListener('mousedown', function(e) {
@@ -606,6 +626,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (manualSyncBtn) {
     manualSyncBtn.addEventListener('click', function() {
       triggerManualSync();
+    });
+  }
+  var forcePullBtn = document.getElementById('force-pull-btn');
+  if (forcePullBtn) {
+    forcePullBtn.addEventListener('click', function() {
+      if (typeof window.forcePullProvidersFromCloud === 'function') {
+        window.forcePullProvidersFromCloud();
+      } else {
+        showToast('请 Ctrl+F5 强刷后再点，或见控制台说明');
+      }
     });
   }
   updateSyncStatusBadge('idle', '等待同步');
@@ -951,7 +981,7 @@ function onShopSearchInput() {
   }
   
   dropdown.innerHTML = matched.slice(0, 10).map(function(s) { 
-    return '<div class="dropdown-item" onmousedown="event.preventDefault();selectShop(\'' + s + '\')">' + s + '</div>';
+    return '<div class="dropdown-item" data-shop-pick="' + escapeHtmlAttr(s) + '">' + escapeHtmlText(s) + '</div>';
   }).join('');
   dropdown.style.display = 'block';
 }
@@ -1569,7 +1599,7 @@ function onProviderSearchInput() {
   }
   
   dropdown.innerHTML = matched.slice(0, 10).map(function(p) { 
-    return '<div class="dropdown-item" onclick="selectProvider(\'' + p + '\')">' + p + '</div>';
+    return '<div class="dropdown-item" data-provider-pick="' + escapeHtmlAttr(p) + '">' + escapeHtmlText(p) + '</div>';
   }).join('');
   dropdown.style.display = 'block';
 }
@@ -2271,19 +2301,190 @@ function closeModal(modalId) {
   document.body.style.overflow = '';
 }
 
+function setNewProviderModalReadOnly(lockShop, lockProvider) {
+  var shopField = document.getElementById('new-provider-shop');
+  var shopnameField = document.getElementById('new-provider-shopname');
+  var providerField = document.getElementById('new-provider-name');
+  if (shopField) {
+    shopField.readOnly = !!lockShop;
+    shopField.style.background = lockShop ? '#f5f5f5' : '';
+  }
+  if (shopnameField) {
+    shopnameField.readOnly = !!lockShop;
+    shopnameField.style.background = lockShop ? '#f5f5f5' : '';
+  }
+  if (providerField) {
+    providerField.readOnly = !!lockProvider;
+    providerField.style.background = lockProvider ? '#f5f5f5' : '';
+  }
+}
+
+function applyShopRenameOnRow(p, oldName, newName) {
+  var touched = false;
+  if (isEntityMatched(p.shop, oldName)) {
+    p.shop = newName;
+    touched = true;
+  }
+  if (isEntityMatched(p.shopname, oldName)) {
+    p.shopname = newName;
+    touched = true;
+  }
+  var hasShopFields = !!(String((p && p.shop) || '').trim() || String((p && p.shopname) || '').trim());
+  if (!hasShopFields && isEntityMatched(p && p.name, oldName)) {
+    p.name = newName;
+    touched = true;
+  }
+  return touched;
+}
+
+function renameShopInContext() {
+  var oldName = (document.getElementById('shop-search-input')?.value || '').trim();
+  if (!oldName) {
+    showToast('请先在店铺框输入或选择要修改的店铺名称');
+    return;
+  }
+  var newName = window.prompt(
+    '将店铺「' + oldName + '」更名为（会更新该店铺下所有规则卡片中的店铺/别名字段）',
+    oldName
+  );
+  if (newName == null) return;
+  newName = String(newName).trim();
+  if (!newName || normalizeEntityKey(newName) === normalizeEntityKey(oldName)) return;
+
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var hit = 0;
+  providers.forEach(function(p) {
+    if (!rowShopMatchesSearch(p, oldName)) return;
+    if (applyShopRenameOnRow(p, oldName, newName)) hit += 1;
+  });
+  if (hit === 0) {
+    showToast('未找到与该店铺匹配的规则卡片');
+    return;
+  }
+  setData(STORAGE_KEYS.PROVIDERS, providers);
+  document.getElementById('shop-search-input').value = newName;
+  var providerInput = document.getElementById('provider-search-input');
+  if (providerInput) providerInput.value = '';
+  loadBrandsByShopAndShowDropdown(newName);
+  var display = document.getElementById('custom-rule-display');
+  if (display) display.style.display = 'none';
+  clearSeriesTags();
+  showToast('已更新 ' + hit + ' 条规则中的店铺名称');
+}
+
+function deleteShopInContext() {
+  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  if (!shopName) {
+    showToast('请先在店铺框输入或选择要删除的店铺');
+    return;
+  }
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var remain = [];
+  var removed = 0;
+  providers.forEach(function(p) {
+    if (rowShopMatchesSearch(p, shopName)) {
+      removed += 1;
+    } else {
+      remain.push(p);
+    }
+  });
+  if (removed === 0) {
+    showToast('未找到与该店铺匹配的规则卡片');
+    return;
+  }
+  if (!window.confirm('将删除店铺「' + shopName + '」下的 ' + removed + ' 条规则卡片，确定吗？')) return;
+  setData(STORAGE_KEYS.PROVIDERS, remain);
+  document.getElementById('shop-search-input').value = '';
+  var providerInput = document.getElementById('provider-search-input');
+  if (providerInput) providerInput.value = '';
+  var brandInput = document.getElementById('brand-input');
+  if (brandInput) brandInput.value = '';
+  var display = document.getElementById('custom-rule-display');
+  if (display) display.style.display = 'none';
+  clearSeriesTags();
+  showToast('已删除 ' + removed + ' 条规则');
+}
+
+function renameProviderInContext() {
+  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  var oldName = (document.getElementById('provider-search-input')?.value || '').trim();
+  if (!oldName) {
+    showToast('请先在提供者框输入或选择要修改的提供者名称');
+    return;
+  }
+  var newName = window.prompt(
+    '将提供者「' + oldName + '」更名为' + (shopName ? '（仅当前店铺「' + shopName + '」下）' : '（全部匹配记录）'),
+    oldName
+  );
+  if (newName == null) return;
+  newName = String(newName).trim();
+  if (!newName || normalizeEntityKey(newName) === normalizeEntityKey(oldName)) return;
+
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var hit = 0;
+  providers.forEach(function(p) {
+    if (!isEntityMatched(p && p.name, oldName)) return;
+    if (shopName && !rowShopMatchesSearch(p, shopName)) return;
+    p.name = newName;
+    hit += 1;
+  });
+  if (hit === 0) {
+    showToast('未找到匹配的提供者记录');
+    return;
+  }
+  setData(STORAGE_KEYS.PROVIDERS, providers);
+  document.getElementById('provider-search-input').value = newName;
+  if (shopName) loadBrandsByShopAndShowDropdown(shopName);
+  showToast('已更新 ' + hit + ' 条规则中的提供者名称');
+}
+
+function deleteProviderInContext() {
+  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
+  if (!providerName) {
+    showToast('请先在提供者框输入或选择要删除的提供者');
+    return;
+  }
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var remain = [];
+  var removed = 0;
+  providers.forEach(function(p) {
+    var matchProvider = isEntityMatched(p && p.name, providerName);
+    var matchShop = !shopName || rowShopMatchesSearch(p, shopName);
+    if (matchProvider && matchShop) {
+      removed += 1;
+    } else {
+      remain.push(p);
+    }
+  });
+  if (removed === 0) {
+    showToast('未找到匹配的提供者记录');
+    return;
+  }
+  var scope = shopName ? '店铺「' + shopName + '」下' : '全部';
+  if (!window.confirm('将删除' + scope + '提供者「' + providerName + '」的 ' + removed + ' 条规则卡片，确定吗？')) return;
+  setData(STORAGE_KEYS.PROVIDERS, remain);
+  document.getElementById('provider-search-input').value = '';
+  var brandInput = document.getElementById('brand-input');
+  if (brandInput) brandInput.value = '';
+  var display = document.getElementById('custom-rule-display');
+  if (display) display.style.display = 'none';
+  clearSeriesTags();
+  showToast('已删除 ' + removed + ' 条规则');
+}
+
 function openAddProvider() {
+  editingProviderIndex = null;
   document.getElementById('modal-provider-title').textContent = '新增提供者';
   
-  // 获取当前已选择的店铺和提供者
   var shopInput = document.getElementById('shop-search-input');
   var providerInput = document.getElementById('provider-search-input');
-  var brandInput = document.getElementById('brand-input');
   
-  var currentShop = shopInput ? shopInput.value : '';
-  var currentProvider = providerInput ? providerInput.value : '';
+  var currentShop = shopInput ? shopInput.value.trim() : '';
+  var currentProvider = providerInput ? providerInput.value.trim() : '';
   
-  // 清空表单（先清空，再填充店铺和提供者）
   document.getElementById('new-provider-shop').value = '';
+  document.getElementById('new-provider-shopname').value = '';
   document.getElementById('new-provider-name').value = '';
   document.getElementById('new-provider-brand').value = '';
   var seriesEl = document.getElementById('new-provider-series');
@@ -2292,30 +2493,17 @@ function openAddProvider() {
   document.getElementById('new-provider-pricing').value = '';
   document.getElementById('new-provider-publishtime').value = '';
   document.getElementById('new-provider-special').value = '';
+  var otherEl = document.getElementById('new-provider-otherinfo');
+  if (otherEl) otherEl.value = '';
   
-  // 填充已选择的店铺和提供者
   document.getElementById('new-provider-shop').value = currentShop;
+  document.getElementById('new-provider-shopname').value = currentShop;
   document.getElementById('new-provider-name').value = currentProvider;
   
-  // 如果已选择店铺或提供者，则禁用对应字段
-  var shopField = document.getElementById('new-provider-shop');
-  var providerField = document.getElementById('new-provider-name');
-  
-  if (currentShop) {
-    shopField.readOnly = true;
-    shopField.style.background = '#f5f5f5';
-  } else {
-    shopField.readOnly = false;
-    shopField.style.background = '';
-  }
-  
-  if (currentProvider) {
-    providerField.readOnly = true;
-    providerField.style.background = '#f5f5f5';
-  } else {
-    providerField.readOnly = false;
-    providerField.style.background = '';
-  }
+  setNewProviderModalReadOnly(!!currentShop, !!currentProvider);
+
+  var saveBtn = document.querySelector('#modal-provider .btn-save');
+  if (saveBtn) saveBtn.onclick = saveProvider;
   
   openModal('modal-provider');
 }
@@ -2373,8 +2561,10 @@ function saveProvider() {
   }
   
   const providers = getData(STORAGE_KEYS.PROVIDERS);
+  var shopnameVal = document.getElementById('new-provider-shopname')?.value.trim() || shop || '';
   providers.push({
     shop: shop || '',
+    shopname: shopnameVal,
     name,
     brand: brandName || '',
     series: seriesName || '',
@@ -2625,9 +2815,10 @@ function editProvider(index) {
   
   editingProviderIndex = index;
   document.getElementById('modal-provider-title').textContent = '编辑提供者';
+  setNewProviderModalReadOnly(false, false);
   
   document.getElementById('new-provider-shop').value = provider.shop || '';
-  document.getElementById('new-provider-shopname').value = provider.shopname || '';
+  document.getElementById('new-provider-shopname').value = provider.shopname || provider.shop || '';
   document.getElementById('new-provider-name').value = provider.name || '';
   document.getElementById('new-provider-brand').value = provider.brand || '';
   document.getElementById('new-provider-series').value = provider.series || '';
