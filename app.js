@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-25';
+var RULE_LIBRARY_BUILD = '20260512-26';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -24,6 +24,8 @@ const STORAGE_KEYS = {
 };
 const APP_LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 const DELETED_BRANDS_KEY = 'rule_library_deleted_brands';
+const DELETED_SHOPS_KEY = 'rule_library_deleted_shops';
+const DELETED_PROVIDERS_KEY = 'rule_library_deleted_providers';
 
  
 
@@ -180,6 +182,52 @@ function unmarkBrandDeleted(name) {
   if (!setObj.has(normalized)) return;
   setObj.delete(normalized);
   saveDeletedBrandSet(setObj);
+}
+
+function getDeletedShopSet() {
+  var arr = JSON.parse(localStorage.getItem(DELETED_SHOPS_KEY) || '[]');
+  return new Set((arr || []).map(function(name) { return normalizeEntityKey(name); }).filter(Boolean));
+}
+
+function saveDeletedShopSet(setObj) {
+  localStorage.setItem(DELETED_SHOPS_KEY, JSON.stringify(Array.from(setObj || [])));
+}
+
+function markShopDeleted(name) {
+  var key = normalizeEntityKey(name);
+  if (!key) return;
+  var setObj = getDeletedShopSet();
+  setObj.add(key);
+  saveDeletedShopSet(setObj);
+}
+
+function isShopDeleted(name) {
+  var key = normalizeEntityKey(name);
+  if (!key) return false;
+  return getDeletedShopSet().has(key);
+}
+
+function getDeletedProviderSet() {
+  var arr = JSON.parse(localStorage.getItem(DELETED_PROVIDERS_KEY) || '[]');
+  return new Set((arr || []).map(function(name) { return normalizeEntityKey(name); }).filter(Boolean));
+}
+
+function saveDeletedProviderSet(setObj) {
+  localStorage.setItem(DELETED_PROVIDERS_KEY, JSON.stringify(Array.from(setObj || [])));
+}
+
+function markProviderDeleted(name) {
+  var key = normalizeEntityKey(name);
+  if (!key) return;
+  var setObj = getDeletedProviderSet();
+  setObj.add(key);
+  saveDeletedProviderSet(setObj);
+}
+
+function isProviderDeleted(name) {
+  var key = normalizeEntityKey(name);
+  if (!key) return false;
+  return getDeletedProviderSet().has(key);
 }
 
 function normalizeEntityKey(value) {
@@ -972,7 +1020,7 @@ function onShopSearchInput() {
 
   var uniqueShops = Object.keys(shopMap).map(function(key) {
     return pickPreferredDisplayName(shopMap[key], true);
-  }).filter(Boolean);
+  }).filter(Boolean).filter(function(s) { return !isShopDeleted(s); });
   var matched = uniqueShops.filter(function(s) { return s.toLowerCase().indexOf(input) !== -1; });
   
   if (matched.length === 0) {
@@ -1576,10 +1624,13 @@ function onProviderSearchInput() {
   }
   
   var providersData = getAllProvidersForSearch();
+  var shopEl = document.getElementById('shop-search-input');
+  var shopVal = shopEl ? String(shopEl.value || '').trim() : '';
   var providerMap = {};
   providersData.forEach(function(p) {
+    if (shopVal && !rowShopMatchesSearch(p, shopVal)) return;
     var rawName = String((p && p.name) || '').trim();
-    if (!rawName) return;
+    if (!rawName || isProviderDeleted(rawName)) return;
     var key = normalizeEntityKey(rawName);
     if (!key) return;
     if (!providerMap[key]) providerMap[key] = [];
@@ -1587,7 +1638,7 @@ function onProviderSearchInput() {
   });
   var uniqueProviders = Object.keys(providerMap).map(function(key) {
     return pickPreferredDisplayName(providerMap[key], false);
-  }).filter(Boolean);
+  }).filter(Boolean).filter(function(p) { return !isProviderDeleted(p); });
   var matched = uniqueProviders.filter(function(p) {
     var normalizedName = normalizeText(p);
     return normalizedName.indexOf(input) !== -1 || input.indexOf(normalizedName) !== -1;
@@ -2388,12 +2439,12 @@ function deleteShopInContext() {
       remain.push(p);
     }
   });
-  if (removed === 0) {
-    showToast('未找到与该店铺匹配的规则卡片');
-    return;
-  }
-  if (!window.confirm('将删除店铺「' + shopName + '」下的 ' + removed + ' 条规则卡片，确定吗？')) return;
-  setData(STORAGE_KEYS.PROVIDERS, remain);
+  var msg = removed > 0
+    ? '将删除店铺「' + shopName + '」下的 ' + removed + ' 条规则卡片，并从搜索中隐藏该店铺。确定吗？'
+    : '未找到该店铺下的规则卡片。是否仅从搜索中隐藏店铺「' + shopName + '」？';
+  if (!window.confirm(msg)) return;
+  if (removed > 0) setData(STORAGE_KEYS.PROVIDERS, remain);
+  markShopDeleted(shopName);
   document.getElementById('shop-search-input').value = '';
   var providerInput = document.getElementById('provider-search-input');
   if (providerInput) providerInput.value = '';
@@ -2402,7 +2453,7 @@ function deleteShopInContext() {
   var display = document.getElementById('custom-rule-display');
   if (display) display.style.display = 'none';
   clearSeriesTags();
-  showToast('已删除 ' + removed + ' 条规则');
+  showToast(removed > 0 ? ('已删除 ' + removed + ' 条规则，店铺已隐藏') : '店铺已从搜索中隐藏');
 }
 
 function renameProviderInContext() {
@@ -2457,20 +2508,24 @@ function deleteProviderInContext() {
       remain.push(p);
     }
   });
-  if (removed === 0) {
-    showToast('未找到匹配的提供者记录');
-    return;
-  }
   var scope = shopName ? '店铺「' + shopName + '」下' : '全部';
-  if (!window.confirm('将删除' + scope + '提供者「' + providerName + '」的 ' + removed + ' 条规则卡片，确定吗？')) return;
-  setData(STORAGE_KEYS.PROVIDERS, remain);
+  var msg = removed > 0
+    ? ('将删除' + scope + '提供者「' + providerName + '」的 ' + removed + ' 条规则卡片，并从搜索中隐藏该提供者' +
+      (shopName ? '；同时隐藏店铺「' + shopName + '」' : '') + '。确定吗？')
+    : ('未找到匹配的规则卡片。是否仅从搜索中隐藏提供者「' + providerName + '」' +
+      (shopName ? '及店铺「' + shopName + '」' : '') + '？');
+  if (!window.confirm(msg)) return;
+  if (removed > 0) setData(STORAGE_KEYS.PROVIDERS, remain);
+  markProviderDeleted(providerName);
+  if (shopName) markShopDeleted(shopName);
   document.getElementById('provider-search-input').value = '';
+  if (shopName) document.getElementById('shop-search-input').value = '';
   var brandInput = document.getElementById('brand-input');
   if (brandInput) brandInput.value = '';
   var display = document.getElementById('custom-rule-display');
   if (display) display.style.display = 'none';
   clearSeriesTags();
-  showToast('已删除 ' + removed + ' 条规则');
+  showToast(removed > 0 ? ('已删除 ' + removed + ' 条规则，已从搜索中隐藏') : '已从搜索中隐藏');
 }
 
 function openAddProvider() {
