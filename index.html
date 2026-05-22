@@ -6,7 +6,7 @@
   <title>教辅店铺个性化生产规则库</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='48'%3E📚%3C/text%3E%3C/svg%3E">
   <!-- 不使用 Google Fonts，避免国内网络 ERR_CONNECTION_TIMED_OUT -->
-  <link rel="stylesheet" href="style.css?v=20260521-01">
+  <link rel="stylesheet" href="style.css?v=20260521-02">
 </head>
 <body>
 
@@ -362,7 +362,7 @@
       </div>
       <div id="manual-input-section" class="filter-section-title mt-20" style="display:none;">✏️ 手动录入信息</div>
     </div>
-    <button type="button" id="provider-scroll-top" class="scroll-top-btn" title="回到顶部" aria-label="回到顶部" style="display:none;">↑ 顶部</button>
+    <button type="button" id="provider-scroll-top" class="scroll-top-btn" title="返回顶部" aria-label="返回顶部" style="display:none;">返回顶部</button>
   </section>
 
   <!-- 新增提供者弹窗 -->
@@ -455,6 +455,7 @@
       <div id="ai-series-tag-container" class="series-tag-container" style="display:none;"></div>
       <div id="ai-result" class="ai-result"></div>
     </div>
+    <button type="button" id="ai-scroll-top" class="scroll-top-btn" title="回到顶部" aria-label="回到顶部" style="display:none;">回到顶部</button>
   </section>
 
   <!-- Toast 提示 -->
@@ -480,7 +481,7 @@ function goHome() {
   </script>
   <script src="db.js"></script>
   <script src="cloud-sync.js?v=20260512-26"></script>
-  <script src="app.js?v=20260521-01"></script>
+  <script src="app.js?v=20260521-02"></script>
   <script>
     // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (async function() {

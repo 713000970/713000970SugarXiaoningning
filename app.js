@@ -452,44 +452,54 @@ function goPage(pageId) {
     loadProviders();
     loadBrands();
     loadProviderSelect();
-    initProviderScrollTop();
-    updateProviderScrollTopVisibility();
-  } else {
-    hideProviderScrollTop();
   }
-  
-  if (pageId === 'ai') {
-    // AI页面初始化
+
+  if (pageId === 'provider' || pageId === 'ai') {
+    initScrollTopButtons();
+    updateScrollTopButtonsVisibility();
+  } else {
+    hideAllScrollTopButtons();
   }
 }
 
-var _providerScrollTopBound = false;
+var _scrollTopBound = false;
+var SCROLL_TOP_PAGES = [
+  { pageId: 'provider', btnId: 'provider-scroll-top' },
+  { pageId: 'ai', btnId: 'ai-scroll-top' }
+];
 
-function initProviderScrollTop() {
-  var btn = document.getElementById('provider-scroll-top');
-  if (!btn || _providerScrollTopBound) return;
-  _providerScrollTopBound = true;
-  window.addEventListener('scroll', updateProviderScrollTopVisibility, { passive: true });
-  btn.addEventListener('click', function() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+function initScrollTopButtons() {
+  if (_scrollTopBound) return;
+  _scrollTopBound = true;
+  window.addEventListener('scroll', updateScrollTopButtonsVisibility, { passive: true });
+  SCROLL_TOP_PAGES.forEach(function(cfg) {
+    var btn = document.getElementById(cfg.btnId);
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   });
 }
 
-function updateProviderScrollTopVisibility() {
-  var btn = document.getElementById('provider-scroll-top');
-  var page = document.getElementById('page-provider');
-  if (!btn || !page) return;
+function updateScrollTopButtonsVisibility() {
   var y = window.scrollY || document.documentElement.scrollTop || 0;
-  var show = page.classList.contains('active') && y > 280;
-  btn.style.display = show ? 'flex' : 'none';
-  btn.classList.toggle('visible', show);
+  SCROLL_TOP_PAGES.forEach(function(cfg) {
+    var btn = document.getElementById(cfg.btnId);
+    var page = document.getElementById('page-' + cfg.pageId);
+    if (!btn || !page) return;
+    var show = page.classList.contains('active') && y > 280;
+    btn.style.display = show ? 'flex' : 'none';
+    btn.classList.toggle('visible', show);
+  });
 }
 
-function hideProviderScrollTop() {
-  var btn = document.getElementById('provider-scroll-top');
-  if (!btn) return;
-  btn.style.display = 'none';
-  btn.classList.remove('visible');
+function hideAllScrollTopButtons() {
+  SCROLL_TOP_PAGES.forEach(function(cfg) {
+    var btn = document.getElementById(cfg.btnId);
+    if (!btn) return;
+    btn.style.display = 'none';
+    btn.classList.remove('visible');
+  });
 }
 
 function goHome() {

@@ -1381,7 +1381,8 @@ body::before {
   color: white;
 }
 
-#page-provider .scroll-top-btn {
+#page-provider .scroll-top-btn,
+#page-ai .scroll-top-btn {
   position: fixed;
   right: 28px;
   bottom: 32px;
@@ -1404,17 +1405,20 @@ body::before {
   pointer-events: none;
 }
 
-#page-provider .scroll-top-btn.visible {
+#page-provider .scroll-top-btn.visible,
+#page-ai .scroll-top-btn.visible {
   opacity: 1;
   pointer-events: auto;
 }
 
-#page-provider .scroll-top-btn:hover {
+#page-provider .scroll-top-btn:hover,
+#page-ai .scroll-top-btn:hover {
   transform: translateY(-3px);
   box-shadow: 0 12px 28px rgba(0, 180, 216, 0.45);
 }
 
-#page-provider .scroll-top-btn:active {
+#page-provider .scroll-top-btn:active,
+#page-ai .scroll-top-btn:active {
   transform: translateY(-1px);
 }
 
