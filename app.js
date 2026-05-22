@@ -452,11 +452,44 @@ function goPage(pageId) {
     loadProviders();
     loadBrands();
     loadProviderSelect();
+    initProviderScrollTop();
+    updateProviderScrollTopVisibility();
+  } else {
+    hideProviderScrollTop();
   }
   
   if (pageId === 'ai') {
     // AI页面初始化
   }
+}
+
+var _providerScrollTopBound = false;
+
+function initProviderScrollTop() {
+  var btn = document.getElementById('provider-scroll-top');
+  if (!btn || _providerScrollTopBound) return;
+  _providerScrollTopBound = true;
+  window.addEventListener('scroll', updateProviderScrollTopVisibility, { passive: true });
+  btn.addEventListener('click', function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+}
+
+function updateProviderScrollTopVisibility() {
+  var btn = document.getElementById('provider-scroll-top');
+  var page = document.getElementById('page-provider');
+  if (!btn || !page) return;
+  var y = window.scrollY || document.documentElement.scrollTop || 0;
+  var show = page.classList.contains('active') && y > 280;
+  btn.style.display = show ? 'flex' : 'none';
+  btn.classList.toggle('visible', show);
+}
+
+function hideProviderScrollTop() {
+  var btn = document.getElementById('provider-scroll-top');
+  if (!btn) return;
+  btn.style.display = 'none';
+  btn.classList.remove('visible');
 }
 
 function goHome() {

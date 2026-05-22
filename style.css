@@ -1381,6 +1381,43 @@ body::before {
   color: white;
 }
 
+#page-provider .scroll-top-btn {
+  position: fixed;
+  right: 28px;
+  bottom: 32px;
+  z-index: 120;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--primary-cyan), var(--primary-teal));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 180, 216, 0.35);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#page-provider .scroll-top-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#page-provider .scroll-top-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0, 180, 216, 0.45);
+}
+
+#page-provider .scroll-top-btn:active {
+  transform: translateY(-1px);
+}
+
 /* ========================================
    Filter Section Title
    ======================================== */
