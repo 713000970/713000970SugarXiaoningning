@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260512-26';
+var RULE_LIBRARY_BUILD = '20260521-04';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -12,6 +12,12 @@ var currentEditingShop = '';
 var currentEditingSeries = '';
 var aiSeriesFilter = '';
 var aiLastMatchedProviders = [];
+var aiSeriesTagsExpanded = false;
+var providerSeriesTagsExpanded = false;
+/** 系列标签默认只渲染前 N 个，避免上千按钮卡死页面 */
+var SERIES_TAG_INITIAL_LIMIT = 40;
+/** 未选系列时结果卡片最多先渲染条数 */
+var AI_RESULT_RENDER_LIMIT = 40;
 var showRulesDebounceTimer = null;
 
 // ========================================
@@ -684,6 +690,15 @@ document.addEventListener('DOMContentLoaded', () => {
   var seriesTagEl = document.getElementById('series-tag-container');
   if (seriesTagEl) {
     seriesTagEl.addEventListener('click', function(e) {
+      var expandBtn = e.target.closest('[data-series-expand]');
+      if (expandBtn) {
+        e.preventDefault();
+        providerSeriesTagsExpanded = expandBtn.getAttribute('data-series-expand') === '1';
+        if (typeof _providerSeriesTagContext !== 'undefined' && _providerSeriesTagContext.matched) {
+          renderSeriesTags(_providerSeriesTagContext.matched, _providerSeriesTagContext.selected, providerSeriesTagsExpanded);
+        }
+        return;
+      }
       var btn = e.target.closest('[data-series-filter]');
       if (!btn) return;
       e.stopPropagation();
@@ -694,6 +709,15 @@ document.addEventListener('DOMContentLoaded', () => {
   var aiSeriesTagEl = document.getElementById('ai-series-tag-container');
   if (aiSeriesTagEl) {
     aiSeriesTagEl.addEventListener('click', function(e) {
+      var expandBtn = e.target.closest('[data-ai-series-expand]');
+      if (expandBtn) {
+        e.preventDefault();
+        aiSeriesTagsExpanded = expandBtn.getAttribute('data-ai-series-expand') === '1';
+        if (aiLastMatchedProviders.length) {
+          renderAiSeriesTags(aiLastMatchedProviders, aiSeriesFilter, aiSeriesTagsExpanded);
+        }
+        return;
+      }
       var btn = e.target.closest('[data-ai-series-filter]');
       if (!btn) return;
       selectAiSeriesFilter(btn.getAttribute('data-ai-series-filter') || '');
@@ -1263,9 +1287,47 @@ function clearSeriesTags() {
   container.style.display = 'none';
   container.innerHTML = '';
   currentEditingSeries = '';
+  providerSeriesTagsExpanded = false;
 }
 
-function renderSeriesTags(matched, selectedSeries) {
+function buildSeriesTagsHtml(seriesMap, options) {
+  options = options || {};
+  var filterAttr = options.filterAttr || 'data-series-filter';
+  var expandToggleAttr = options.expandToggleAttr || 'data-series-expand';
+  var selectedSeries = String(options.selectedSeries || '').trim();
+  var totalMatched = options.totalMatched != null ? options.totalMatched : 0;
+  var expanded = !!options.expanded;
+
+  var seriesList = Object.keys(seriesMap).sort();
+  if (seriesList.length === 0) return '';
+
+  var showAll = expanded || seriesList.length <= SERIES_TAG_INITIAL_LIMIT;
+  var visibleList = showAll ? seriesList : seriesList.slice(0, SERIES_TAG_INITIAL_LIMIT);
+  var hiddenCount = showAll ? 0 : seriesList.length - SERIES_TAG_INITIAL_LIMIT;
+
+  var allClass = selectedSeries ? 'series-tag' : 'series-tag active';
+  var html = '<span class="series-tag-label">系列：</span>';
+  html += '<button class="' + allClass + '" type="button" ' + filterAttr + '="">全部系列（' + totalMatched + '）</button>';
+
+  visibleList.forEach(function(seriesName) {
+    var count = seriesMap[seriesName];
+    var isActive = selectedSeries === seriesName;
+    var cls = isActive ? 'series-tag active' : 'series-tag';
+    html += '<button class="' + cls + '" type="button" ' + filterAttr + '="' + escapeHtmlAttr(encodeURIComponent(seriesName)) + '">' +
+      escapeHtmlText(seriesName) + '（' + count + '）</button>';
+  });
+
+  if (hiddenCount > 0) {
+    html += '<button class="series-tag series-tag-more" type="button" ' + expandToggleAttr + '="1">展开其余 ' + hiddenCount + ' 个系列 ▼</button>';
+  } else if (expanded && seriesList.length > SERIES_TAG_INITIAL_LIMIT) {
+    html += '<button class="series-tag series-tag-more" type="button" ' + expandToggleAttr + '="0">收起系列 ▲</button>';
+  }
+  return html;
+}
+
+var _providerSeriesTagContext = { matched: [], selected: '' };
+
+function renderSeriesTags(matched, selectedSeries, expandedOpt) {
   var container = document.getElementById('series-tag-container');
   if (!container) return;
 
@@ -1282,24 +1344,23 @@ function renderSeriesTags(matched, selectedSeries) {
     return;
   }
 
-  var currentSeries = String(selectedSeries || '').trim();
-  var allClass = currentSeries ? 'series-tag' : 'series-tag active';
-  var html = '<span class="series-tag-label">系列：</span>';
-  html += '<button class="' + allClass + '" type="button" data-series-filter="">全部系列（' + matched.length + '）</button>';
+  if (expandedOpt !== undefined) providerSeriesTagsExpanded = !!expandedOpt;
+  _providerSeriesTagContext = {
+    matched: matched,
+    selected: String(selectedSeries || '').trim()
+  };
 
-  seriesList.forEach(function(seriesName) {
-    var count = seriesMap[seriesName];
-    var isActive = currentSeries === seriesName;
-    var cls = isActive ? 'series-tag active' : 'series-tag';
-    html += '<button class="' + cls + '" type="button" data-series-filter="' + escapeHtmlAttr(encodeURIComponent(seriesName)) + '">' +
-      escapeHtmlText(seriesName) + '（' + count + '）</button>';
+  container.innerHTML = buildSeriesTagsHtml(seriesMap, {
+    filterAttr: 'data-series-filter',
+    expandToggleAttr: 'data-series-expand',
+    selectedSeries: _providerSeriesTagContext.selected,
+    totalMatched: matched.length,
+    expanded: providerSeriesTagsExpanded
   });
-
-  container.innerHTML = html;
   container.style.display = 'flex';
 }
 
-function renderAiSeriesTags(matchedProviders, selectedSeries) {
+function renderAiSeriesTags(matchedProviders, selectedSeries, expandedOpt) {
   var container = document.getElementById('ai-series-tag-container');
   if (!container) return;
 
@@ -1308,26 +1369,20 @@ function renderAiSeriesTags(matchedProviders, selectedSeries) {
     var key = String((p && p.series) || '').trim() || '未设置系列';
     seriesMap[key] = (seriesMap[key] || 0) + 1;
   });
-  var seriesList = Object.keys(seriesMap).sort();
-  if (seriesList.length === 0) {
+  if (Object.keys(seriesMap).length === 0) {
     container.style.display = 'none';
     container.innerHTML = '';
     return;
   }
 
-  var currentSeries = String(selectedSeries || '').trim();
-  var allClass = currentSeries ? 'series-tag' : 'series-tag active';
-  var total = (matchedProviders || []).length;
-  var html = '<span class="series-tag-label">系列：</span>';
-  html += '<button class="' + allClass + '" type="button" data-ai-series-filter="">全部系列（' + total + '）</button>';
-  seriesList.forEach(function(seriesName) {
-    var count = seriesMap[seriesName];
-    var isActive = currentSeries === seriesName;
-    var cls = isActive ? 'series-tag active' : 'series-tag';
-    html += '<button class="' + cls + '" type="button" data-ai-series-filter="' + escapeHtmlAttr(encodeURIComponent(seriesName)) + '">' +
-      escapeHtmlText(seriesName) + '（' + count + '）</button>';
+  if (expandedOpt !== undefined) aiSeriesTagsExpanded = !!expandedOpt;
+  container.innerHTML = buildSeriesTagsHtml(seriesMap, {
+    filterAttr: 'data-ai-series-filter',
+    expandToggleAttr: 'data-ai-series-expand',
+    selectedSeries: String(selectedSeries || '').trim(),
+    totalMatched: (matchedProviders || []).length,
+    expanded: aiSeriesTagsExpanded
   });
-  container.innerHTML = html;
   container.style.display = 'flex';
 }
 
@@ -1366,7 +1421,10 @@ function aiRenderProviderResults(fullList) {
     return;
   }
 
-  resultBox.innerHTML = list.map(function(rule) {
+  var truncated = !aiSeriesFilter && list.length > AI_RESULT_RENDER_LIMIT;
+  var renderList = truncated ? list.slice(0, AI_RESULT_RENDER_LIMIT) : list;
+
+  resultBox.innerHTML = renderList.map(function(rule) {
     var providerName = rule.name || '未命名提供者';
     var brandName = rule.brand || '未设置品牌';
     var seriesName = (rule.series || '').trim() || '未设置系列';
@@ -1390,7 +1448,9 @@ function aiRenderProviderResults(fullList) {
         '</div>' +
       '</div>' +
     '</div>';
-  }).join('');
+  }).join('') + (truncated
+    ? '<div class="ai-result-truncate-hint">共匹配 <strong>' + list.length + '</strong> 条规则，已显示前 ' + AI_RESULT_RENDER_LIMIT + ' 条。请点上方系列标签筛选，或展开系列后选择具体系列查看。</div>'
+    : '');
 }
 
 function selectSeriesFilter(seriesEncoded) {
@@ -2998,11 +3058,13 @@ function aiQuery() {
     resultBox.innerHTML = '';
     aiSeriesFilter = '';
     aiLastMatchedProviders = [];
+    aiSeriesTagsExpanded = false;
     renderAiSeriesTags([], '');
     return;
   }
 
   aiSeriesFilter = '';
+  aiSeriesTagsExpanded = false;
   
   const queryLower = query.toLowerCase();
   const normalizedQuery = normalizeForSearch(query);
@@ -3825,6 +3887,21 @@ extraStyles.textContent = `
     border-color: var(--primary-cyan);
     color: var(--primary-cyan);
     background: rgba(34, 211, 238, 0.08);
+  }
+  .series-tag-more {
+    border-style: dashed;
+    color: var(--primary-cyan);
+    font-weight: 600;
+  }
+  .ai-result-truncate-hint {
+    margin-top: 16px;
+    padding: 12px 16px;
+    border-radius: var(--radius-md, 8px);
+    background: rgba(0, 180, 216, 0.08);
+    border: 1px solid rgba(0, 180, 216, 0.25);
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
   }
   .rule-edit-hint {
     font-size: 12px;
