@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260521-05';
+var RULE_LIBRARY_BUILD = '20260521-06';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -19,6 +19,8 @@ var SERIES_TAG_INITIAL_LIMIT = 40;
 /** 未选系列时结果卡片最多先渲染条数 */
 var AI_RESULT_RENDER_LIMIT = 40;
 var showRulesDebounceTimer = null;
+/** 正在编辑规则卡片时锁定列表刷新，避免云同步/定时刷新把编辑页冲掉（表现为闪退） */
+var providerRuleEditLock = null;
 
 // ========================================
 // 数据存储（本地存储）
@@ -712,6 +714,29 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  var ruleDisplayEl = document.getElementById('custom-rule-display');
+  if (ruleDisplayEl) {
+    ruleDisplayEl.addEventListener('click', function(e) {
+      var editBtn = e.target.closest('[data-edit-rule]');
+      if (editBtn) {
+        e.preventDefault();
+        editRuleByIndex(
+          parseInt(editBtn.getAttribute('data-index'), 10),
+          decodeURIComponent(editBtn.getAttribute('data-shop') || ''),
+          decodeURIComponent(editBtn.getAttribute('data-provider') || ''),
+          decodeURIComponent(editBtn.getAttribute('data-brand') || ''),
+          decodeURIComponent(editBtn.getAttribute('data-series') || '')
+        );
+        return;
+      }
+      var delBtn = e.target.closest('[data-delete-rule]');
+      if (delBtn) {
+        e.preventDefault();
+        deleteRuleByIndex(parseInt(delBtn.getAttribute('data-index'), 10));
+      }
+    });
+  }
+
   var aiSeriesTagEl = document.getElementById('ai-series-tag-container');
   if (aiSeriesTagEl) {
     aiSeriesTagEl.addEventListener('click', function(e) {
@@ -775,12 +800,31 @@ document.addEventListener('DOMContentLoaded', () => {
   }, true);
 });
 
+function isProviderRuleEditActive() {
+  if (!providerRuleEditLock) return false;
+  var display = document.getElementById('custom-rule-display');
+  if (!display || !display.querySelector('.rule-card-edit')) {
+    providerRuleEditLock = null;
+    return false;
+  }
+  return true;
+}
+
+function setProviderRuleEditLock(lock) {
+  providerRuleEditLock = lock || null;
+}
+
+function cancelProviderRuleEdit() {
+  setProviderRuleEditLock(null);
+  showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries, true);
+}
+
 function refreshProviderViews() {
   loadProviderSelect();
   loadProviders();
   loadBrands();
   updateStats();
-  if (currentEditingBrand) {
+  if (currentEditingBrand && !isProviderRuleEditActive()) {
     scheduleShowRulesByBrandAndShop();
   }
 }
@@ -1490,8 +1534,11 @@ function selectBrand(brandName) {
   showRulesByBrandAndShop(brandName, shopName, '');
 }
 
-function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
+function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh) {
   console.log('showRulesByBrandAndShop called:', brandName, shopName);
+  if (!forceRefresh && isProviderRuleEditActive()) {
+    return;
+  }
   brandName = String(brandName || '').trim();
   shopName = String(shopName || '').trim();
   var providers = localStorage.getItem('rule_library_providers');
@@ -1656,8 +1703,8 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
       var providerEncoded = encodeURIComponent(p.name || '');
       var brandEncoded = encodeURIComponent(p.brand || '');
       var seriesEncoded = encodeURIComponent((p.series || '').trim());
-      var actionButtons = '<button class="rule-edit-btn" onclick="editRuleByIndex(' + globalIndex + ',\'' + shopEncoded + '\',\'' + providerEncoded + '\',\'' + brandEncoded + '\',\'' + seriesEncoded + '\')">✏️ 修改</button>' +
-                       '<button class="rule-delete-btn" onclick="deleteRuleByIndex(' + globalIndex + ')">🗑️ 删除</button>';
+      var actionButtons = '<button type="button" class="rule-edit-btn" data-edit-rule="1" data-index="' + globalIndex + '" data-shop="' + escapeHtmlAttr(shopEncoded) + '" data-provider="' + escapeHtmlAttr(providerEncoded) + '" data-brand="' + escapeHtmlAttr(brandEncoded) + '" data-series="' + escapeHtmlAttr(seriesEncoded) + '">✏️ 修改</button>' +
+                       '<button type="button" class="rule-delete-btn" data-delete-rule="1" data-index="' + globalIndex + '">🗑️ 删除</button>';
       html += '<div class="rule-card">';
       html += '  <div class="rule-card-header">';
       html += '    <div class="rule-card-title">' + escapeHtmlText(ruleName) + '</div>';
@@ -2156,7 +2203,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   var html = '<div class="rule-card-edit">';
   html += '  <div class="rule-card-header">';
   html += '    <div class="rule-card-title">编辑: ' + escapeHtmlText((rule.brand || '未命名规则') + ' · ' + ((rule.series || '').trim() || '未设置系列')) + '</div>';
-  html += '    <button class="rule-edit-btn" onclick="showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries)">✖ 取消</button>';
+  html += '    <button type="button" class="rule-edit-btn" onclick="cancelProviderRuleEdit()">✖ 取消</button>';
   html += '  </div>';
   html += '  <div class="rule-card-body">';
   html += '    <p class="rule-edit-hint">提示：在输入框中按 <strong>Alt + 空格</strong> 可插入换行。</p>';
@@ -2181,6 +2228,14 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   document.getElementById('edit-publishTime').value = rule.publishTime || '';
   document.getElementById('edit-specialCase').value = rule.specialCase || '';
   document.getElementById('edit-otherInfo').value = rule.otherInfo || '';
+
+  setProviderRuleEditLock({
+    resolvedIndex: resolvedIndex,
+    targetShop: targetShop,
+    targetProvider: targetProvider,
+    targetBrand: targetBrand,
+    targetSeries: targetSeries
+  });
   
   document.getElementById('save-rule-btn').addEventListener('click', function() {
     saveRuleByIndex(resolvedIndex, targetShop, targetProvider, targetBrand, targetSeries);
@@ -2225,9 +2280,10 @@ function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, t
     // 系列/品牌/提供者/店铺不在“编辑规则”里改动，避免上次规则带值导致联动串改
     
     console.log('💾 保存的数据:', providersData[resolvedIndex]);
+    setProviderRuleEditLock(null);
     setData(STORAGE_KEYS.PROVIDERS, providersData);
     showToast('保存成功');
-    showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries);
+    showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries, true);
   } catch (err) {
     console.error('saveRuleByIndex 失败:', err);
     showToast('保存失败，请重试');
@@ -2235,6 +2291,9 @@ function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, t
 }
 
 function deleteRuleByIndex(globalIndex) {
+  if (isProviderRuleEditActive()) {
+    setProviderRuleEditLock(null);
+  }
   if (!confirm('确定要删除这条规则吗？')) return;
   
   var providers = localStorage.getItem('rule_library_providers');
@@ -2247,7 +2306,7 @@ function deleteRuleByIndex(globalIndex) {
   providersData.splice(globalIndex, 1);
   setData(STORAGE_KEYS.PROVIDERS, providersData);
   showToast('删除成功');
-  showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries);
+  showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries, true);
 }
 
 function showManualInput() {
