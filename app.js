@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260521-04';
+var RULE_LIBRARY_BUILD = '20260521-05';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 var currentBrand = '';
@@ -32,6 +32,18 @@ const APP_LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 const DELETED_BRANDS_KEY = 'rule_library_deleted_brands';
 const DELETED_SHOPS_KEY = 'rule_library_deleted_shops';
 const DELETED_PROVIDERS_KEY = 'rule_library_deleted_providers';
+
+function providerHasMeaningfulRule(p) {
+  if (!p) return false;
+  return !!(
+    String(p.naming || '').trim() ||
+    String(p.split || '').trim() ||
+    String(p.pricing || '').trim() ||
+    String(p.publishTime || '').trim() ||
+    String(p.specialCase || '').trim() ||
+    String(p.otherInfo || '').trim()
+  );
+}
 
  
 
@@ -546,13 +558,7 @@ function cleanupBlankPlaceholderProviders() {
   if (!Array.isArray(providers) || providers.length === 0) return;
 
   function hasMeaningfulRule(p) {
-    return !!(
-      String((p && p.split) || '').trim() ||
-      String((p && p.pricing) || '').trim() ||
-      String((p && p.publishTime) || '').trim() ||
-      String((p && p.specialCase) || '').trim() ||
-      String((p && p.otherInfo) || '').trim()
-    );
+    return providerHasMeaningfulRule(p);
   }
 
   function groupKey(p) {
@@ -920,6 +926,7 @@ function loadProviders() {
             ${p.shop || p.shopname ? '🏪' + (p.shop || '') + (p.shop && p.shopname ? ' / ' : '') + (p.shopname || '') : ''} ${brandName}${seriesName ? ' · ' + seriesName : ''}
           </div>
           <div class="provider-tags">
+            ${p.naming ? '<span class="ptag">命名:' + p.naming + '</span>' : ''}
             ${p.split ? '<span class="ptag">拆分:' + p.split + '</span>' : ''}
             ${p.pricing ? '<span class="ptag">定价:' + p.pricing + '</span>' : ''}
             ${p.publishTime ? '<span class="ptag">发布:' + p.publishTime + '</span>' : ''}
@@ -1440,6 +1447,7 @@ function aiRenderProviderResults(fullList) {
           '<div class="ai-result-row"><span class="ai-result-label">提供者</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(providerName)) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">品牌</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(brandName)) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">系列</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(seriesName)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">命名</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.naming)) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">拆分</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.split)) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">定价</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.pricing)) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">发布时间</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.publishTime)) + '</span></div>' +
@@ -1583,16 +1591,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
   }
 
   // 删除空白规则卡片：同一店铺/提供者/品牌/系列已存在有效规则时，隐藏纯空白占位记录
-  var hasMeaningfulRule = function(p) {
-    if (!p) return false;
-    return !!(
-      String(p.split || '').trim() ||
-      String(p.pricing || '').trim() ||
-      String(p.publishTime || '').trim() ||
-      String(p.specialCase || '').trim() ||
-      String(p.otherInfo || '').trim()
-    );
-  };
+  var hasMeaningfulRule = providerHasMeaningfulRule;
   var groupIdentityKey = function(p) {
     return [
       normalizeEntityKey(p && p.shop),
@@ -1666,6 +1665,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter) {
       html += '  </div>';
       html += '  <div class="rule-card-body">';
       html += '    <div class="rule-row"><span class="rule-label">系列：</span><span class="rule-value">' + escapeHtmlText((p.series || '').trim() || '未设置系列') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">命名：</span><span class="rule-value">' + escapeHtmlText(p.naming || '待录入') + '</span></div>';
       html += '    <div class="rule-row"><span class="rule-label">拆分：</span><span class="rule-value">' + escapeHtmlText(p.split || '待录入') + '</span></div>';
       html += '    <div class="rule-row"><span class="rule-label">定价：</span><span class="rule-value">' + escapeHtmlText(p.pricing || '待录入') + '</span></div>';
       html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><span class="rule-value">' + escapeHtmlText(p.publishTime || '待录入') + '</span></div>';
@@ -1700,6 +1700,7 @@ function showRulesByShop(shopName) {
   matched.slice(0, 20).forEach(function(p) {
     html += '<div class="rule-result-item">';
     html += '<div class="rule-result-title"><strong>品牌：</strong>' + (p.brand || '-') + '</div>';
+    html += '<div class="rule-result-row"><strong>命名：</strong>' + (p.naming || '-') + '</div>';
     html += '<div class="rule-result-row"><strong>拆分：</strong>' + (p.split || '-') + '</div>';
     html += '<div class="rule-result-row"><strong>定价：</strong>' + (p.pricing || '-') + '</div>';
     html += '<div class="rule-result-row"><strong>发布时间：</strong>' + (p.publishTime || '-') + '</div>';
@@ -1959,6 +1960,7 @@ function displayBrandRule(brandName) {
     displayBox.style.display = 'block';
     displayBox.innerHTML = '<div class="rule-display-header"><span class="rule-icon">📋</span> <span>' + brandName + ' 规则</span></div>' +
       '<div class="rule-display-content">' +
+      '<div class="rule-item"><span class="label">命名：</span><span class="value">' + (rule.naming || '无') + '</span></div>' +
       '<div class="rule-item"><span class="label">拆分：</span><span class="value">' + (rule.split || '无') + '</span></div>' +
       '<div class="rule-item"><span class="label">定价：</span><span class="value">' + (rule.pricing || '无') + '</span></div>' +
       '<div class="rule-item"><span class="label">发布时间：</span><span class="value">' + (rule.publishTime || '无') + '</span></div>' +
@@ -2007,7 +2009,7 @@ function onSeriesChange() {
   console.log('matched:', matched.length);
   
   // 显示规则
-  var currentRule = matched.length > 0 ? matched[0] : {split: '', pricing: '', publishTime: '', specialCase: ''};
+  var currentRule = matched.length > 0 ? matched[0] : {naming: '', split: '', pricing: '', publishTime: '', specialCase: ''};
   var displayBox = document.getElementById('custom-rule-display');
   if (displayBox) {
     displayBox.style.display = 'block';
@@ -2016,12 +2018,14 @@ function onSeriesChange() {
         '<button class="btn-edit-rule" onclick="editRule()">✏️ 修改</button>' +
       '</div>' +
       '<div class="rule-display-content" id="rule-content">' +
+        '<div class="rule-item"><span class="label">命名：</span><span class="value" id="rule-naming">' + escapeHtmlText(currentRule.naming || '待录入') + '</span></div>' +
         '<div class="rule-item"><span class="label">拆分：</span><span class="value" id="rule-split">' + escapeHtmlText(currentRule.split || '待录入') + '</span></div>' +
         '<div class="rule-item"><span class="label">定价：</span><span class="value" id="rule-pricing">' + escapeHtmlText(currentRule.pricing || '待录入') + '</span></div>' +
         '<div class="rule-item"><span class="label">发布时间：</span><span class="value" id="rule-publishTime">' + escapeHtmlText(currentRule.publishTime || '待录入') + '</span></div>' +
         '<div class="rule-item"><span class="label">特例：</span><span class="value" id="rule-specialCase">' + escapeHtmlText(currentRule.specialCase || '待录入') + '</span></div>' +
       '</div>' +
       '<div class="rule-edit-content" id="rule-edit" style="display:none;">' +
+        '<div class="rule-item"><span class="label">命名：</span><textarea rows="2" id="edit-naming" class="rule-input alt-space-newline"></textarea></div>' +
         '<div class="rule-item"><span class="label">拆分：</span><textarea rows="2" id="edit-split" class="rule-input alt-space-newline"></textarea></div>' +
         '<div class="rule-item"><span class="label">定价：</span><textarea rows="2" id="edit-pricing" class="rule-input alt-space-newline"></textarea></div>' +
         '<div class="rule-item"><span class="label">发布时间：</span><textarea rows="2" id="edit-publishTime" class="rule-input alt-space-newline"></textarea></div>' +
@@ -2031,6 +2035,8 @@ function onSeriesChange() {
           '<button class="btn-save" onclick="saveEditRule()">保存</button>' +
         '</div>' +
       '</div>';
+    var namingEl = document.getElementById('edit-naming');
+    if (namingEl) namingEl.value = currentRule.naming || '';
     var splitEl = document.getElementById('edit-split');
     if (splitEl) splitEl.value = currentRule.split || '';
     var prEl = document.getElementById('edit-pricing');
@@ -2065,10 +2071,12 @@ function saveEditRule() {
   var providerInput = document.getElementById('provider-search-input');
   var providerName = providerInput ? providerInput.value : '';
   
+  var elNaming = document.getElementById('edit-naming');
   var elSplit = document.getElementById('edit-split');
   var elPricing = document.getElementById('edit-pricing');
   var elPub = document.getElementById('edit-publishTime');
   var elSpec = document.getElementById('edit-specialCase');
+  var newNaming = elNaming ? elNaming.value.trim() : '';
   var newSplit = elSplit ? elSplit.value.trim() : '';
   var newPricing = elPricing ? elPricing.value.trim() : '';
   var newPublishTime = elPub ? elPub.value.trim() : '';
@@ -2090,6 +2098,7 @@ function saveEditRule() {
   
   if (matchedIndex >= 0) {
     // 更新现有项
+    newProvidersList[matchedIndex].naming = newNaming;
     newProvidersList[matchedIndex].split = newSplit;
     newProvidersList[matchedIndex].pricing = newPricing;
     newProvidersList[matchedIndex].publishTime = newPublishTime;
@@ -2100,6 +2109,7 @@ function saveEditRule() {
       name: providerName,
       brand: brandName,
       series: seriesName,
+      naming: newNaming,
       split: newSplit,
       pricing: newPricing,
       publishTime: newPublishTime,
@@ -2154,6 +2164,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   html += '    <div class="rule-row"><span class="rule-label">提供者：</span><span class="rule-value">' + escapeHtmlText(rule.name || '未设置提供者') + '</span></div>';
   html += '    <div class="rule-row"><span class="rule-label">品牌：</span><span class="rule-value">' + escapeHtmlText(rule.brand || '未设置品牌') + '</span></div>';
   html += '    <div class="rule-row"><span class="rule-label">系列：</span><span class="rule-value">' + escapeHtmlText((rule.series || '').trim() || '未设置系列') + '</span></div>';
+  html += '    <div class="rule-row"><span class="rule-label">命名：</span><textarea class="rule-input alt-space-newline" rows="2" id="edit-naming"></textarea></div>';
   html += '    <div class="rule-row"><span class="rule-label">拆分：</span><textarea class="rule-input alt-space-newline" rows="3" id="edit-split"></textarea></div>';
   html += '    <div class="rule-row"><span class="rule-label">定价：</span><textarea class="rule-input alt-space-newline" rows="3" id="edit-pricing"></textarea></div>';
   html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><textarea class="rule-input alt-space-newline" rows="2" id="edit-publishTime"></textarea></div>';
@@ -2164,6 +2175,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   html += '</div>';
   
   display.innerHTML = html;
+  document.getElementById('edit-naming').value = rule.naming || '';
   document.getElementById('edit-split').value = rule.split || '';
   document.getElementById('edit-pricing').value = rule.pricing || '';
   document.getElementById('edit-publishTime').value = rule.publishTime || '';
@@ -2178,6 +2190,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
 function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, targetSeries) {
   try {
     console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
+    var newNaming = document.getElementById('edit-naming') ? document.getElementById('edit-naming').value.trim() : '';
     var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
     var newPricing = document.getElementById('edit-pricing') ? document.getElementById('edit-pricing').value.trim() : '';
     var newPublishTime = document.getElementById('edit-publishTime') ? document.getElementById('edit-publishTime').value.trim() : '';
@@ -2203,6 +2216,7 @@ function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, t
       return;
     }
     
+    providersData[resolvedIndex].naming = newNaming;
     providersData[resolvedIndex].split = newSplit;
     providersData[resolvedIndex].pricing = newPricing;
     providersData[resolvedIndex].publishTime = newPublishTime;
@@ -2346,6 +2360,7 @@ function searchProvider() {
             ${p.shop || p.shopname ? '🏪' + (p.shop || '') + (p.shop && p.shopname ? ' / ' : '') + (p.shopname || '') : ''} ${brandName}${seriesName ? ' · ' + seriesName : ''}
           </div>
           <div class="provider-tags">
+            ${p.naming ? '<span class="ptag">命名:' + p.naming + '</span>' : ''}
             ${p.split ? '<span class="ptag">拆分:' + p.split + '</span>' : ''}
             ${p.pricing ? '<span class="ptag">定价:' + p.pricing + '</span>' : ''}
             ${p.publishTime ? '<span class="ptag">发布:' + p.publishTime + '</span>' : ''}
@@ -2647,6 +2662,7 @@ function openAddProvider() {
   document.getElementById('new-provider-brand').value = '';
   var seriesEl = document.getElementById('new-provider-series');
   if (seriesEl) seriesEl.value = '';
+  document.getElementById('new-provider-naming').value = '';
   document.getElementById('new-provider-split').value = '';
   document.getElementById('new-provider-pricing').value = '';
   document.getElementById('new-provider-publishtime').value = '';
@@ -2707,6 +2723,7 @@ function saveProvider() {
   const name = document.getElementById('new-provider-name')?.value.trim();
   const brandName = document.getElementById('new-provider-brand')?.value.trim();
   const seriesName = document.getElementById('new-provider-series')?.value.trim();
+  const naming = document.getElementById('new-provider-naming')?.value.trim();
   const split = document.getElementById('new-provider-split')?.value.trim();
   const pricing = document.getElementById('new-provider-pricing')?.value.trim();
   const publishTime = document.getElementById('new-provider-publishtime')?.value.trim();
@@ -2726,6 +2743,7 @@ function saveProvider() {
     name,
     brand: brandName || '',
     series: seriesName || '',
+    naming: naming || '',
     split: split || '',
     pricing: pricing || '',
     publishTime: publishTime || '',
@@ -2791,6 +2809,7 @@ function saveBrand(nameInput) {
       name: providerName,
       brand: name,
       series: '',
+      naming: '',
       split: '',
       pricing: '',
       publishTime: '',
@@ -2941,6 +2960,7 @@ function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, provider
       name: providerName,
       brand: brandName,
       series: name,
+      naming: '',
       split: '',
       pricing: '',
       publishTime: '',
@@ -2980,10 +3000,13 @@ function editProvider(index) {
   document.getElementById('new-provider-name').value = provider.name || '';
   document.getElementById('new-provider-brand').value = provider.brand || '';
   document.getElementById('new-provider-series').value = provider.series || '';
+  document.getElementById('new-provider-naming').value = provider.naming || '';
   document.getElementById('new-provider-split').value = provider.split || '';
   document.getElementById('new-provider-pricing').value = provider.pricing || '';
   document.getElementById('new-provider-publishtime').value = provider.publishTime || '';
   document.getElementById('new-provider-special').value = provider.specialCase || '';
+  var otherEditEl = document.getElementById('new-provider-otherinfo');
+  if (otherEditEl) otherEditEl.value = provider.otherInfo || '';
   
   openModal('modal-provider');
   
@@ -2997,10 +3020,12 @@ function updateProvider() {
   const name = document.getElementById('new-provider-name')?.value.trim();
   const brandName = document.getElementById('new-provider-brand')?.value.trim();
   const seriesName = document.getElementById('new-provider-series')?.value.trim();
+  const naming = document.getElementById('new-provider-naming')?.value.trim();
   const split = document.getElementById('new-provider-split')?.value.trim();
   const pricing = document.getElementById('new-provider-pricing')?.value.trim();
   const publishTime = document.getElementById('new-provider-publishtime')?.value.trim();
   const specialCase = document.getElementById('new-provider-special')?.value.trim();
+  const otherInfo = document.getElementById('new-provider-otherinfo')?.value.trim();
   
   if (!name) {
     showToast('请输入提供者名称');
@@ -3008,16 +3033,20 @@ function updateProvider() {
   }
   
   const providers = getData(STORAGE_KEYS.PROVIDERS);
+  var prev = providers[editingProviderIndex] || {};
   providers[editingProviderIndex] = {
+    id: prev.id,
     shop: shop || '',
     shopname: shopname || '',
     name,
     brand: brandName,
     series: seriesName || '',
+    naming: naming || '',
     split: split || '',
     pricing: pricing || '',
     publishTime: publishTime || '',
-    specialCase: specialCase || ''
+    specialCase: specialCase || '',
+    otherInfo: otherInfo || ''
   };
   setData(STORAGE_KEYS.PROVIDERS, providers);
   
@@ -3096,6 +3125,7 @@ function aiQuery() {
         p.series || '',
         p.shop || '',
         p.shopname || '',
+        p.naming || '',
         p.split || '',
         p.pricing || '',
         p.publishTime || '',
@@ -3115,6 +3145,7 @@ function aiQuery() {
         p.series || '',
         p.shop || '',
         p.shopname || '',
+        p.naming || '',
         p.split || '',
         p.pricing || '',
         p.publishTime || '',
@@ -3154,16 +3185,7 @@ function aiQuery() {
     .map(function(item) { return item.data; });
 
   // AI 查询与提供者查询保持一致：仅删除“同组已有有效规则”下的空白占位卡
-  var hasMeaningfulRuleForAi = function(p) {
-    if (!p) return false;
-    return !!(
-      String(p.split || '').trim() ||
-      String(p.pricing || '').trim() ||
-      String(p.publishTime || '').trim() ||
-      String(p.specialCase || '').trim() ||
-      String(p.otherInfo || '').trim()
-    );
-  };
+  var hasMeaningfulRuleForAi = providerHasMeaningfulRule;
   var aiGroupIdentityKey = function(p) {
     return [
       normalizeEntityKey(p && p.shop),
@@ -3201,6 +3223,7 @@ function aiQuery() {
       return;
     }
     var existingScore = (
+      (String(existing.naming || '').trim() ? 1 : 0) +
       (String(existing.split || '').trim() ? 1 : 0) +
       (String(existing.pricing || '').trim() ? 1 : 0) +
       (String(existing.publishTime || '').trim() ? 1 : 0) +
@@ -3208,6 +3231,7 @@ function aiQuery() {
       (String(existing.otherInfo || '').trim() ? 1 : 0)
     );
     var currentScore = (
+      (String(p.naming || '').trim() ? 1 : 0) +
       (String(p.split || '').trim() ? 1 : 0) +
       (String(p.pricing || '').trim() ? 1 : 0) +
       (String(p.publishTime || '').trim() ? 1 : 0) +
