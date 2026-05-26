@@ -2,8 +2,34 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260521-06';
+var RULE_LIBRARY_BUILD = '20260526-08';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
+
+function isMultiUserMode() {
+  return !!(window.RULE_LIBRARY_CONFIG && window.RULE_LIBRARY_CONFIG.multiUser);
+}
+
+/** 维护：地址栏 ?admin=1 或控制台 localStorage.setItem('rule_library_sync_admin','1') */
+function isSyncAdminMode() {
+  if (!isMultiUserMode()) return true;
+  try {
+    if (/[?&]admin=1(?:&|$)/.test(String(location.search || ''))) return true;
+    if (localStorage.getItem('rule_library_sync_admin') === '1') return true;
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+function applyMultiUserUi() {
+  if (!isMultiUserMode() || isSyncAdminMode()) return;
+  ['force-pull-btn'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.remove();
+  });
+  var hint = document.getElementById('multi-user-hint');
+  if (hint) hint.hidden = false;
+}
+window.isMultiUserMode = isMultiUserMode;
+window.isSyncAdminMode = isSyncAdminMode;
 
 var currentBrand = '';
 var currentProvider = '';
@@ -77,6 +103,10 @@ function initCollapsibles() {
 
 // 重置为官方数据（优先 CSV 表 providers-from-csv.json，约 2361 条）
 function resetToPresetData() {
+  if (isMultiUserMode() && !isSyncAdminMode()) {
+    alert('多人协作模式下已禁用全库重置。请联系管理员。');
+    return;
+  }
   if (!confirm('确定要重置所有数据吗？将恢复为「教辅生产说明」CSV 官方表（约 2361 条）。')) return;
   (async function() {
     try {
@@ -343,15 +373,20 @@ function buildRoughMatchSamplesHtml(providersData, needles) {
   });
   if (!samples.length) {
     var n = (providersData && providersData.length) || 0;
-    var pullBtn =
-      n < 400
-        ? '<p style="margin:10px 0 0;"><button type="button" class="sync-btn" style="cursor:pointer;padding:8px 14px;border-radius:8px;border:none;background:var(--primary-cyan, #22d3ee);color:#0f172a;font-weight:600;" onclick="if(typeof window.forcePullProvidersFromCloud===\'function\'){window.forcePullProvidersFromCloud();}else{alert(\'请刷新页面后重试\');}">从云端重新拉取完整书目</button> ' +
-          '<span style="font-size:12px;">（会清除「待同步」标记；仅在确认<strong>云端</strong>数据更全时使用）</span></p>'
-        : '';
+    var pullBtn = '';
+    if (n < 400 && !isMultiUserMode()) {
+      pullBtn =
+        '<p style="margin:10px 0 0;"><button type="button" class="sync-btn" style="cursor:pointer;padding:8px 14px;border-radius:8px;border:none;background:var(--primary-cyan, #22d3ee);color:#0f172a;font-weight:600;" onclick="if(typeof window.forcePullProvidersFromCloud===\'function\'){window.forcePullProvidersFromCloud();}else{alert(\'请刷新页面后重试\');}">从云端重新拉取完整书目</button> ' +
+        '<span style="font-size:12px;">（会清除「待同步」标记；仅在确认<strong>云端</strong>数据更全时使用）</span></p>';
+    }
+    var hintExtra = isMultiUserMode()
+      ? '多人协作下请点顶栏「立即同步」获取最新数据，勿用本机覆盖云端。'
+      : '若你曾在云端录入过大量规则，可尝试从云端重新拉取（单人维护时用）。';
     return (
       '<div class="match-hint" style="margin-top:10px;font-size:13px;color:#64748b;line-height:1.55;">在现有 ' +
       n +
-      ' 条卡片中，未在「店铺/别名/提供者/品牌」里搜到「朝霞」「王朝霞」。说明<strong>本机当前数据里很可能没有该校书目</strong>；若你曾在云端录入过大量规则，可点击下方按钮尝试<strong>强制以云端为准</strong>重新下载。</div>' +
+      ' 条卡片中，未在「店铺/别名/提供者/品牌」里搜到「朝霞」「王朝霞」。说明<strong>本机当前数据里很可能没有该校书目</strong>。' +
+      hintExtra + '</div>' +
       pullBtn
     );
   }
@@ -775,6 +810,7 @@ document.addEventListener('DOMContentLoaded', () => {
       triggerManualSync();
     });
   }
+  applyMultiUserUi();
   var forcePullBtn = document.getElementById('force-pull-btn');
   if (forcePullBtn) {
     forcePullBtn.addEventListener('click', function() {
@@ -785,7 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-  updateSyncStatusBadge('idle', '等待同步');
+  updateSyncStatusBadge('idle', isMultiUserMode() ? '自动同步' : '等待同步');
 
   console.log('[规则库] 已加载脚本 build=' + RULE_LIBRARY_BUILD + '（若与页顶版本不一致请 Ctrl+F5 强刷）');
 
@@ -3743,6 +3779,10 @@ function showToast(message) {
 
 // 重置提供者/品牌/系列数据（仅清空本地存储中的录入数据，不影响预置数据）
 function resetProviderData() {
+  if (isMultiUserMode() && !isSyncAdminMode()) {
+    alert('多人协作模式下已禁用清空本地库。');
+    return;
+  }
   if (!confirm('将清空已录入的提供者/品牌/系列数据，仅保留预置数据。是否继续？')) return;
 
   // 清空本地存储的相关数据

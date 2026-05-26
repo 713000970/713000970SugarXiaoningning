@@ -168,6 +168,15 @@ body::before {
   box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
 }
 
+.multi-user-hint {
+  font-size: 11px;
+  color: #64748b;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+
 .status-indicator {
   display: flex;
   align-items: center;

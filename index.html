@@ -19,8 +19,9 @@
       </div>
       <div class="topbar-meta">
         <span class="version-badge" id="app-build-badge" title="与控制台 [规则库] build 一致即为最新脚本">加载中…</span>
-        <button id="manual-sync-btn" class="sync-btn" type="button">立即同步</button>
-        <button id="force-pull-btn" class="sync-btn sync-btn-alt" type="button" title="用 Supabase 全表覆盖本机（云端 2357 条时用）">以云端为准</button>
+        <button id="manual-sync-btn" class="sync-btn" type="button" title="上传本机修改并拉取他人更新">立即同步</button>
+        <button id="force-pull-btn" class="sync-btn sync-btn-alt" type="button" title="用云端全表覆盖本机（多人协作下已隐藏）" data-dangerous-sync="1">以云端为准</button>
+        <span id="multi-user-hint" class="multi-user-hint" hidden>多人协作</span>
         <span class="status-indicator" id="sync-status-indicator">
           <span class="status-dot" id="sync-status-dot"></span>
           <span class="status-text" id="sync-status-text">等待同步</span>
@@ -484,9 +485,10 @@ function goHome() {
 }
   </script>
   <script src="db.js"></script>
+  <script src="site-config.js?v=20260526"></script>
   <script src="data-bootstrap.js?v=csv-20260526"></script>
   <script src="cloud-sync.js?v=20260526-06"></script>
-  <script src="app.js?v=20260521-06"></script>
+  <script src="app.js?v=20260526-08"></script>
   <script>
     // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (async function() {

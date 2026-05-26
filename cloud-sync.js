@@ -10,7 +10,7 @@ const INCREMENTAL_SYNC_MIN_ROWS = 400;
 /** 变更条数超过此值仍回退为整表替换（大批量导入等） */
 const INCREMENTAL_MAX_CHANGES = 2000;
 const SYNC_HTTP_CHUNK = 400;
-/** 拉取全表列（Supabase providers 表无 naming 列，不可写进 select 列表） */
+/** 拉取全表列（表结构见 providers-setup.sql，含 naming 列） */
 const PROVIDERS_REST_PATH = '/rest/v1/providers?select=*';
 /** 已知总行数时并行拉取分页 */
 const FETCH_CLOUD_PARALLEL_PAGES = 3;
@@ -131,11 +131,9 @@ function toCloudProvider(p) {
   };
 }
 
-/** 写入 Supabase 的字段（表结构无 naming，POST 不可带该列） */
+/** 写入 Supabase（字段与 providers-setup.sql 一致） */
 function toCloudProviderDbRow(p) {
-  var row = toCloudProvider(p || {});
-  delete row.naming;
-  return row;
+  return toCloudProvider(p || {});
 }
 
 function calcSnapshot(data) {
@@ -435,6 +433,9 @@ function notifyProvidersUpdated(source) {
 // opts.fromTimer：定时触发；opts.quickCheck：手动「立即同步」先探测行数/快照
 // opts.forcePull：强制全表拉取（「以云端为准」）
 async function cloudSync(opts) {
+  if (opts && opts.forcePull && isMultiUserSyncBlocked()) {
+    opts = Object.assign({}, opts, { forcePull: false });
+  }
   opts = opts || {};
   var fromTimer = !!opts.fromTimer;
   var quickCheck = !!opts.quickCheck;
@@ -544,6 +545,18 @@ async function cloudSync(opts) {
         queuePendingSync(localProvidersNow);
         notifyProvidersUpdated('cloud-local-dirty');
         markSyncSuccess('本地待同步，已排队回传云端');
+        return;
+      }
+
+      /** 云端条数远少于本机时，禁止用云端覆盖本地（避免 2364 条被 1～2 条冲掉） */
+      if (localProvidersNow.length >= 100 && formatted.length < localProvidersNow.length * 0.5) {
+        var blockMsg = '已阻止同步：云端仅 ' + formatted.length + ' 条，本机有 ' + localProvidersNow.length +
+          ' 条。请先用 recover.html 从本机恢复云端，勿用少量云端覆盖本机。';
+        console.error('🌥️ ' + blockMsg);
+        emitSyncStatus('error', '云端数据过少，已保护本机');
+        if (typeof alert === 'function') alert(blockMsg);
+        localStorage.setItem(LOCAL_DIRTY_KEY, '1');
+        queuePendingSync(localProvidersNow);
         return;
       }
 
@@ -768,7 +781,22 @@ function startCloudAutoSync() {
  * 直接把云端 providers 全表写入本机（绕过 cloudSync 的分支判断，避免一直合并不了远程全量）。
  * 慎用：本机未上传的修改会丢失。
  */
+function isMultiUserSyncBlocked() {
+  var cfg = window.RULE_LIBRARY_CONFIG;
+  if (!cfg || !cfg.multiUser) return false;
+  if (typeof window.isSyncAdminMode === 'function' && window.isSyncAdminMode()) return false;
+  try {
+    if (localStorage.getItem('rule_library_sync_admin') === '1') return false;
+  } catch (e) { /* ignore */ }
+  return true;
+}
+
 window.forcePullProvidersFromCloud = async function() {
+  if (isMultiUserSyncBlocked()) {
+    if (typeof showToast === 'function') showToast('多人协作模式已禁用「以云端为准」');
+    else if (typeof alert === 'function') alert('多人协作模式已禁用「以云端为准」。请使用「立即同步」。');
+    return;
+  }
   if (isCloudSyncing) {
     if (typeof showToast === 'function') showToast('正在同步中，请稍候再试');
     return;
@@ -818,6 +846,12 @@ window.forcePullProvidersFromCloud = async function() {
  * 在网站打开 F12 控制台执行：await forceRestoreLocalProvidersToCloud()
  */
 window.forceRestoreLocalProvidersToCloud = async function() {
+  if (isMultiUserSyncBlocked()) {
+    if (typeof alert === 'function') {
+      alert('多人协作模式请在 recover.html 维护页操作，或联系管理员加 ?admin=1');
+    }
+    return;
+  }
   if (typeof confirm === 'function' && !confirm(
     '将把浏览器里 rule_library_providers 的全部数据分批写入 Supabase（不先清空表）。\n\n确定继续？'
   )) {
