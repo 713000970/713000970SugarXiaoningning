@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>规则库 · 数据恢复</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 20px; line-height: 1.6; }
+    h1 { font-size: 1.35rem; }
+    .box { background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 10px; padding: 16px; margin: 16px 0; }
+    .warn { background: #fff7ed; border-color: #fdba74; }
+    button { margin: 8px 8px 8px 0; padding: 10px 18px; border: none; border-radius: 8px; cursor: pointer; font-size: 15px; }
+  .btn-primary { background: #0891b2; color: #fff; }
+  .btn-secondary { background: #e2e8f0; color: #0f172a; }
+  #log { white-space: pre-wrap; font-size: 13px; background: #0f172a; color: #e2e8f0; padding: 12px; border-radius: 8px; max-height: 280px; overflow: auto; }
+  .stat { font-size: 1.1rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>教辅规则库 · 云端数据恢复</h1>
+  <p>请在 <strong>同一浏览器</strong> 中打开过 <a href="https://d4.fuxue.online/">d4.fuxue.online</a> 后再访问本页（须同站点，才能读到本机缓存）。</p>
+
+  <div class="box">
+    <div>本机缓存条数：<span class="stat" id="local-count">检测中…</span></div>
+    <div>Supabase 当前可见行数：<span class="stat" id="remote-count">—</span></div>
+  </div>
+
+  <div class="box warn">
+    <strong>说明：</strong>恢复只会 <strong>分批写入</strong>，不会先清空整张表。上传前请确认本机条数正确。
+  </div>
+
+  <button type="button" class="btn-secondary" id="btn-backup">① 下载本机备份 (.json)</button>
+  <button type="button" class="btn-primary" id="btn-restore">② 恢复到 Supabase（不删表）</button>
+  <button type="button" class="btn-secondary" id="btn-refresh">刷新统计</button>
+
+  <p><a href="https://d4.fuxue.online/">← 返回规则库首页</a></p>
+  <pre id="log"></pre>
+
+  <script>
+(function() {
+  var SUPABASE_URL = 'https://wsrbjgiscfxsyucsgzof.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_EenxYjB0VmulAQRr24IyDw_mj1AxX38';
+  var CHUNK = 400;
+  var logEl = document.getElementById('log');
+
+  function log(msg) {
+    logEl.textContent += msg + '\n';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function getLocal() {
+    try {
+      return JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function toCloudRow(p) {
+    return {
+      shop: p.shop || '',
+      shopname: p.shopname || '',
+      name: p.name || '',
+      brand: p.brand || '',
+      series: p.series || '',
+      split: p.split || p.splitDimension || '',
+      pricing: p.pricing || '',
+      publishtime: p.publishTime || p.publishtime || '',
+      specialcase: p.specialCase || p.specialcase || '',
+      otherinfo: p.otherInfo || p.otherinfo || ''
+    };
+  }
+
+  function dedupeRows(list) {
+    var map = new Map();
+    list.forEach(function(p) {
+      var c = toCloudRow(p);
+      var key = [c.shop, c.shopname, c.name, c.brand, c.series].join('|').toLowerCase();
+      if (!key.replace(/\|/g, '')) return;
+      if (p.id) c.id = Number(p.id);
+      map.set(key, c);
+    });
+    return Array.from(map.values());
+  }
+
+  async function fetchRemoteCount() {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=id', {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_KEY,
+        'Range-Unit': 'items',
+        Range: '0-0',
+        Prefer: 'count=exact'
+      }
+    });
+    if (!res.ok) return null;
+    await res.json().catch(function() { return []; });
+    var cr = res.headers.get('content-range') || '';
+    var m = cr.match(/\/(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
+  async function refreshStats() {
+    var local = getLocal();
+    document.getElementById('local-count').textContent = local.length;
+    try {
+      var rc = await fetchRemoteCount();
+      document.getElementById('remote-count').textContent = rc === null ? '无法读取' : String(rc);
+    } catch (e) {
+      document.getElementById('remote-count').textContent = '错误';
+    }
+  }
+
+  document.getElementById('btn-backup').onclick = function() {
+    var local = getLocal();
+    if (!local.length) {
+      alert('本机没有 rule_library_providers 数据。请先用打开过规则库首页的同一浏览器访问本页。');
+      return;
+    }
+    var blob = new Blob([JSON.stringify(local, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'providers-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    log('已下载备份，共 ' + local.length + ' 条');
+  };
+
+  document.getElementById('btn-restore').onclick = async function() {
+    var local = getLocal();
+    if (!local.length) {
+      alert('本机无数据，无法恢复');
+      return;
+    }
+    if (!confirm('将把本机 ' + local.length + ' 条规则分批写入 Supabase（不先 DELETE 全表）。\n\n确定继续？')) return;
+
+    logEl.textContent = '';
+    var rows = dedupeRows(local);
+    log('去重后 ' + rows.length + ' 条，开始上传…');
+
+    var ok = 0;
+    for (var i = 0; i < rows.length; i += CHUNK) {
+      var chunk = rows.slice(i, i + CHUNK);
+      var res = await fetch(SUPABASE_URL + '/rest/v1/providers', {
+        method: 'POST',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          Prefer: 'return=minimal'
+        },
+        body: JSON.stringify(chunk)
+      });
+      if (!res.ok) {
+        var err = await res.text();
+        log('第 ' + (i / CHUNK + 1) + ' 批失败: ' + res.status + ' ' + err);
+        alert('上传失败，见下方日志。若提示权限，请在 Supabase 为 providers 表开启 INSERT 策略。');
+        return;
+      }
+      ok += chunk.length;
+      log('已上传 ' + ok + ' / ' + rows.length);
+    }
+
+    localStorage.setItem('rule_library_local_dirty', '0');
+    log('完成。请到 Supabase Table Editor 查看 providers 行数。');
+    alert('已写入 ' + rows.length + ' 条，请到 Supabase 核对行数。');
+    refreshStats();
+  };
+
+  document.getElementById('btn-refresh').onclick = refreshStats;
+  refreshStats();
+})();
+  </script>
+</body>
+</html>

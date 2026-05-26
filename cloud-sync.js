@@ -15,6 +15,8 @@ const PROVIDERS_REST_PATH = '/rest/v1/providers?select=*';
 /** 已知总行数时并行拉取分页 */
 const FETCH_CLOUD_PARALLEL_PAGES = 3;
 const CLOUD_SNAPSHOT_KEY = 'rule_library_cloud_snapshot';
+/** 本地条数超过此值且云端拉取为 0 时，禁止自动整表上传（防止 DELETE 清空云端） */
+const BLOCK_UPLOAD_WHEN_REMOTE_EMPTY_MIN_LOCAL = 50;
 
 let onCloudSyncReady = null;
 let cloudSyncTimer = null;
@@ -364,7 +366,18 @@ async function fetchCloudProviders() {
   var totalHint = await fetchCloudProvidersDeclaredTotal();
   var all = [];
 
-  if (totalHint === 0) return [];
+  /** 计数为 0 时再拉一页，避免 Content-Range 误报 0 导致误判「云端无数据」 */
+  if (totalHint === 0) {
+    var probe = await fetchProvidersRange(0, pageSize - 1, true);
+    if (!probe.list.length) return [];
+    all = probe.list;
+    var probeTotal = parseContentRangeItems(probe.contentRange);
+    if (probeTotal && typeof probeTotal.total === 'number' && probeTotal.total > probe.list.length) {
+      totalHint = probeTotal.total;
+    } else {
+      return all;
+    }
+  }
 
   if (typeof totalHint === 'number' && totalHint > 0) {
     var pageStarts = [];
@@ -481,12 +494,22 @@ async function cloudSync(opts) {
     console.log('🌥️ 云端数据:', remoteData);
 
     if (!remoteData || remoteData.length === 0) {
-      // 远程为空，从本地上传
-      console.log('🌥️ 云端无数据，从本地上传...');
       const localData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
-
+      var declaredEmpty = await fetchCloudProvidersDeclaredTotal();
+      if (localData.length > BLOCK_UPLOAD_WHEN_REMOTE_EMPTY_MIN_LOCAL && !opts.forcePushUpload) {
+        var msg = '云端拉取为 ' + (declaredEmpty === null ? '0(不可读)' : declaredEmpty) +
+          ' 条，本地有 ' + localData.length + ' 条，已阻止自动上传以免误删云端。' +
+          '请先在 Supabase 检查 RLS/数据；确认要灌库时在控制台执行 forceRestoreLocalProvidersToCloud()';
+        console.error('🌥️ ' + msg);
+        emitSyncStatus('error', '已阻止自动上传，请检查 Supabase');
+        if (typeof alert === 'function') {
+          alert(msg);
+        }
+        return;
+      }
+      console.log('🌥️ 云端拉取为 0 条，从本地上传...');
       if (localData.length > 0) {
-        await syncToCloud(localData);
+        await syncToCloud(localData, { reentrant: true });
       }
     } else {
       // 远程有数据，转回驼峰后更新本地
@@ -561,6 +584,14 @@ async function cloudSync(opts) {
 async function syncProvidersFullTableReplace(data) {
   const formatted = toCloudProviderListForUpload(data);
   const nextSnapshot = calcSnapshot(formatted);
+
+  var remoteCount = await fetchCloudProvidersDeclaredTotal();
+  if (typeof remoteCount === 'number' && remoteCount > 0 && remoteCount < formatted.length * 0.5) {
+    console.error('🌥️ 已阻止整表替换：云端现有 ' + remoteCount + ' 条，本地将上传 ' + formatted.length +
+      ' 条。请用 forceRestoreLocalProvidersToCloud() 仅追加写入，或先备份。');
+    emitSyncStatus('error', '已阻止整表删除，云端数据过少');
+    return false;
+  }
 
   const deleteRes = await fetch(SUPABASE_URL + '/rest/v1/providers?id=gt.0', {
     method: 'DELETE',
@@ -779,6 +810,44 @@ window.forcePullProvidersFromCloud = async function() {
   } finally {
     isCloudSyncing = false;
     flushPendingSync();
+  }
+};
+
+/**
+ * 仅从本机 POST 灌入云端，不执行 DELETE 全表（用于 Supabase 误删后的恢复）。
+ * 在网站打开 F12 控制台执行：await forceRestoreLocalProvidersToCloud()
+ */
+window.forceRestoreLocalProvidersToCloud = async function() {
+  if (typeof confirm === 'function' && !confirm(
+    '将把浏览器里 rule_library_providers 的全部数据分批写入 Supabase（不先清空表）。\n\n确定继续？'
+  )) {
+    return;
+  }
+  var localData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+  if (!localData.length) {
+    if (typeof alert === 'function') alert('本地无数据，无法恢复');
+    return;
+  }
+  isCloudSyncing = true;
+  emitSyncStatus('syncing', '正在恢复写入云端 ' + localData.length + ' 条…');
+  try {
+    var formatted = toCloudProviderListForUpload(localData);
+    for (var off = 0; off < formatted.length; off += SYNC_HTTP_CHUNK) {
+      var chunk = formatted.slice(off, off + SYNC_HTTP_CHUNK).map(providerRowForDb);
+      await httpPostProvidersJson('', chunk, 'return=minimal');
+    }
+    persistCloudSnapshot(calcSnapshot(formatted));
+    lastSyncedRawProvidersStr = JSON.stringify(localData);
+    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+    markSyncSuccess('已恢复写入 ' + formatted.length + ' 条');
+    if (typeof showToast === 'function') showToast('已写入 ' + formatted.length + ' 条，请到 Supabase 核对行数');
+    if (typeof alert === 'function') alert('已分批写入 ' + formatted.length + ' 条，请到 Supabase Table Editor 核对 providers 行数');
+  } catch (e) {
+    emitSyncStatus('error', String((e && e.message) || e));
+    if (typeof alert === 'function') alert('恢复失败：' + String((e && e.message) || e));
+    throw e;
+  } finally {
+    isCloudSyncing = false;
   }
 };
 
