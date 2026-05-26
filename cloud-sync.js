@@ -10,9 +10,8 @@ const INCREMENTAL_SYNC_MIN_ROWS = 400;
 /** 变更条数超过此值仍回退为整表替换（大批量导入等） */
 const INCREMENTAL_MAX_CHANGES = 2000;
 const SYNC_HTTP_CHUNK = 400;
-/** 拉取时只请求业务字段（不含 select=* 的冗余列） */
-const PROVIDERS_SELECT_COLS = 'id,shop,shopname,name,brand,series,naming,split,pricing,publishtime,specialcase,otherinfo';
-const PROVIDERS_REST_PATH = '/rest/v1/providers?select=' + encodeURIComponent(PROVIDERS_SELECT_COLS);
+/** 拉取全表列（Supabase providers 表无 naming 列，不可写进 select 列表） */
+const PROVIDERS_REST_PATH = '/rest/v1/providers?select=*';
 /** 已知总行数时并行拉取分页 */
 const FETCH_CLOUD_PARALLEL_PAGES = 3;
 const CLOUD_SNAPSHOT_KEY = 'rule_library_cloud_snapshot';
@@ -130,6 +129,13 @@ function toCloudProvider(p) {
   };
 }
 
+/** 写入 Supabase 的字段（表结构无 naming，POST 不可带该列） */
+function toCloudProviderDbRow(p) {
+  var row = toCloudProvider(p || {});
+  delete row.naming;
+  return row;
+}
+
 function calcSnapshot(data) {
   var list = (data || []).map(function(item) {
     return toCloudProvider(item || {});
@@ -171,7 +177,7 @@ function toCloudProviderListForUpload(data) {
 }
 
 function providerRowForDb(p) {
-  var o = toCloudProvider(p || {});
+  var o = toCloudProviderDbRow(p || {});
   if (isPositiveIntId(p && p.id)) o.id = Number(p.id);
   return o;
 }
@@ -312,7 +318,7 @@ async function syncProvidersIncrementalApply(delta) {
   }
   for (i = 0; i < delta.insertsNoId.length; i += SYNC_HTTP_CHUNK) {
     var insChunk = delta.insertsNoId.slice(i, i + SYNC_HTTP_CHUNK).map(function(p) {
-      return toCloudProvider(p || {});
+      return toCloudProviderDbRow(p || {});
     });
     await httpPostProvidersJson('', insChunk, 'return=minimal');
   }
