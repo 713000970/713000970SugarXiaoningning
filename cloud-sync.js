@@ -1,4 +1,4 @@
-// 云同步配置
+﻿// 云同步配置
 const SUPABASE_URL = 'https://wsrbjgiscfxsyucsgzof.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EenxYjB0VmulAQRr24IyDw_mj1AxX38';
 /** 定时同步间隔：万级数据下全量拉取成本高，适当拉长 */
@@ -10,6 +10,12 @@ const INCREMENTAL_SYNC_MIN_ROWS = 400;
 /** 变更条数超过此值仍回退为整表替换（大批量导入等） */
 const INCREMENTAL_MAX_CHANGES = 2000;
 const SYNC_HTTP_CHUNK = 400;
+/** 拉取时只请求业务字段（不含 select=* 的冗余列） */
+const PROVIDERS_SELECT_COLS = 'id,shop,shopname,name,brand,series,naming,split,pricing,publishtime,specialcase,otherinfo';
+const PROVIDERS_REST_PATH = '/rest/v1/providers?select=' + encodeURIComponent(PROVIDERS_SELECT_COLS);
+/** 已知总行数时并行拉取分页 */
+const FETCH_CLOUD_PARALLEL_PAGES = 3;
+const CLOUD_SNAPSHOT_KEY = 'rule_library_cloud_snapshot';
 
 let onCloudSyncReady = null;
 let cloudSyncTimer = null;
@@ -211,6 +217,53 @@ function captureSyncBaselineFromStorage() {
   }
 }
 
+function persistCloudSnapshot(snapshot) {
+  lastCloudSnapshot = snapshot || '';
+  try {
+    if (snapshot) localStorage.setItem(CLOUD_SNAPSHOT_KEY, snapshot);
+    else localStorage.removeItem(CLOUD_SNAPSHOT_KEY);
+  } catch (e) {}
+}
+
+function loadPersistedCloudSnapshot() {
+  try {
+    var s = localStorage.getItem(CLOUD_SNAPSHOT_KEY);
+    if (s) lastCloudSnapshot = s;
+  } catch (e) {}
+}
+
+/** 本地无待传且快照与当前一致时，可只做行数探测而跳过万级全表 GET */
+function canSkipFullCloudPull(localProviders) {
+  var list = localProviders || [];
+  if (!list.length) return false;
+  var storedSnap = lastCloudSnapshot;
+  try {
+    if (!storedSnap) storedSnap = localStorage.getItem(CLOUD_SNAPSHOT_KEY) || '';
+  } catch (e) {}
+  if (!storedSnap) return false;
+  return calcSnapshot(list) === storedSnap;
+}
+
+async function fetchProvidersRange(from, to, withCountExact) {
+  var headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Range-Unit': 'items',
+    'Range': from + '-' + to
+  };
+  if (withCountExact) headers['Prefer'] = 'count=exact';
+  var res = await fetch(SUPABASE_URL + PROVIDERS_REST_PATH, { headers: headers });
+  if (!res.ok) {
+    var errText = await res.text();
+    throw new Error('拉取云端失败: ' + res.status + ' ' + errText);
+  }
+  var rows = await res.json();
+  return {
+    list: Array.isArray(rows) ? rows : [],
+    contentRange: res.headers.get('content-range') || res.headers.get('Content-Range')
+  };
+}
+
 async function httpPostProvidersJson(pathSuffix, bodyArray, preferPrefer) {
   var headers = {
     'apikey': SUPABASE_KEY,
@@ -308,56 +361,32 @@ async function fetchCloudProviders() {
   if (totalHint === 0) return [];
 
   if (typeof totalHint === 'number' && totalHint > 0) {
-    while (all.length < totalHint) {
-      var from = all.length;
-      var to = Math.min(from + pageSize - 1, totalHint - 1);
-      var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=*', {
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': 'Bearer ' + SUPABASE_KEY,
-          'Range-Unit': 'items',
-          'Range': from + '-' + to,
-          'Prefer': 'count=exact'
+    var pageStarts = [];
+    for (var ps = 0; ps < totalHint; ps += pageSize) pageStarts.push(ps);
+    for (var pi = 0; pi < pageStarts.length; pi += FETCH_CLOUD_PARALLEL_PAGES) {
+      var batchStarts = pageStarts.slice(pi, pi + FETCH_CLOUD_PARALLEL_PAGES);
+      var parts = await Promise.all(batchStarts.map(function(from) {
+        var to = Math.min(from + pageSize - 1, totalHint - 1);
+        return fetchProvidersRange(from, to, false);
+      }));
+      parts.forEach(function(part) {
+        if (part.list.length === 0 && all.length < totalHint) {
+          console.warn('🌥️ 并行分页返回 0 行，可能遭 max-rows 截断');
         }
+        all = all.concat(part.list);
       });
-      if (!res.ok) {
-        var errText = await res.text();
-        throw new Error('拉取云端失败: ' + res.status + ' ' + errText);
-      }
-      var rows = await res.json();
-      var list = Array.isArray(rows) ? rows : [];
-      if (list.length === 0) {
-        console.warn('🌥️ Content-Range 声明 ' + totalHint + ' 条，但从下标 ' + from + ' 起无行，提前结束（请检查 max-rows / 代理截断）');
-        break;
-      }
-      all = all.concat(list);
     }
     return all;
   }
 
-  /** 拿不到总数时：用每页 Content-Range，避免「本页未满 1000」误判为已拉完（服务端 max-rows 小于请求的 Range 时会发生） */
+  /** 拿不到总数时：用每页 Content-Range，避免「本页未满 1000」误判为已拉完 */
   var from = 0;
   var declaredTotal = null;
   while (true) {
     var to = from + pageSize - 1;
-    var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=*', {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Range-Unit': 'items',
-        'Range': from + '-' + to,
-        'Prefer': 'count=exact'
-      }
-    });
-    if (!res.ok) {
-      var errText = await res.text();
-      throw new Error('拉取云端失败: ' + res.status + ' ' + errText);
-    }
-
-    var rows = await res.json();
-    var list = Array.isArray(rows) ? rows : [];
-    var cr = res.headers.get('content-range') || res.headers.get('Content-Range');
-    var parsed = parseContentRangeItems(cr);
+    var page = await fetchProvidersRange(from, to, true);
+    var list = page.list;
+    var parsed = parseContentRangeItems(page.contentRange);
     if (parsed && typeof parsed.total === 'number' && !isNaN(parsed.total)) {
       declaredTotal = parsed.total;
     }
@@ -384,10 +413,12 @@ function notifyProvidersUpdated(source) {
 }
 
 // 云同步API - 加载时拉取数据
-// opts.fromTimer：定时触发时，本地有未传则不再 GET 全表；本地干净时先比对行数，一致则跳过万级拉取
+// opts.fromTimer：定时触发；opts.quickCheck：手动「立即同步」先探测行数/快照
+// opts.forcePull：强制全表拉取（「以云端为准」）
 async function cloudSync(opts) {
   opts = opts || {};
   var fromTimer = !!opts.fromTimer;
+  var quickCheck = !!opts.quickCheck;
 
   if (isCloudSyncing) return;
   isCloudSyncing = true;
@@ -401,6 +432,14 @@ async function cloudSync(opts) {
     const localProviders = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
     const localDirty = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
 
+    /** 本地有待传：直接上传，不再先拉 2000+ 行（删改卡后最常见） */
+    if (localDirty && !opts.forcePull) {
+      emitSyncStatus('syncing', '正在上传本地变更…');
+      await syncToCloud(localProviders, { reentrant: true });
+      if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
+      return;
+    }
+
     if (fromTimer && localDirty) {
       const localProvidersNow = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
       localStorage.setItem(LOCAL_DIRTY_KEY, '1');
@@ -410,16 +449,28 @@ async function cloudSync(opts) {
       return;
     }
 
-    if (fromTimer && !localDirty) {
-      var rc = await fetchCloudProvidersDeclaredTotal();
-      var localLen = (localProviders && localProviders.length) || 0;
-      if (typeof rc === 'number' && rc === localLen) {
+    /** 打开页面 / 定时 / 手动同步：本地干净且快照一致时，仅探测行数即可 */
+    var tryFastSkip = !localDirty && !opts.forcePull;
+    if (tryFastSkip && canSkipFullCloudPull(localProviders)) {
+      var rcSnap = await fetchCloudProvidersDeclaredTotal();
+      var localLenSnap = localProviders.length;
+      if (typeof rcSnap === 'number' && rcSnap === localLenSnap) {
         markSyncSuccess('已是最新');
+        if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
         return;
       }
     }
 
-    const localSnapshot = calcSnapshot(localProviders);
+    if (tryFastSkip && !canSkipFullCloudPull(localProviders)) {
+      var rc = await fetchCloudProvidersDeclaredTotal();
+      var localLen = localProviders.length;
+      if (typeof rc === 'number' && rc === localLen && localLen > 0) {
+        markSyncSuccess('已是最新');
+        if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
+        return;
+      }
+    }
+
     const remoteData = await fetchCloudProviders();
     console.log('🌥️ 云端数据:', remoteData);
 
@@ -469,7 +520,7 @@ async function cloudSync(opts) {
 
       localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
       localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-      lastCloudSnapshot = remoteSnapshot;
+      persistCloudSnapshot(remoteSnapshot);
       if (remoteSnapshot !== localSnapshotNow) {
         notifyProvidersUpdated('cloud-pull');
       }
@@ -520,7 +571,7 @@ async function syncProvidersFullTableReplace(data) {
   }
 
   if (formatted.length === 0) {
-    lastCloudSnapshot = nextSnapshot;
+    persistCloudSnapshot(nextSnapshot);
     localStorage.setItem(LOCAL_DIRTY_KEY, '0');
     lastSyncedRawProvidersStr = JSON.stringify(data);
     markSyncSuccess('已同步');
@@ -547,7 +598,7 @@ async function syncProvidersFullTableReplace(data) {
     }
   }
 
-  lastCloudSnapshot = nextSnapshot;
+  persistCloudSnapshot(nextSnapshot);
   localStorage.setItem(LOCAL_DIRTY_KEY, '0');
   lastSyncedRawProvidersStr = JSON.stringify(data);
   markSyncSuccess('已同步');
@@ -572,7 +623,7 @@ async function trySyncToCloudIncremental(data, formatted) {
   var delta = computeProviderSyncDelta(baselineFormatted, formatted);
   var opCount = delta.deletes.length + delta.upserts.length + delta.insertsNoId.length;
   if (opCount <= 0) {
-    lastCloudSnapshot = calcSnapshot(formatted);
+    persistCloudSnapshot(calcSnapshot(formatted));
     localStorage.setItem(LOCAL_DIRTY_KEY, '0');
     lastSyncedRawProvidersStr = JSON.stringify(data);
     markSyncSuccess('已同步');
@@ -590,7 +641,7 @@ async function trySyncToCloudIncremental(data, formatted) {
   }
   var stored = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
   var storedFmt = toCloudProviderListForUpload(stored);
-  lastCloudSnapshot = calcSnapshot(storedFmt);
+  persistCloudSnapshot(calcSnapshot(storedFmt));
   lastSyncedRawProvidersStr = JSON.stringify(stored);
   localStorage.setItem(LOCAL_DIRTY_KEY, '0');
   markSyncSuccess('已增量同步（' + opCount + ' 项）');
@@ -598,16 +649,7 @@ async function trySyncToCloudIncremental(data, formatted) {
 }
 
 // 保存数据后自动同步到云端
-async function syncToCloud(data) {
-  if (isCloudSyncing) {
-    queuePendingSync(data);
-    emitSyncStatus('syncing', '同步排队中...');
-    return;
-  }
-  isCloudSyncing = true;
-  clearRetryTimers();
-  emitSyncStatus('syncing', '同步中...');
-  try {
+async function syncToCloudImpl(data) {
     console.log('🌥️ 同步到云端...', (data || []).length, '条');
 
     const formatted = toCloudProviderListForUpload(data);
@@ -619,7 +661,7 @@ async function syncToCloud(data) {
         console.error('🌥️ 已阻止用空列表覆盖云端（云端 ' + remoteCount + ' 条），疑为误清空，已从云端恢复本地。');
         localStorage.setItem('rule_library_providers', JSON.stringify(remoteRows.map(toLocalProvider)));
         localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-        lastCloudSnapshot = calcSnapshot(remoteRows.map(toLocalProvider));
+        persistCloudSnapshot(calcSnapshot(remoteRows.map(toLocalProvider)));
         notifyProvidersUpdated('cloud-recovered-from-empty-sync');
         markSyncSuccess('已阻止误清空，已从云端恢复');
         captureSyncBaselineFromStorage();
@@ -650,12 +692,31 @@ async function syncToCloud(data) {
     if (!ok) {
       return;
     }
+}
+
+async function syncToCloud(data, options) {
+  options = options || {};
+  if (isCloudSyncing && !options.reentrant) {
+    queuePendingSync(data);
+    emitSyncStatus('syncing', '同步排队中...');
+    return;
+  }
+  var manageLock = !options.reentrant;
+  if (manageLock) {
+    isCloudSyncing = true;
+    clearRetryTimers();
+    emitSyncStatus('syncing', '同步中...');
+  }
+  try {
+    await syncToCloudImpl(data);
   } catch (e) {
     console.error('🌥️ 同步失败:', e);
     scheduleRetry();
   } finally {
-    isCloudSyncing = false;
-    flushPendingSync();
+    if (manageLock) {
+      isCloudSyncing = false;
+      flushPendingSync();
+    }
   }
 }
 
@@ -684,7 +745,7 @@ window.forcePullProvidersFromCloud = async function() {
   emitSyncStatus('syncing', '正在从云端强制拉取…');
   try {
     localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-    lastCloudSnapshot = '';
+    persistCloudSnapshot('');
     pendingSyncData = null;
     clearRetryTimers();
 
@@ -700,7 +761,7 @@ window.forcePullProvidersFromCloud = async function() {
     var formatted = remoteData.map(toLocalProvider);
     localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
     localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-    lastCloudSnapshot = calcSnapshot(formatted);
+    persistCloudSnapshot(calcSnapshot(formatted));
     notifyProvidersUpdated('cloud-force-pull');
     markSyncSuccess('已从云端写入本地 ' + cnt + ' 条');
     if (typeof updateStats === 'function') updateStats();
@@ -714,3 +775,18 @@ window.forcePullProvidersFromCloud = async function() {
     flushPendingSync();
   }
 };
+
+loadPersistedCloudSnapshot();
+captureSyncBaselineFromStorage();
+
+/** 覆盖 app.js 的手动同步：先快速探测，必要时再全表拉取 */
+window.addEventListener('load', function() {
+  window.triggerManualSync = function() {
+    if (typeof cloudSync !== 'function') {
+      if (typeof showToast === 'function') showToast('同步功能不可用');
+      return;
+    }
+    cloudSync({ quickCheck: true });
+    if (typeof showToast === 'function') showToast('已开始同步');
+  };
+});
