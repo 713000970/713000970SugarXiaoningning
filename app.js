@@ -56,29 +56,18 @@ const defaultData = {
   series: []
 };
 
-// 初始化数据
+// 初始化数据（优先 CSV 官方表，见 data-bootstrap.js / providers-from-csv.json）
 function initData() {
-  if (typeof presetData === 'undefined') return;
-  
-  // 检查是否已经有数据，避免覆盖用户保存的数据
   var existingData = localStorage.getItem(STORAGE_KEYS.PROVIDERS);
   if (existingData && existingData !== '[]') {
-    // 已有数据，不覆盖
-    var providers = JSON.parse(existingData);
-    var brands = localStorage.getItem(STORAGE_KEYS.BRANDS);
-    brands = brands ? JSON.parse(brands) : [];
-    
     if (typeof updateStats === 'function') updateStats();
     return;
   }
-  
-  var providers = presetData.providers;
-  var brands = presetData.brands;
-  
-  localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(providers));
-  localStorage.setItem(STORAGE_KEYS.BRANDS, JSON.stringify(brands.map(function(n, i) { return { id: String(i+1), name: n }; })));
-  localStorage.setItem(STORAGE_KEYS.SERIES, JSON.stringify([]));
-  
+  if (typeof presetData !== 'undefined') {
+    localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(presetData.providers));
+    localStorage.setItem(STORAGE_KEYS.BRANDS, JSON.stringify(presetData.brands.map(function(n, i) { return { id: String(i+1), name: n }; })));
+    localStorage.setItem(STORAGE_KEYS.SERIES, JSON.stringify([]));
+  }
   if (typeof updateStats === 'function') updateStats();
 }
 
@@ -86,17 +75,29 @@ function initCollapsibles() {
   // 占位函数
 }
 
-// 重置为预置数据（可清除所有修改）
+// 重置为官方数据（优先 CSV 表 providers-from-csv.json，约 2361 条）
 function resetToPresetData() {
-  if (confirm('确定要重置所有数据吗？这将清除所有已修改的数据，恢复为初始数据。')) {
-    localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(presetData.providers));
-    localStorage.setItem(STORAGE_KEYS.BRANDS, JSON.stringify(presetData.brands.map((name, i) => ({ id: (i + 1).toString(), name }))));
-    localStorage.setItem(STORAGE_KEYS.SERIES, JSON.stringify(defaultData.series));
-    loadProviders();
-    loadBrands();
-    updateStats();
-    showToast('数据已重置为初始状态');
-  }
+  if (!confirm('确定要重置所有数据吗？将恢复为「教辅生产说明」CSV 官方表（约 2361 条）。')) return;
+  (async function() {
+    try {
+      if (typeof ensureOfficialProvidersLoaded === 'function') {
+        await ensureOfficialProvidersLoaded({ force: true });
+      } else if (typeof presetData !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(presetData.providers));
+        localStorage.setItem(STORAGE_KEYS.BRANDS, JSON.stringify(presetData.brands.map(function(name, i) {
+          return { id: String(i + 1), name: name };
+        })));
+      }
+      localStorage.setItem(STORAGE_KEYS.SERIES, JSON.stringify(defaultData.series));
+      localStorage.setItem(APP_LOCAL_DIRTY_KEY, '1');
+      loadProviders();
+      loadBrands();
+      updateStats();
+      showToast('已恢复为 CSV 官方表');
+    } catch (e) {
+      alert('重置失败：' + (e.message || e));
+    }
+  })();
 }
 
 // 数据操作
