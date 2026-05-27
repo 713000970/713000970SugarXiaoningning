@@ -487,22 +487,19 @@ function goHome() {
   <script src="db.js"></script>
   <script src="site-config.js?v=20260526"></script>
   <script src="data-bootstrap.js?v=csv-20260526"></script>
-  <script src="cloud-sync.js?v=20260526-06"></script>
-  <script src="app.js?v=20260526-08"></script>
+  <script src="cloud-sync.js?v=20260526-09"></script>
+  <script src="app.js?v=20260526-10"></script>
   <script>
     // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (async function() {
       console.log('🚀 开始初始化...');
 
-      if (typeof ensureOfficialProvidersLoaded === 'function') {
-        try {
-          var boot = await ensureOfficialProvidersLoaded({ minCount: 500 });
-          console.log('🚀 官方表(CSV):', boot.source, boot.count, '条');
-        } catch (e) {
-          console.warn('🚀 CSV 官方表未载入，将使用已有缓存或 db.js:', e);
-        }
-      }
-      
+      /** 新电脑/空缓存：先 cloudSync 拉 Supabase（约 2358 条），避免先灌 CSV 再误上传覆盖云端 */
+      var localCount = 0;
+      try {
+        localCount = JSON.parse(localStorage.getItem('rule_library_providers') || '[]').length;
+      } catch (e) { localCount = 0; }
+
       if (typeof cloudSync === 'function') {
         console.log('🚀 调用 cloudSync...');
         await cloudSync();
@@ -514,6 +511,19 @@ function goHome() {
         }
       } else {
         console.log('🚀 cloudSync 未定义');
+      }
+
+      try {
+        localCount = JSON.parse(localStorage.getItem('rule_library_providers') || '[]').length;
+      } catch (e) { localCount = 0; }
+      if (localCount < 500 && typeof ensureOfficialProvidersLoaded === 'function') {
+        try {
+          var boot = await ensureOfficialProvidersLoaded({ minCount: 500, markDirty: true });
+          console.log('🚀 云端仍不足，已用官方 CSV 兜底:', boot.source, boot.count, '条');
+          if (typeof cloudSync === 'function') await cloudSync();
+        } catch (e) {
+          console.warn('🚀 CSV 官方表未载入:', e);
+        }
       }
       
       console.log('🚀 检查数据...');

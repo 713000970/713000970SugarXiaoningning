@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260526-08';
+var RULE_LIBRARY_BUILD = '20260526-10';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -111,7 +111,7 @@ function resetToPresetData() {
   (async function() {
     try {
       if (typeof ensureOfficialProvidersLoaded === 'function') {
-        await ensureOfficialProvidersLoaded({ force: true });
+        await ensureOfficialProvidersLoaded({ force: true, markDirty: true });
       } else if (typeof presetData !== 'undefined') {
         localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(presetData.providers));
         localStorage.setItem(STORAGE_KEYS.BRANDS, JSON.stringify(presetData.brands.map(function(name, i) {
@@ -328,19 +328,12 @@ function ruleRowMatchesEditIdentity(p, targetShop, targetProvider, targetBrand, 
     normalizeText((p && p.series) || '') === normalizeText(targetSeries);
 }
 
-/** 品牌下拉/搜索与行内品牌：严格相等或模糊一致（避免不可见字符、简写差异） */
+/** 品牌筛选：仅完全相等（NFKC+去空格后比较），不用「包含」以免「暑假」带出「小学暑假专项训练」 */
 function brandMatchesUi(pBrand, selectedBrand) {
   var a = normalizeText(pBrand);
   var b = normalizeText(selectedBrand);
-  if (a === b) return true;
   if (!a || !b) return false;
-  if (isEntityMatched(pBrand, selectedBrand)) return true;
-  var ak = normalizeEntityKey(pBrand);
-  var bk = normalizeEntityKey(selectedBrand);
-  if (ak && bk && Math.min(ak.length, bk.length) >= 3) {
-    if (ak.indexOf(bk) !== -1 || bk.indexOf(ak) !== -1) return true;
-  }
-  return false;
+  return a === b;
 }
 
 /** 在 shop/shopname/name/brand 拼接串中粗搜 needle（实体键），用于 0 条时的对照提示 */
@@ -474,12 +467,14 @@ function setData(key, data, options) {
   options = options || {};
   localStorage.setItem(key, JSON.stringify(data));
 
+  var fromCloud = !!options.fromCloud;
   var suppressProviders =
     key === STORAGE_KEYS.PROVIDERS &&
     (options.skipCloudSync ||
-      (typeof window !== 'undefined' && window.__RULE_LIB_SUPPRESS_PROVIDER_SYNC));
+      (!fromCloud && typeof window !== 'undefined' && window.__RULE_LIB_SUPPRESS_PROVIDER_SYNC));
 
-  if (!suppressProviders) {
+  /** 用户改规则必须标 dirty；仅云端写入本地时不要标（避免误拦上传） */
+  if (key === STORAGE_KEYS.PROVIDERS && !fromCloud) {
     localStorage.setItem(APP_LOCAL_DIRTY_KEY, '1');
   }
 
