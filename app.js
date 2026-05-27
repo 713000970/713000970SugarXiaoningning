@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260526-10';
+var RULE_LIBRARY_BUILD = '20260526-11';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -492,6 +492,50 @@ function setData(key, data, options) {
 // ========================================
 // 页面导航
 // ========================================
+/** 进入提供者查询页时清空上次搜索条件与结果（从首页再次进入为空白表单） */
+function resetProviderQueryPage() {
+  currentBrand = '';
+  currentProvider = '';
+  currentEditingBrand = '';
+  currentEditingShop = '';
+  currentEditingSeries = '';
+  providerSeriesTagsExpanded = false;
+  setProviderRuleEditLock(null);
+  if (showRulesDebounceTimer) {
+    clearTimeout(showRulesDebounceTimer);
+    showRulesDebounceTimer = null;
+  }
+
+  var shopInput = document.getElementById('shop-search-input');
+  if (shopInput) shopInput.value = '';
+  var providerInput = document.getElementById('provider-search-input');
+  if (providerInput) providerInput.value = '';
+  var brandInput = document.getElementById('brand-input');
+  if (brandInput) {
+    brandInput.value = '';
+    brandInput.placeholder = '请先选择店铺...';
+    brandInput.removeAttribute('data-shop-brands');
+    brandInput.removeAttribute('data-current-shop');
+    brandInput.removeAttribute('data-current-provider');
+    brandInput.removeAttribute('data-provider-brands');
+  }
+
+  ['shop-dropdown', 'provider-dropdown', 'brand-dropdown'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+
+  var display = document.getElementById('custom-rule-display');
+  if (display) {
+    display.style.display = 'none';
+    display.innerHTML = '';
+  }
+  clearSeriesTags();
+
+  var addSeriesBtn = document.getElementById('add-series-btn');
+  if (addSeriesBtn) addSeriesBtn.style.display = 'none';
+}
+
 function goPage(pageId) {
   document.querySelectorAll('.page').forEach(page => {
     page.classList.remove('active');
@@ -500,6 +544,7 @@ function goPage(pageId) {
   window.scrollTo(0, 0);
   
   if (pageId === 'provider') {
+    resetProviderQueryPage();
     loadProviders();
     loadBrands();
     loadProviderSelect();
