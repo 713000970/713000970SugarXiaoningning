@@ -3,6 +3,8 @@ const SUPABASE_URL = 'https://wsrbjgiscfxsyucsgzof.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EenxYjB0VmulAQRr24IyDw_mj1AxX38';
 /** 定时同步间隔：万级数据下全量拉取成本高，适当拉长 */
 const CLOUD_SYNC_INTERVAL_MS = 45000;
+/** 本机有未传云端修改时，更频繁自动重试上传 */
+const CLOUD_DIRTY_RETRY_MS = 12000;
 const CLOUD_RETRY_DELAY_MS = 5000;
 const LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 /** 行数超过此值且基线可用时，尽量走增量上传（避免 DELETE 全表 + POST 上万行） */
@@ -29,6 +31,7 @@ let retryCountdownTimer = null;
 let retryRemainSec = 0;
 let lastSuccessAt = null;
 let pendingSyncData = null;
+let dirtyRetryTimer = null;
 
 function emitSyncStatus(status, message, extra) {
   window.dispatchEvent(new CustomEvent('cloud-sync-status', {
@@ -154,6 +157,58 @@ function providerIdentityKey(p) {
   var brand = String(p.brand || '').trim().toLowerCase();
   var series = String(p.series || '').trim().toLowerCase();
   return [shop, shopname, name, brand, series].join('|');
+}
+
+function hasMeaningfulRuleCloud(p) {
+  if (!p) return false;
+  return !!(
+    String(p.naming || '').trim() ||
+    String(p.split || '').trim() ||
+    String(p.pricing || '').trim() ||
+    String(p.publishTime || p.publishtime || '').trim() ||
+    String(p.specialCase || p.specialcase || '').trim() ||
+    String(p.otherInfo || p.otherinfo || '').trim()
+  );
+}
+
+/**
+ * 从云端拉取时合并本机：保留「仅本机有」或「本机已录入规则、云端仍为空」的行，避免次日打开被旧云端冲掉。
+ */
+function mergeRemoteProvidersPreservingLocal(localRows, remoteRows) {
+  var local = (localRows || []).map(toLocalProvider);
+  var remote = (remoteRows || []).map(toLocalProvider);
+  var byKey = new Map();
+  remote.forEach(function(p) {
+    byKey.set(providerIdentityKey(p), p);
+  });
+  var changed = false;
+
+  local.forEach(function(lp) {
+    var k = providerIdentityKey(lp);
+    if (!k.replace(/\|/g, '')) return;
+    var rp = byKey.get(k);
+    if (!rp) {
+      if (hasMeaningfulRuleCloud(lp)) {
+        byKey.set(k, lp);
+        changed = true;
+      }
+      return;
+    }
+    var localSig = providerContentSignature(lp);
+    var remoteSig = providerContentSignature(rp);
+    if (localSig === remoteSig) return;
+    if (hasMeaningfulRuleCloud(lp) && !hasMeaningfulRuleCloud(rp)) {
+      byKey.set(k, lp);
+      changed = true;
+      return;
+    }
+    if (hasMeaningfulRuleCloud(lp) && hasMeaningfulRuleCloud(rp) && localSig !== remoteSig) {
+      byKey.set(k, lp);
+      changed = true;
+    }
+  });
+
+  return { list: Array.from(byKey.values()), changed: changed };
 }
 
 /** 将当前内存中的规则列表转为上传用行，并按主键去重（后者覆盖前者）；保留数据库 id 供增量同步 */
@@ -497,20 +552,39 @@ async function cloudSync(opts) {
     if (!remoteData || remoteData.length === 0) {
       const localData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
       var declaredEmpty = await fetchCloudProvidersDeclaredTotal();
+      var localDirtyNow = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
+
+      /** 本地有待上传：直接增量/上传，不因「读不到云端」而拦截 */
+      if (localDirtyNow && localData.length > 0) {
+        emitSyncStatus('syncing', '正在上传本地变更…');
+        await syncToCloud(localData, { reentrant: true, forcePushUpload: true });
+        if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
+        return;
+      }
+
+      /** 读不到行数（多为 RLS/API），不是「云端真为空」 */
+      if (declaredEmpty === null && localData.length > BLOCK_UPLOAD_WHEN_REMOTE_EMPTY_MIN_LOCAL) {
+        var rlsMsg =
+          '无法读取云端 providers（显示为 0 不可读），本地 ' + localData.length + ' 条已保留。\n\n' +
+          '请在 Supabase → SQL Editor 运行 providers-fix-rls-only.sql，然后点「立即同步」。\n' +
+          '（不要执行整表 DELETE；新增店铺保存后也会自动标为待上传）';
+        console.error('🌥️ ' + rlsMsg);
+        emitSyncStatus('error', '无法读取云端，请修复 RLS');
+        if (typeof alert === 'function') alert(rlsMsg);
+        return;
+      }
+
       if (localData.length > BLOCK_UPLOAD_WHEN_REMOTE_EMPTY_MIN_LOCAL && !opts.forcePushUpload) {
-        var msg = '云端拉取为 ' + (declaredEmpty === null ? '0(不可读)' : declaredEmpty) +
-          ' 条，本地有 ' + localData.length + ' 条，已阻止自动上传以免误删云端。' +
-          '请先在 Supabase 检查 RLS/数据；确认要灌库时在控制台执行 forceRestoreLocalProvidersToCloud()';
+        var msg = '云端拉取为 ' + declaredEmpty + ' 条，本地有 ' + localData.length +
+          ' 条，已阻止自动整库上传以免误删云端。\n\n若你刚新增规则，请先修复 RLS 再点「立即同步」。';
         console.error('🌥️ ' + msg);
-        emitSyncStatus('error', '已阻止自动上传，请检查 Supabase');
-        if (typeof alert === 'function') {
-          alert(msg);
-        }
+        emitSyncStatus('error', '已阻止自动上传');
+        if (typeof alert === 'function') alert(msg);
         return;
       }
       console.log('🌥️ 云端拉取为 0 条，从本地上传...');
       if (localData.length > 0) {
-        await syncToCloud(localData, { reentrant: true });
+        await syncToCloud(localData, { reentrant: true, forcePushUpload: true });
       }
     } else {
       // 远程有数据，转回驼峰后更新本地
@@ -560,14 +634,23 @@ async function cloudSync(opts) {
         return;
       }
 
-      localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
-      localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-      persistCloudSnapshot(remoteSnapshot);
-      if (remoteSnapshot !== localSnapshotNow) {
-        notifyProvidersUpdated('cloud-pull');
+      var mergeResult = mergeRemoteProvidersPreservingLocal(localProvidersNow, formatted);
+      localStorage.setItem('rule_library_providers', JSON.stringify(mergeResult.list));
+      if (mergeResult.changed) {
+        console.log('🌥️ 合并云端时保留了本机已录入规则，将回传云端');
+        localStorage.setItem(LOCAL_DIRTY_KEY, '1');
+        queuePendingSync(mergeResult.list);
+        notifyProvidersUpdated('cloud-merge-local-edits');
+        markSyncSuccess('已保留本机录入并上传云端…');
+      } else {
+        localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+        persistCloudSnapshot(calcSnapshot(mergeResult.list));
+        if (remoteSnapshot !== localSnapshotNow) {
+          notifyProvidersUpdated('cloud-pull');
+        }
+        markSyncSuccess('已同步');
+        console.log('🌥️ 已从云端同步数据，本地更新');
       }
-      markSyncSuccess('已同步');
-      console.log('🌥️ 已从云端同步数据，本地更新');
     }
 
     // 同步完成回调
@@ -591,14 +674,47 @@ async function cloudSync(opts) {
   }
 }
 
+/** 仅推送相对上次基线的新增/修改，不 DELETE 云端行（RLS 异常或本地 dirty 时用） */
+async function syncProvidersPushLocalChangesOnly(data) {
+  var formatted = toCloudProviderListForUpload(data);
+  var baselineFmt = [];
+  if (lastSyncedRawProvidersStr) {
+    try {
+      baselineFmt = toCloudProviderListForUpload(JSON.parse(lastSyncedRawProvidersStr));
+    } catch (e) { /* ignore */ }
+  }
+  var delta = computeProviderSyncDelta(baselineFmt, formatted);
+  delta.deletes = [];
+  var opCount = delta.upserts.length + delta.insertsNoId.length;
+  if (opCount <= 0) {
+    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+    lastSyncedRawProvidersStr = JSON.stringify(data);
+    markSyncSuccess('已同步');
+    return true;
+  }
+  await syncProvidersIncrementalApply(delta);
+  var stored = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+  var storedFmt = toCloudProviderListForUpload(stored);
+  persistCloudSnapshot(calcSnapshot(storedFmt));
+  lastSyncedRawProvidersStr = JSON.stringify(stored);
+  localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+  markSyncSuccess('已上传 ' + opCount + ' 项变更');
+  return true;
+}
+
 /**
  * 整表 DELETE + POST（大批量变更或增量失败时回退）
  */
-async function syncProvidersFullTableReplace(data) {
+async function syncProvidersFullTableReplace(data, options) {
+  options = options || {};
   const formatted = toCloudProviderListForUpload(data);
   const nextSnapshot = calcSnapshot(formatted);
 
   var remoteCount = await fetchCloudProvidersDeclaredTotal();
+  if (options.forcePushUpload && (remoteCount === null || remoteCount === 0)) {
+    console.warn('🌥️ 云端不可读或为空，跳过整表 DELETE，仅推送本地变更');
+    return await syncProvidersPushLocalChangesOnly(data);
+  }
   if (typeof remoteCount === 'number' && remoteCount > 0 && remoteCount < formatted.length * 0.5) {
     console.error('🌥️ 已阻止整表替换：云端现有 ' + remoteCount + ' 条，本地将上传 ' + formatted.length +
       ' 条。请用 forceRestoreLocalProvidersToCloud() 仅追加写入，或先备份。');
@@ -699,7 +815,8 @@ async function trySyncToCloudIncremental(data, formatted) {
 }
 
 // 保存数据后自动同步到云端
-async function syncToCloudImpl(data) {
+async function syncToCloudImpl(data, options) {
+    options = options || {};
     console.log('🌥️ 同步到云端...', (data || []).length, '条');
 
     const formatted = toCloudProviderListForUpload(data);
@@ -738,10 +855,23 @@ async function syncToCloudImpl(data) {
       return;
     }
 
-    var ok = await syncProvidersFullTableReplace(data);
-    if (!ok) {
-      return;
+    if (options.forcePushUpload) {
+      var pushedOnly = await syncProvidersPushLocalChangesOnly(data);
+      if (pushedOnly) return;
     }
+
+    var ok = await syncProvidersFullTableReplace(data, options);
+    if (!ok) {
+      throw new Error('sync_upload_failed');
+    }
+}
+
+function isLocalProvidersDirty() {
+  try {
+    return localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
+  } catch (e) {
+    return false;
+  }
 }
 
 async function syncToCloud(data, options) {
@@ -749,19 +879,25 @@ async function syncToCloud(data, options) {
   if (isCloudSyncing && !options.reentrant) {
     queuePendingSync(data);
     emitSyncStatus('syncing', '同步排队中...');
-    return;
+    return { ok: false, queued: true };
   }
   var manageLock = !options.reentrant;
   if (manageLock) {
     isCloudSyncing = true;
     clearRetryTimers();
-    emitSyncStatus('syncing', '同步中...');
+    emitSyncStatus('syncing', '正在上传…');
   }
   try {
-    await syncToCloudImpl(data);
+    await syncToCloudImpl(data, options);
+    var ok = !isLocalProvidersDirty();
+    if (!ok) {
+      scheduleRetry();
+    }
+    return { ok: ok };
   } catch (e) {
     console.error('🌥️ 同步失败:', e);
     scheduleRetry();
+    return { ok: false, error: String((e && e.message) || e) };
   } finally {
     if (manageLock) {
       isCloudSyncing = false;
@@ -770,11 +906,31 @@ async function syncToCloud(data, options) {
   }
 }
 
+window.syncProvidersToCloud = syncToCloud;
+window.isLocalProvidersDirty = isLocalProvidersDirty;
+
+function startDirtyAutoRetry() {
+  if (dirtyRetryTimer) return;
+  dirtyRetryTimer = setInterval(function() {
+    if (!isLocalProvidersDirty() || isCloudSyncing) return;
+    var data;
+    try {
+      data = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+    } catch (e) {
+      return;
+    }
+    if (!data.length) return;
+    emitSyncStatus('syncing', '后台自动上传…');
+    syncToCloud(data, { reentrant: false });
+  }, CLOUD_DIRTY_RETRY_MS);
+}
+
 function startCloudAutoSync() {
   if (cloudSyncTimer) return;
   cloudSyncTimer = setInterval(function() {
     cloudSync({ fromTimer: true });
   }, CLOUD_SYNC_INTERVAL_MS);
+  startDirtyAutoRetry();
 }
 
 /**

@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260526-11';
+var RULE_LIBRARY_BUILD = '20260526-13';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -489,6 +489,43 @@ function setData(key, data, options) {
   syncToCloud(data);
 }
 
+/** 保存规则并尽量立即上传云端；awaitCloud 时等待上传结果（录入用，无需每条手动点同步） */
+async function persistProviders(data, options) {
+  options = options || {};
+  localStorage.setItem(STORAGE_KEYS.PROVIDERS, JSON.stringify(data));
+  localStorage.setItem(APP_LOCAL_DIRTY_KEY, '1');
+  window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'local' } }));
+  updateSyncStatusFromDirty();
+
+  if (options.skipCloudSync || typeof syncToCloud !== 'function') {
+    return { ok: true, localOnly: true };
+  }
+  if (!options.awaitCloud) {
+    syncToCloud(data);
+    return { ok: null, pending: true };
+  }
+  var result = await syncToCloud(data, { reentrant: false });
+  updateSyncStatusFromDirty();
+  return result || { ok: false };
+}
+
+function updateSyncStatusFromDirty() {
+  if (typeof updateSyncStatusBadge !== 'function') return;
+  if (localStorage.getItem(APP_LOCAL_DIRTY_KEY) === '1') {
+    updateSyncStatusBadge('idle', '待同步（自动上传）');
+  }
+}
+
+function toastAfterProviderSync(syncResult) {
+  if (syncResult && syncResult.ok) {
+    showToast('已保存，同事可见');
+  } else if (syncResult && syncResult.queued) {
+    showToast('已保存，正在上传…');
+  } else {
+    showToast('已保存，后台约 12 秒内自动上传');
+  }
+}
+
 // ========================================
 // 页面导航
 // ========================================
@@ -842,7 +879,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.addEventListener('cloud-sync-status', function(evt) {
     var detail = evt ? evt.detail : null;
-    updateSyncStatusBadge(detail && detail.status, detail && detail.message);
+    if (detail && detail.status === 'success' && localStorage.getItem(APP_LOCAL_DIRTY_KEY) !== '1') {
+      updateSyncStatusBadge('success', detail.message || '已同步');
+    } else if (detail && detail.status === 'syncing') {
+      updateSyncStatusBadge('syncing', detail.message || '正在上传…');
+    } else if (detail && detail.status === 'error') {
+      updateSyncStatusBadge('error', detail.message || '上传失败，自动重试');
+    } else if (localStorage.getItem(APP_LOCAL_DIRTY_KEY) === '1') {
+      updateSyncStatusBadge('idle', '待同步（自动上传）');
+    } else {
+      updateSyncStatusBadge(detail && detail.status, detail && detail.message);
+    }
+  });
+
+  window.addEventListener('beforeunload', function(e) {
+    try {
+      if (localStorage.getItem(APP_LOCAL_DIRTY_KEY) === '1') {
+        e.preventDefault();
+        e.returnValue = '有修改尚未同步到云端，离开可能丢失，请先点「立即同步」。';
+        return e.returnValue;
+      }
+    } catch (err) { /* ignore */ }
   });
   var manualSyncBtn = document.getElementById('manual-sync-btn');
   if (manualSyncBtn) {
@@ -2319,7 +2376,12 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   });
 }
 
-function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, targetSeries) {
+async function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, targetSeries) {
+  var saveBtn = document.getElementById('save-rule-btn');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '保存并上传…';
+  }
   try {
     console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
     var newNaming = document.getElementById('edit-naming') ? document.getElementById('edit-naming').value.trim() : '';
@@ -2358,12 +2420,17 @@ function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, t
     
     console.log('💾 保存的数据:', providersData[resolvedIndex]);
     setProviderRuleEditLock(null);
-    setData(STORAGE_KEYS.PROVIDERS, providersData);
-    showToast('保存成功');
+    var syncResult = await persistProviders(providersData, { awaitCloud: true });
+    toastAfterProviderSync(syncResult);
     showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries, true);
   } catch (err) {
     console.error('saveRuleByIndex 失败:', err);
     showToast('保存失败，请重试');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 保存';
+    }
   }
 }
 
@@ -2854,7 +2921,7 @@ function openAddSeries() {
 // ========================================
 // 保存操作
 // ========================================
-function saveProvider() {
+async function saveProvider() {
   const shop = document.getElementById('new-provider-shop')?.value.trim();
   const name = document.getElementById('new-provider-name')?.value.trim();
   const brandName = document.getElementById('new-provider-brand')?.value.trim();
@@ -2886,9 +2953,8 @@ function saveProvider() {
     specialCase: specialCase || '',
     otherInfo: otherInfo || ''
   });
-  setData(STORAGE_KEYS.PROVIDERS, providers);
-  
-  showToast('保存成功');
+  var syncResult = await persistProviders(providers, { awaitCloud: true });
+  toastAfterProviderSync(syncResult);
   closeModal('modal-provider');
   
   loadProviders();
@@ -3055,7 +3121,7 @@ function deleteBrand(nameInput) {
   }
 }
 
-function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, providerInput) {
+async function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, providerInput) {
   const brandId = brandIdInput || document.getElementById('new-series-brand')?.value || '';
   const name = (nameInput || document.getElementById('new-series-name')?.value || '').trim();
   const shopName = (shopInput || document.getElementById('shop-search-input')?.value || '').trim();
@@ -3103,7 +3169,8 @@ function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, provider
       specialCase: '',
       otherInfo: ''
     });
-    setData(STORAGE_KEYS.PROVIDERS, providers);
+    var syncResult = await persistProviders(providers, { awaitCloud: true });
+    toastAfterProviderSync(syncResult);
   }
 
   var seriesSelect = document.getElementById('series-select');
@@ -3113,7 +3180,7 @@ function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, provider
   }
 
   showRulesByBrandAndShop(brandName, shopName);
-  showToast(linked ? '系列已存在并已关联当前规则' : '系列添加成功');
+  if (linked) showToast('系列已存在并已关联当前规则');
 }
 
 // ========================================
