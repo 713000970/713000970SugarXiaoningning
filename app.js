@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260526-13';
+var RULE_LIBRARY_BUILD = '20260526-37';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -54,7 +54,8 @@ var providerRuleEditLock = null;
 const STORAGE_KEYS = {
   PROVIDERS: 'rule_library_providers',
   BRANDS: 'rule_library_brands',
-  SERIES: 'rule_library_series'
+  SERIES: 'rule_library_series',
+  BRAND_DEFAULTS: 'rule_library_brand_defaults'
 };
 const APP_LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 const DELETED_BRANDS_KEY = 'rule_library_deleted_brands';
@@ -64,6 +65,7 @@ const DELETED_PROVIDERS_KEY = 'rule_library_deleted_providers';
 function providerHasMeaningfulRule(p) {
   if (!p) return false;
   return !!(
+    String(p.album || '').trim() ||
     String(p.naming || '').trim() ||
     String(p.split || '').trim() ||
     String(p.pricing || '').trim() ||
@@ -73,7 +75,659 @@ function providerHasMeaningfulRule(p) {
   );
 }
 
- 
+var ALBUM_COVER_BUILD_URL = 'https://bar.xkw.com/cover/build';
+
+function buildDefaultAlbumRule(_bookTitle, providerName) {
+  var book = 'XXXX（书籍名称）';
+  var provider = String(providerName || '').trim() || 'XXXX（提供者名称）';
+  return '1、专辑简介：' + book + '系列资料由' + provider + '提供，并授权学科网在互联网进行发布，侵权必究！\n' +
+    '2、专辑封面：若无教辅图书封面，则用智能平台生成，要求最下标必须写学科网书城 ' + ALBUM_COVER_BUILD_URL + '\n' +
+    '3、其他：专辑"热点""推荐"等该栏标签不做任何勾选';
+}
+
+function resolveAlbumRule(p) {
+  var stored = String((p && p.album) || '').trim();
+  if (stored) return stored;
+  return buildDefaultAlbumRule(null, p && p.name);
+}
+
+function resolveAlbumForSave(rawAlbum, brand, series, providerName) {
+  var trimmed = String(rawAlbum || '').trim();
+  if (trimmed) return trimmed;
+  return buildDefaultAlbumRule(null, providerName);
+}
+
+/** 平台级默认（新建系列规则卡时填充；个性化在系列卡上改） */
+var PLATFORM_RULE_DEFAULTS = {
+  naming: '【品牌】学年 + 年级 + 学科 + 对应封面/文件名称（版本）',
+  split: '按照各类型规则拆分',
+  pricing: '通用规则',
+  publishTime: '通用规则',
+  specialCase: '/',
+  otherInfo: '/'
+};
+
+/** 视为「尚未录入规则」的占位值（含旧版默认），用于批量填充 */
+var LEGACY_PLACEHOLDER_RULE_VALUES = {
+  naming: ['', '按教辅通用规范'],
+  split: ['', '按教辅通用规范'],
+  pricing: ['', '通用规则'],
+  publishTime: ['', '立即发布', '通用规则'],
+  specialCase: ['', '/'],
+  otherInfo: ['', '/']
+};
+
+function isPlaceholderRuleField(field, value) {
+  var v = String(value || '').trim();
+  var list = LEGACY_PLACEHOLDER_RULE_VALUES[field] || [''];
+  return list.indexOf(v) !== -1;
+}
+
+/** 命名/拆分/定价等均未个性化录入（全空或仍为占位默认） */
+function isUnfilledRuleCard(p) {
+  if (!p) return false;
+  return isPlaceholderRuleField('naming', p.naming) &&
+    isPlaceholderRuleField('split', p.split) &&
+    isPlaceholderRuleField('pricing', p.pricing) &&
+    isPlaceholderRuleField('publishTime', p.publishTime) &&
+    isPlaceholderRuleField('specialCase', p.specialCase) &&
+    isPlaceholderRuleField('otherInfo', p.otherInfo);
+}
+
+/** 命名尚未录入（空或旧占位） */
+function isNamingUnfilled(p) {
+  return isPlaceholderRuleField('naming', p && p.naming);
+}
+
+function getStandardRuleFillPayload() {
+  return {
+    naming: PLATFORM_RULE_DEFAULTS.naming,
+    split: PLATFORM_RULE_DEFAULTS.split,
+    pricing: PLATFORM_RULE_DEFAULTS.pricing,
+    publishTime: PLATFORM_RULE_DEFAULTS.publishTime,
+    specialCase: PLATFORM_RULE_DEFAULTS.specialCase,
+    otherInfo: PLATFORM_RULE_DEFAULTS.otherInfo
+  };
+}
+
+function brandDefaultsContextKey(shop, provider, brand) {
+  var shopKey = String(shop || '').trim().toLowerCase();
+  var provKey = String(provider || '').trim().toLowerCase();
+  var brandKey = String(brand || '').trim().toLowerCase();
+  return [shopKey, provKey, brandKey].join('|');
+}
+
+function getBrandDefaultsMap() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEYS.BRAND_DEFAULTS);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveBrandDefaultsMap(map) {
+  localStorage.setItem(STORAGE_KEYS.BRAND_DEFAULTS, JSON.stringify(map || {}));
+}
+
+function getStoredBrandDefaults(shop, provider, brand) {
+  var key = brandDefaultsContextKey(shop, provider, brand);
+  var map = getBrandDefaultsMap();
+  return map[key] || null;
+}
+
+function inferBrandDefaultsFromProviders(shop, provider, brand) {
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var found = null;
+  providers.forEach(function(p) {
+    if (found) return;
+    if (!isSameContextProvider(p, shop, provider)) return;
+    if (!brandMatchesUi(p && p.brand, brand)) return;
+    if (!providerHasMeaningfulRule(p)) return;
+    found = {
+      naming: String(p.naming || '').trim(),
+      split: String(p.split || '').trim(),
+      pricing: String(p.pricing || '').trim(),
+      publishTime: String(p.publishTime || '').trim()
+    };
+  });
+  return found;
+}
+
+/** 品牌默认：显式配置 > 同品牌已有规则 > 平台默认 */
+function getBrandDefaults(shop, provider, brand) {
+  var stored = getStoredBrandDefaults(shop, provider, brand);
+  if (stored && (stored.naming || stored.split || stored.pricing || stored.publishTime)) {
+    return Object.assign({}, PLATFORM_RULE_DEFAULTS, stored);
+  }
+  var inferred = inferBrandDefaultsFromProviders(shop, provider, brand);
+  if (inferred) {
+    return Object.assign({}, PLATFORM_RULE_DEFAULTS, inferred);
+  }
+  return Object.assign({}, PLATFORM_RULE_DEFAULTS);
+}
+
+function setBrandDefaults(shop, provider, brand, fields) {
+  var key = brandDefaultsContextKey(shop, provider, brand);
+  if (!key.replace(/\|/g, '')) return;
+  var map = getBrandDefaultsMap();
+  map[key] = {
+    naming: String((fields && fields.naming) || '').trim(),
+    split: String((fields && fields.split) || '').trim(),
+    pricing: String((fields && fields.pricing) || '').trim(),
+    publishTime: String((fields && fields.publishTime) || '').trim()
+  };
+  saveBrandDefaultsMap(map);
+}
+
+function buildNewProviderRuleCard(shop, provider, brand, series, bbmSeriesId) {
+  var defs = getBrandDefaults(shop, provider, brand);
+  var card = {
+    shop: String(shop || '').trim(),
+    shopname: String(shop || '').trim(),
+    name: String(provider || '').trim(),
+    brand: String(brand || '').trim(),
+    series: String(series || '').trim(),
+    album: buildDefaultAlbumRule(null, provider),
+    naming: defs.naming || '',
+    split: defs.split || '',
+    pricing: defs.pricing || '',
+    publishTime: defs.publishTime || '',
+    specialCase: defs.specialCase || PLATFORM_RULE_DEFAULTS.specialCase || '',
+    otherInfo: defs.otherInfo || PLATFORM_RULE_DEFAULTS.otherInfo || ''
+  };
+  if (bbmSeriesId != null && bbmSeriesId !== '') card.bbmSeriesId = bbmSeriesId;
+  return card;
+}
+
+function getBbmSeriesListForBrand(brandName) {
+  var orgId = getBbmOrgIdForCurrentShop();
+  if (!orgId || !window.BbmBrandApi || typeof BbmBrandApi.getBbmSeriesForBrand !== 'function') return [];
+  return BbmBrandApi.getBbmSeriesForBrand(orgId, brandName);
+}
+
+function providerSeriesIdentityKey(p) {
+  return [
+    normalizeEntityKey(p && p.shop),
+    normalizeEntityKey(p && p.shopname),
+    normalizeEntityKey(p && p.name),
+    normalizeText(p && p.brand),
+    normalizeText((p && p.series) || '')
+  ].join('|');
+}
+
+/** 书城系列改名后：按 bbmSeriesId / 1:1 孤儿匹配重命名本地卡，并合并重复系列卡 */
+function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providersOpt) {
+  shopName = String(shopName || '').trim();
+  providerName = String(providerName || '').trim();
+  brandName = String(brandName || '').trim();
+  if (!shopName || !providerName || !brandName) {
+    return { renamed: 0, deduped: 0, changed: false, providers: providersOpt || getData(STORAGE_KEYS.PROVIDERS) };
+  }
+
+  var seriesList = getBbmSeriesListForBrand(brandName);
+  var providers = Array.isArray(providersOpt) ? providersOpt.slice() : getData(STORAGE_KEYS.PROVIDERS);
+  if (!seriesList.length) return { renamed: 0, deduped: 0, changed: false, providers: providers };
+  var bbmNameSet = {};
+  seriesList.forEach(function(s) { bbmNameSet[normalizeText(s.name)] = true; });
+  var renamed = 0;
+
+  providers.forEach(function(p, i) {
+    if (!isSameContextProvider(p, shopName, providerName)) return;
+    if (!brandMatchesUi(p && p.brand, brandName)) return;
+    if (!p.bbmSeriesId) return;
+    var bbm = seriesList.find(function(s) { return String(s.id) === String(p.bbmSeriesId); });
+    if (!bbm) return;
+    if (normalizeText(p.series) !== normalizeText(bbm.name)) {
+      providers[i] = Object.assign({}, p, { series: bbm.name });
+      renamed += 1;
+    }
+  });
+
+  providers.forEach(function(p, i) {
+    if (!isSameContextProvider(p, shopName, providerName)) return;
+    if (!brandMatchesUi(p && p.brand, brandName)) return;
+    if (p.bbmSeriesId) return;
+    var sn = normalizeText(p.series);
+    if (!sn) return;
+    var bbm = seriesList.find(function(s) { return normalizeText(s.name) === sn; });
+    if (bbm) providers[i] = Object.assign({}, p, { bbmSeriesId: bbm.id });
+  });
+
+  function matchedBbmIdSet() {
+    var set = {};
+    providers.forEach(function(p) {
+      if (!isSameContextProvider(p, shopName, providerName)) return;
+      if (!brandMatchesUi(p && p.brand, brandName)) return;
+      if (!String(p.series || '').trim()) return;
+      if (p.bbmSeriesId) {
+        set[String(p.bbmSeriesId)] = true;
+        return;
+      }
+      if (bbmNameSet[normalizeText(p.series)]) {
+        var hit = seriesList.find(function(s) { return normalizeText(s.name) === normalizeText(p.series); });
+        if (hit) set[String(hit.id)] = true;
+      }
+    });
+    return set;
+  }
+
+  var orphanLocals = [];
+  providers.forEach(function(p) {
+    if (!isSameContextProvider(p, shopName, providerName)) return;
+    if (!brandMatchesUi(p && p.brand, brandName)) return;
+    if (!String(p.series || '').trim()) return;
+    if (p.bbmSeriesId) return;
+    if (!bbmNameSet[normalizeText(p.series)]) orphanLocals.push(p);
+  });
+
+  var matchedIds = matchedBbmIdSet();
+  var unmatchedBbm = seriesList.filter(function(s) { return !matchedIds[String(s.id)]; });
+
+  if (orphanLocals.length === 1 && unmatchedBbm.length === 1) {
+    var orphanKey = normalizeText(orphanLocals[0].series);
+    var target = unmatchedBbm[0];
+    providers.forEach(function(p, i) {
+      if (!isSameContextProvider(p, shopName, providerName)) return;
+      if (!brandMatchesUi(p && p.brand, brandName)) return;
+      if (p.bbmSeriesId) return;
+      if (normalizeText(p.series) !== orphanKey) return;
+      providers[i] = Object.assign({}, p, { series: target.name, bbmSeriesId: target.id });
+      renamed += 1;
+    });
+  }
+
+  var deduped = 0;
+  var groups = {};
+  providers.forEach(function(p, i) {
+    if (!isSameContextProvider(p, shopName, providerName)) return;
+    if (!brandMatchesUi(p && p.brand, brandName)) return;
+    if (!String(p.series || '').trim()) return;
+    var key = providerSeriesIdentityKey(p);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(i);
+  });
+
+  var removeIdx = {};
+  Object.keys(groups).forEach(function(key) {
+    var indices = groups[key];
+    if (indices.length <= 1) return;
+    var best = indices[0];
+    indices.forEach(function(i) {
+      if (providerHasMeaningfulRule(providers[i]) && !providerHasMeaningfulRule(providers[best])) best = i;
+    });
+    indices.forEach(function(i) {
+      if (i !== best) removeIdx[i] = true;
+    });
+    deduped += indices.length - 1;
+  });
+
+  if (Object.keys(removeIdx).length) {
+    providers = providers.filter(function(_, i) { return !removeIdx[i]; });
+  }
+
+  return { renamed: renamed, deduped: deduped, changed: renamed > 0 || deduped > 0, providers: providers };
+}
+
+function isSeriesRuleBlank(p) {
+  return isUnfilledRuleCard(p);
+}
+
+function seriesRuleExists(providers, shop, provider, brand, seriesName, bbmSeriesId) {
+  var normSeries = normalizeText(seriesName);
+  return providers.some(function(p) {
+    if (!isSameContextProvider(p, shop, provider)) return false;
+    if (!brandMatchesUi(p && p.brand, brand)) return false;
+    if (bbmSeriesId != null && bbmSeriesId !== '' && String(p.bbmSeriesId) === String(bbmSeriesId)) return true;
+    return normalizeText(String((p && p.series) || '').trim()) === normSeries;
+  });
+}
+
+var _ensureBbmSeriesInflight = false;
+
+/** 书城系列自动建卡并填充品牌默认（命名/拆分/定价等） */
+async function ensureBbmSeriesRuleCardsForBrand(shopName, providerName, brandName, options) {
+  options = options || {};
+  shopName = String(shopName || '').trim();
+  providerName = String(providerName || '').trim();
+  brandName = String(brandName || '').trim();
+  if (!shopName || !providerName || !brandName) return { created: 0 };
+
+  var seriesList = getBbmSeriesListForBrand(brandName);
+  if (!seriesList.length) return { created: 0 };
+
+  if (_ensureBbmSeriesInflight) return { created: 0, skipped: true };
+  _ensureBbmSeriesInflight = true;
+  try {
+    var syncResult = syncBbmSeriesNamesForBrand(shopName, providerName, brandName, getData(STORAGE_KEYS.PROVIDERS));
+    var providers = syncResult.providers || getData(STORAGE_KEYS.PROVIDERS);
+    var created = 0;
+    var renamed = syncResult.renamed || 0;
+    var deduped = syncResult.deduped || 0;
+
+    seriesList.forEach(function(item) {
+      var seriesName = item.name;
+      if (seriesRuleExists(providers, shopName, providerName, brandName, seriesName, item.id)) return;
+      providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, seriesName, item.id));
+      created += 1;
+    });
+
+    if (created > 0 || syncResult.changed) {
+      if (typeof persistProviders === 'function') {
+        await persistProviders(providers, { awaitCloud: !!options.awaitCloud });
+      } else {
+        setData(STORAGE_KEYS.PROVIDERS, providers);
+      }
+      if (!options.silent && typeof showToast === 'function') {
+        if (renamed > 0) {
+          showToast('已同步书城系列改名 ' + renamed + ' 条' + (deduped ? '，合并重复 ' + deduped + ' 条' : ''));
+        } else if (created > 0) {
+          showToast('已为书城 ' + created + ' 个系列创建规则卡（已填默认）');
+        } else if (deduped > 0) {
+          showToast('已合并重复系列规则卡 ' + deduped + ' 条');
+        }
+      }
+    }
+    return { created: created, renamed: renamed, deduped: deduped };
+  } finally {
+    _ensureBbmSeriesInflight = false;
+  }
+}
+
+function renderBrandDefaultsPanel(shopName, providerName, brandName) {
+  var panel = document.getElementById('brand-defaults-panel');
+  if (!panel) return;
+  shopName = String(shopName || '').trim();
+  providerName = String(providerName || '').trim();
+  brandName = String(brandName || '').trim();
+  if (!shopName || !providerName || !brandName) {
+    panel.style.display = 'none';
+    return;
+  }
+  var defs = getBrandDefaults(shopName, providerName, brandName);
+  var stored = getStoredBrandDefaults(shopName, providerName, brandName);
+  var sourceHint = stored ? '已保存的品牌默认' : (inferBrandDefaultsFromProviders(shopName, providerName, brandName) ? '继承自本品牌已有规则' : '平台默认（新建系列时自动填充）');
+  panel.style.display = 'block';
+  panel.innerHTML =
+    '<div class="brand-defaults-header">' +
+      '<span class="brand-defaults-title">📌 品牌默认规则</span>' +
+      '<span class="brand-defaults-source">' + escapeHtmlText(sourceHint) + '</span>' +
+    '</div>' +
+    '<p class="brand-defaults-desc">新建系列规则卡时自动填充；有个性化需求在系列卡上修改即可。</p>' +
+    '<div class="brand-defaults-grid">' +
+      '<label class="brand-defaults-field"><span>命名</span><textarea id="brand-def-naming" class="rule-input alt-space-newline" rows="2"></textarea></label>' +
+      '<label class="brand-defaults-field"><span>拆分</span><textarea id="brand-def-split" class="rule-input alt-space-newline" rows="2"></textarea></label>' +
+      '<label class="brand-defaults-field"><span>定价</span><textarea id="brand-def-pricing" class="rule-input alt-space-newline" rows="2"></textarea></label>' +
+      '<label class="brand-defaults-field"><span>发布时间</span><textarea id="brand-def-publishTime" class="rule-input alt-space-newline" rows="2"></textarea></label>' +
+    '</div>' +
+    '<div class="brand-defaults-actions">' +
+      '<button type="button" class="btn-add-sm" onclick="saveBrandDefaultsFromPanel()">保存品牌默认</button>' +
+      '<button type="button" class="btn-add-sm btn-muted-sm" onclick="applyBrandDefaultsToBlankSeries()">应用到空白系列卡</button>' +
+    '</div>';
+  var elNaming = document.getElementById('brand-def-naming');
+  var elSplit = document.getElementById('brand-def-split');
+  var elPricing = document.getElementById('brand-def-pricing');
+  var elPub = document.getElementById('brand-def-publishTime');
+  if (elNaming) elNaming.value = defs.naming || '';
+  if (elSplit) elSplit.value = defs.split || '';
+  if (elPricing) elPricing.value = defs.pricing || '';
+  if (elPub) elPub.value = defs.publishTime || '';
+}
+
+function readBrandDefaultsPanelFields() {
+  return {
+    naming: (document.getElementById('brand-def-naming') && document.getElementById('brand-def-naming').value || '').trim(),
+    split: (document.getElementById('brand-def-split') && document.getElementById('brand-def-split').value || '').trim(),
+    pricing: (document.getElementById('brand-def-pricing') && document.getElementById('brand-def-pricing').value || '').trim(),
+    publishTime: (document.getElementById('brand-def-publishTime') && document.getElementById('brand-def-publishTime').value || '').trim()
+  };
+}
+
+async function saveBrandDefaultsFromPanel() {
+  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
+  var brandName = (document.getElementById('brand-input')?.value || '').trim();
+  if (!shopName || !providerName || !brandName) {
+    showToast('请先选择店铺、提供者、品牌');
+    return;
+  }
+  var fields = readBrandDefaultsPanelFields();
+  setBrandDefaults(shopName, providerName, brandName, fields);
+  renderBrandDefaultsPanel(shopName, providerName, brandName);
+  showToast('已保存品牌「' + brandName + '」默认规则');
+}
+
+async function applyBrandDefaultsToBlankSeries() {
+  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
+  var brandName = (document.getElementById('brand-input')?.value || '').trim();
+  if (!shopName || !providerName || !brandName) {
+    showToast('请先选择店铺、提供者、品牌');
+    return;
+  }
+  var fields = readBrandDefaultsPanelFields();
+  setBrandDefaults(shopName, providerName, brandName, fields);
+  var defs = getBrandDefaults(shopName, providerName, brandName);
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var updated = 0;
+  providers.forEach(function(p, i) {
+    if (!isSameContextProvider(p, shopName, providerName)) return;
+    if (!brandMatchesUi(p && p.brand, brandName)) return;
+    if (!String((p && p.series) || '').trim()) return;
+    if (!isSeriesRuleBlank(p)) return;
+    providers[i] = Object.assign({}, p, {
+      naming: defs.naming || '',
+      split: defs.split || '',
+      pricing: defs.pricing || '',
+      publishTime: defs.publishTime || '',
+      specialCase: defs.specialCase || PLATFORM_RULE_DEFAULTS.specialCase || '',
+      otherInfo: defs.otherInfo || PLATFORM_RULE_DEFAULTS.otherInfo || ''
+    });
+    updated += 1;
+  });
+  if (!updated) {
+    showToast('没有需要填充的空白系列卡');
+    return;
+  }
+  if (typeof persistProviders === 'function') {
+    await persistProviders(providers, { awaitCloud: true });
+  } else {
+    setData(STORAGE_KEYS.PROVIDERS, providers);
+  }
+  showToast('已为 ' + updated + ' 张空白系列卡填入品牌默认');
+  showRulesByBrandAndShop(brandName, shopName, '', true);
+}
+
+window.saveBrandDefaultsFromPanel = saveBrandDefaultsFromPanel;
+window.applyBrandDefaultsToBlankSeries = applyBrandDefaultsToBlankSeries;
+
+window.onBbmBrandsFetched = function() {
+  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
+  var brandName = (document.getElementById('brand-input')?.value || '').trim();
+  if (!shopName || !providerName) return;
+
+  var orgId = getBbmOrgIdForCurrentShop();
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var totalRenamed = 0;
+  var totalDeduped = 0;
+  var syncChanged = false;
+
+  if (orgId && window.BbmBrandApi) {
+    (BbmBrandApi.getCachedBrands(orgId, true) || []).forEach(function(b) {
+      if (!b || !b.name) return;
+      var sync = syncBbmSeriesNamesForBrand(shopName, providerName, b.name, providers);
+      providers = sync.providers || providers;
+      if (sync.changed) {
+        syncChanged = true;
+        totalRenamed += sync.renamed || 0;
+        totalDeduped += sync.deduped || 0;
+      }
+    });
+  }
+
+  var afterSync = function() {
+    if (!brandName) return;
+    ensureBbmSeriesRuleCardsForBrand(shopName, providerName, brandName, { silent: true, awaitCloud: true })
+      .then(function() {
+        showRulesByBrandAndShop(brandName, shopName, '', true);
+      });
+  };
+
+  if (syncChanged) {
+    var persist = typeof persistProviders === 'function'
+      ? persistProviders(providers, { awaitCloud: true })
+      : Promise.resolve(setData(STORAGE_KEYS.PROVIDERS, providers));
+    persist.then(function() {
+      if (typeof showToast === 'function' && totalRenamed > 0) {
+        showToast('已同步书城系列改名 ' + totalRenamed + ' 条' + (totalDeduped ? '，合并重复 ' + totalDeduped + ' 条' : ''));
+      }
+      afterSync();
+    }).catch(afterSync);
+    return;
+  }
+
+  if (!brandName) return;
+  ensureBbmSeriesRuleCardsForBrand(shopName, providerName, brandName, { silent: false, awaitCloud: true })
+    .then(function(res) {
+      if (res && res.renamed > 0 && typeof showToast === 'function') {
+        showToast('已同步书城系列改名 ' + res.renamed + ' 条' + (res.deduped ? '，合并重复 ' + res.deduped + ' 条' : ''));
+      }
+      showRulesByBrandAndShop(brandName, shopName, '', true);
+    });
+};
+
+/** 是否为系统生成的三行专辑模板（书籍名尚为品牌/系列，非 XXXX 占位） */
+function isLegacyAutoAlbumTemplate(album) {
+  var text = String(album || '').trim();
+  if (!text || text.indexOf('XXXX（书籍名称）') !== -1) return false;
+  if (text.indexOf('1、专辑简介：') !== 0) return false;
+  if (text.indexOf('2、专辑封面：') === -1 || text.indexOf('3、其他：') === -1) return false;
+  if (text.indexOf('系列资料由') === -1 || text.indexOf('提供，并授权学科网') === -1) return false;
+  return /^1、专辑简介：.+系列资料由/.test(text.split('\n')[0] || text);
+}
+
+function migrateLegacyAlbumBookPlaceholder(album, providerName) {
+  if (!isLegacyAutoAlbumTemplate(album)) return String(album || '');
+  var text = String(album || '').trim();
+  var m = text.match(/系列资料由(.+?)提供，并授权学科网/);
+  var provider = (m && m[1] ? m[1].trim() : '') || String(providerName || '').trim();
+  return buildDefaultAlbumRule(null, provider);
+}
+
+/**
+ * 批量把旧默认专辑（品牌/系列作书名）改为 XXXX（书籍名称）；可重复执行，已是新格式则跳过。
+ * @returns {{ list: Array, changed: number }}
+ */
+function migrateLegacyAlbumBookPlaceholders(providers) {
+  var list = Array.isArray(providers) ? providers.slice() : getData(STORAGE_KEYS.PROVIDERS);
+  var changed = 0;
+  list.forEach(function(p, i) {
+    if (!p || !isLegacyAutoAlbumTemplate(p.album)) return;
+    var next = migrateLegacyAlbumBookPlaceholder(p.album, p.name);
+    if (next && next !== String(p.album || '').trim()) {
+      list[i] = Object.assign({}, p, { album: next });
+      changed += 1;
+    }
+  });
+  return { list: list, changed: changed };
+}
+
+async function runLegacyAlbumBookPlaceholderMigration() {
+  var result = migrateLegacyAlbumBookPlaceholders();
+  if (!result.changed) return result;
+  console.log('[规则库] 专辑简介占位符迁移：' + result.changed + ' 条 → XXXX（书籍名称）');
+  if (typeof persistProviders === 'function') {
+    await persistProviders(result.list, { awaitCloud: true });
+  } else {
+    setData(STORAGE_KEYS.PROVIDERS, result.list);
+  }
+  if (typeof showToast === 'function') {
+    showToast('已自动更新 ' + result.changed + ' 条专辑简介为 XXXX（书籍名称）');
+  }
+  return result;
+}
+
+window.migrateLegacyAlbumBookPlaceholders = migrateLegacyAlbumBookPlaceholders;
+window.runLegacyAlbumBookPlaceholderMigration = runLegacyAlbumBookPlaceholderMigration;
+
+/**
+ * 为所有「无规则/仅占位」卡片统一填入平台标准规则。
+ * @returns {{ list: Array, changed: number }}
+ */
+function migrateUnfilledRuleCards(providers) {
+  var list = Array.isArray(providers) ? providers.slice() : getData(STORAGE_KEYS.PROVIDERS);
+  var fill = getStandardRuleFillPayload();
+  var changed = 0;
+  list.forEach(function(p, i) {
+    if (!isUnfilledRuleCard(p)) return;
+    list[i] = Object.assign({}, p, fill);
+    changed += 1;
+  });
+  return { list: list, changed: changed };
+}
+
+async function runStandardRuleFillMigration() {
+  var result = migrateUnfilledRuleCards();
+  var namingResult = migrateMissingNamingRuleCards(result.list);
+  var finalList = namingResult.list;
+  var totalChanged = result.changed + namingResult.changed;
+  if (!totalChanged) return { list: finalList, changed: 0 };
+  console.log('[规则库] 标准规则填充：全量 ' + result.changed + ' 条，补命名 ' + namingResult.changed + ' 条');
+  if (typeof persistProviders === 'function') {
+    await persistProviders(finalList, { awaitCloud: true });
+  } else {
+    setData(STORAGE_KEYS.PROVIDERS, finalList);
+  }
+  if (typeof showToast === 'function') {
+    var msg = '已更新 ' + totalChanged + ' 张规则卡';
+    if (namingResult.changed > 0) {
+      msg = '已为 ' + namingResult.changed + ' 张卡片补全命名规则' +
+        (result.changed > 0 ? '（另 ' + result.changed + ' 张全量填充）' : '');
+    }
+    showToast(msg);
+  }
+  if (typeof updateStats === 'function') updateStats();
+  return { list: finalList, changed: totalChanged };
+}
+
+/**
+ * 仅补「命名」：其它字段已有个性化内容、命名仍为空的卡片。
+ * @returns {{ list: Array, changed: number }}
+ */
+function migrateMissingNamingRuleCards(providers) {
+  var list = Array.isArray(providers) ? providers.slice() : getData(STORAGE_KEYS.PROVIDERS);
+  var standardNaming = PLATFORM_RULE_DEFAULTS.naming;
+  var changed = 0;
+  list.forEach(function(p, i) {
+    if (!isNamingUnfilled(p)) return;
+    if (isUnfilledRuleCard(p)) return;
+    list[i] = Object.assign({}, p, { naming: standardNaming });
+    changed += 1;
+  });
+  return { list: list, changed: changed };
+}
+
+async function runMissingNamingRuleFillMigration() {
+  var result = migrateMissingNamingRuleCards();
+  if (!result.changed) return result;
+  console.log('[规则库] 补全命名：' + result.changed + ' 条');
+  if (typeof persistProviders === 'function') {
+    await persistProviders(result.list, { awaitCloud: true });
+  } else {
+    setData(STORAGE_KEYS.PROVIDERS, result.list);
+  }
+  if (typeof showToast === 'function') {
+    showToast('已为 ' + result.changed + ' 张卡片补全命名规则');
+  }
+  if (typeof updateStats === 'function') updateStats();
+  return result;
+}
+
+window.migrateUnfilledRuleCards = migrateUnfilledRuleCards;
+window.migrateMissingNamingRuleCards = migrateMissingNamingRuleCards;
+window.runStandardRuleFillMigration = runStandardRuleFillMigration;
+window.runMissingNamingRuleFillMigration = runMissingNamingRuleFillMigration;
 
 // 默认数据
 const defaultData = {
@@ -571,6 +1225,163 @@ function resetProviderQueryPage() {
 
   var addSeriesBtn = document.getElementById('add-series-btn');
   if (addSeriesBtn) addSeriesBtn.style.display = 'none';
+
+  var orgInput = document.getElementById('org-id-input');
+  if (orgInput) orgInput.value = '';
+  if (window.BbmBrandApi && typeof BbmBrandApi.setBbmFetchStatus === 'function') {
+    BbmBrandApi.setBbmFetchStatus('', false);
+  }
+}
+
+// ========================================
+// 规则导出（Word / TXT）
+// ========================================
+
+function downloadExportBlob(filename, blob) {
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(a.href); }, 2000);
+}
+
+function formatRuleExportTextBlock(p, index) {
+  var album = resolveAlbumRule(p);
+  var lines = [
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '【' + index + '】' + [p.shop || p.shopname, p.name, p.brand, p.series].filter(Boolean).join(' · '),
+    '店铺：' + (p.shop || p.shopname || '-'),
+    '提供者：' + (p.name || '-'),
+    '品牌：' + (p.brand || '-'),
+    '系列：' + (p.series || '-'),
+    '命名：' + (p.naming || '-'),
+    '拆分：' + (p.split || '-'),
+    '定价：' + (p.pricing || '-'),
+    '发布时间：' + (p.publishTime || '-'),
+    '专辑：' + album,
+    '特例：' + (p.specialCase || '-'),
+    '其他信息：' + (p.otherInfo || '-')
+  ];
+  return lines.join('\n');
+}
+
+function buildRulesExportWordHtml(list, scopeLabel) {
+  var now = new Date();
+  var cards = list.map(function(p, i) {
+    var title = escapeHtmlText([p.shop || p.shopname, p.name, p.brand, p.series].filter(Boolean).join(' · '));
+    var album = escapeHtmlText(resolveAlbumRule(p)).replace(/\n/g, '<br/>');
+    return (
+      '<div class="rule-card">' +
+        '<h2>【' + (i + 1) + '】' + title + '</h2>' +
+        '<table class="rule-table">' +
+          '<tr><td class="lbl">店铺</td><td>' + escapeHtmlText(p.shop || p.shopname || '-') + '</td></tr>' +
+          '<tr><td class="lbl">提供者</td><td>' + escapeHtmlText(p.name || '-') + '</td></tr>' +
+          '<tr><td class="lbl">品牌</td><td>' + escapeHtmlText(p.brand || '-') + '</td></tr>' +
+          '<tr><td class="lbl">系列</td><td>' + escapeHtmlText(p.series || '-') + '</td></tr>' +
+          '<tr><td class="lbl">命名</td><td>' + escapeHtmlText(p.naming || '-') + '</td></tr>' +
+          '<tr><td class="lbl">拆分</td><td>' + escapeHtmlText(p.split || '-') + '</td></tr>' +
+          '<tr><td class="lbl">定价</td><td>' + escapeHtmlText(p.pricing || '-') + '</td></tr>' +
+          '<tr><td class="lbl">发布时间</td><td>' + escapeHtmlText(p.publishTime || '-') + '</td></tr>' +
+          '<tr><td class="lbl">专辑</td><td>' + album + '</td></tr>' +
+          '<tr><td class="lbl">特例</td><td>' + escapeHtmlText(p.specialCase || '-') + '</td></tr>' +
+          '<tr><td class="lbl">其他信息</td><td>' + escapeHtmlText(p.otherInfo || '-') + '</td></tr>' +
+        '</table>' +
+      '</div>'
+    );
+  }).join('');
+
+  return (
+    '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" lang="zh-CN">' +
+    '<head><meta charset="utf-8">' +
+    '<title>教辅生产规则导出</title>' +
+    '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]-->' +
+    '<style>' +
+      'body{font-family:"Microsoft YaHei",SimSun,sans-serif;font-size:11pt;line-height:1.5;color:#111;}' +
+      'h1{font-size:16pt;border-bottom:2px solid #0891b2;padding-bottom:8px;}' +
+      '.meta{color:#555;font-size:10pt;margin-bottom:16px;}' +
+      '.rule-card{margin:18px 0 24px;page-break-inside:avoid;}' +
+      'h2{font-size:13pt;color:#0f766e;margin:0 0 8px;}' +
+      'table.rule-table{width:100%;border-collapse:collapse;}' +
+      'table.rule-table td{border:1px solid #cbd5e1;padding:6px 8px;vertical-align:top;}' +
+      'table.rule-table td.lbl{width:88px;background:#f0fdfa;font-weight:bold;}' +
+    '</style></head><body>' +
+    '<h1>教辅店铺个性化生产规则库</h1>' +
+    '<p class="meta">导出范围：' + escapeHtmlText(scopeLabel) + '<br/>' +
+    '导出时间：' + escapeHtmlText(now.toLocaleString('zh-CN')) + '<br/>' +
+    '规则条数：' + list.length + '</p>' +
+    cards +
+    '</body></html>'
+  );
+}
+
+function makeSingleRuleExportFilename(ext, p) {
+  var date = new Date().toISOString().slice(0, 10);
+  var safe = [p && p.brand, p && p.series].filter(Boolean).join('-')
+    .replace(/[\\/:*?"<>|\s]+/g, '_')
+    .slice(0, 72);
+  return '生产规则-' + (safe || '未命名') + '-' + date + '.' + ext;
+}
+
+function resolveRuleForExport(index) {
+  var list = getData(STORAGE_KEYS.PROVIDERS);
+  if (typeof index !== 'number' || isNaN(index) || index < 0 || index >= list.length) return null;
+  return list[index] || null;
+}
+
+function buildRuleCardExportButtons(globalIndex) {
+  if (typeof globalIndex !== 'number' || globalIndex < 0) return '';
+  return '<button type="button" class="rule-export-btn" data-export-txt="1" data-index="' + globalIndex + '" title="导出本条为 TXT">📄 TXT</button>' +
+    '<button type="button" class="rule-export-btn rule-export-btn-word" data-export-word="1" data-index="' + globalIndex + '" title="导出本条为 Word">📘 Word</button>';
+}
+
+function exportRuleCardByIndex(globalIndex, format) {
+  var p = resolveRuleForExport(globalIndex);
+  if (!p) {
+    showToast('未找到该规则');
+    return;
+  }
+  var scopeLabel = [p.brand, p.series].filter(Boolean).join(' · ') || '单条规则';
+  if (format === 'txt') {
+    var txtBody = formatRuleExportTextBlock(p, 1) + '\n';
+    var blob = new Blob(['\uFEFF' + txtBody], { type: 'text/plain;charset=utf-8' });
+    downloadExportBlob(makeSingleRuleExportFilename('txt', p), blob);
+    showToast('已导出 TXT');
+    return;
+  }
+  var html = buildRulesExportWordHtml([p], scopeLabel);
+  var wordBlob = new Blob(['\uFEFF' + html], { type: 'application/msword;charset=utf-8' });
+  downloadExportBlob(makeSingleRuleExportFilename('doc', p), wordBlob);
+  showToast('已导出 Word');
+}
+
+function exportRulesAsTxt(index) {
+  exportRuleCardByIndex(index, 'txt');
+}
+
+function exportRulesAsWord(index) {
+  exportRuleCardByIndex(index, 'word');
+}
+
+window.exportRuleCardByIndex = exportRuleCardByIndex;
+window.exportRulesAsTxt = exportRulesAsTxt;
+window.exportRulesAsWord = exportRulesAsWord;
+
+function handleRuleCardExportClick(e) {
+  var txtBtn = e.target.closest('[data-export-txt]');
+  if (txtBtn) {
+    e.preventDefault();
+    exportRuleCardByIndex(parseInt(txtBtn.getAttribute('data-index'), 10), 'txt');
+    return true;
+  }
+  var wordBtn = e.target.closest('[data-export-word]');
+  if (wordBtn) {
+    e.preventDefault();
+    exportRuleCardByIndex(parseInt(wordBtn.getAttribute('data-index'), 10), 'word');
+    return true;
+  }
+  return false;
 }
 
 function goPage(pageId) {
@@ -816,7 +1627,12 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         providerSeriesTagsExpanded = expandBtn.getAttribute('data-series-expand') === '1';
         if (typeof _providerSeriesTagContext !== 'undefined' && _providerSeriesTagContext.matched) {
-          renderSeriesTags(_providerSeriesTagContext.matched, _providerSeriesTagContext.selected, providerSeriesTagsExpanded);
+          renderSeriesTags(
+            _providerSeriesTagContext.matched,
+            _providerSeriesTagContext.selected,
+            providerSeriesTagsExpanded,
+            _providerSeriesTagContext.bbmSeriesNames
+          );
         }
         return;
       }
@@ -846,7 +1662,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (delBtn) {
         e.preventDefault();
         deleteRuleByIndex(parseInt(delBtn.getAttribute('data-index'), 10));
+        return;
       }
+      if (handleRuleCardExportClick(e)) return;
+    });
+  }
+
+  var aiResultEl = document.getElementById('ai-result');
+  if (aiResultEl) {
+    aiResultEl.addEventListener('click', function(e) {
+      handleRuleCardExportClick(e);
     });
   }
 
@@ -1331,6 +2156,29 @@ function selectShop(shopName) {
   if (addSeriesBtn) addSeriesBtn.style.display = 'none';
 }
 
+function getBbmOrgIdForCurrentShop() {
+  var shop = (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value || '').trim();
+  var provider = (document.getElementById('provider-search-input') && document.getElementById('provider-search-input').value || '').trim();
+  var orgInput = document.getElementById('org-id-input');
+  var typed = orgInput ? String(orgInput.value || '').trim() : '';
+  if (typed) return typed;
+  if (window.BbmBrandApi && shop) {
+    var saved = BbmBrandApi.getOrgIdForShop(shop);
+    if (saved) return saved;
+  }
+  if (window.CustomerPoolOrg && typeof CustomerPoolOrg.lookupOrgId === 'function') {
+    var hit = CustomerPoolOrg.lookupOrgId(shop, provider);
+    if (hit && hit.orgId) return hit.orgId;
+  }
+  return '';
+}
+
+function getBbmSeriesNamesForBrand(brandName) {
+  var orgId = getBbmOrgIdForCurrentShop();
+  if (!orgId || !window.BbmBrandApi) return [];
+  return BbmBrandApi.getBbmSeriesNames(orgId, brandName);
+}
+
 function loadBrandsByShopAndShowDropdown(shopName) {
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : (typeof presetData !== 'undefined' ? presetData.providers : []);
@@ -1346,13 +2194,21 @@ function loadBrandsByShopAndShowDropdown(shopName) {
   var brands = [...new Set(matched.map(function(p) { return p.brand; }).filter(Boolean))].filter(function(name) {
     return !deletedBrandSet.has(normalizeText(name));
   });
+
+  if (window.BbmBrandApi) {
+    BbmBrandApi.loadOrgIdInputForShop(shopName, providerName);
+    var orgId = getBbmOrgIdForCurrentShop();
+    if (orgId) {
+      var bbmBrands = BbmBrandApi.getCachedBrands(orgId, true);
+      brands = BbmBrandApi.mergeBrandNames(brands, bbmBrands);
+    }
+  }
   
   var brandInput = document.getElementById('brand-input');
   
   if (brandInput) {
-    brandInput.placeholder = '点击选择品牌...';
+    brandInput.placeholder = brands.length ? '点击选择品牌（含书城）...' : '点击选择品牌...';
     brandInput.value = '';
-    // 存储该店铺的品牌到 brandInput 的 data 属性
     brandInput.setAttribute('data-shop-brands', JSON.stringify(brands));
     brandInput.setAttribute('data-current-shop', shopName);
     brandInput.setAttribute('data-current-provider', providerName);
@@ -1378,8 +2234,13 @@ function showBrandList(e) {
   }
   
   if (shopBrands.length > 0) {
-    dropdown.innerHTML = shopBrands.slice(0, 80).map(function(b) { 
-      return '<div class="dropdown-item" data-brand-name="' + escapeHtmlAttr(b) + '">' + escapeHtmlText(b) + '</div>';
+    dropdown.innerHTML = shopBrands.slice(0, 80).map(function(b) {
+      var bbmMark = '';
+      if (window.BbmBrandApi) {
+        var orgId = getBbmOrgIdForCurrentShop();
+        if (orgId && BbmBrandApi.findBbmBrand(orgId, b)) bbmMark = ' <span class="bbm-tag">书城</span>';
+      }
+      return '<div class="dropdown-item" data-brand-name="' + escapeHtmlAttr(b) + '">' + escapeHtmlText(b) + bbmMark + '</div>';
     }).join('');
     dropdown.style.display = 'block';
   }
@@ -1482,6 +2343,7 @@ function buildSeriesTagsHtml(seriesMap, options) {
   var selectedSeries = String(options.selectedSeries || '').trim();
   var totalMatched = options.totalMatched != null ? options.totalMatched : 0;
   var expanded = !!options.expanded;
+  var bbmOnlySet = options.bbmOnlySet || {};
 
   var seriesList = Object.keys(seriesMap).sort();
   if (seriesList.length === 0) return '';
@@ -1498,8 +2360,9 @@ function buildSeriesTagsHtml(seriesMap, options) {
     var count = seriesMap[seriesName];
     var isActive = selectedSeries === seriesName;
     var cls = isActive ? 'series-tag active' : 'series-tag';
+    var countLabel = count > 0 ? count : (bbmOnlySet[seriesName] ? '书城' : count);
     html += '<button class="' + cls + '" type="button" ' + filterAttr + '="' + escapeHtmlAttr(encodeURIComponent(seriesName)) + '">' +
-      escapeHtmlText(seriesName) + '（' + count + '）</button>';
+      escapeHtmlText(seriesName) + '（' + countLabel + '）</button>';
   });
 
   if (hiddenCount > 0) {
@@ -1512,15 +2375,25 @@ function buildSeriesTagsHtml(seriesMap, options) {
 
 var _providerSeriesTagContext = { matched: [], selected: '' };
 
-function renderSeriesTags(matched, selectedSeries, expandedOpt) {
+function renderSeriesTags(matched, selectedSeries, expandedOpt, bbmSeriesNames) {
   var container = document.getElementById('series-tag-container');
   if (!container) return;
 
   var seriesMap = {};
+  var bbmOnlySet = {};
   (matched || []).forEach(function(item) {
     var p = item && item.data ? item.data : {};
     var key = (p.series || '').trim() || '未设置系列';
     seriesMap[key] = (seriesMap[key] || 0) + 1;
+  });
+
+  (bbmSeriesNames || []).forEach(function(name) {
+    var key = String(name || '').trim();
+    if (!key) return;
+    if (!seriesMap[key]) {
+      seriesMap[key] = 0;
+      bbmOnlySet[key] = true;
+    }
   });
 
   var seriesList = Object.keys(seriesMap).sort();
@@ -1532,7 +2405,8 @@ function renderSeriesTags(matched, selectedSeries, expandedOpt) {
   if (expandedOpt !== undefined) providerSeriesTagsExpanded = !!expandedOpt;
   _providerSeriesTagContext = {
     matched: matched,
-    selected: String(selectedSeries || '').trim()
+    selected: String(selectedSeries || '').trim(),
+    bbmSeriesNames: bbmSeriesNames || []
   };
 
   container.innerHTML = buildSeriesTagsHtml(seriesMap, {
@@ -1540,7 +2414,8 @@ function renderSeriesTags(matched, selectedSeries, expandedOpt) {
     expandToggleAttr: 'data-series-expand',
     selectedSeries: _providerSeriesTagContext.selected,
     totalMatched: matched.length,
-    expanded: providerSeriesTagsExpanded
+    expanded: providerSeriesTagsExpanded,
+    bbmOnlySet: bbmOnlySet
   });
   container.style.display = 'flex';
 }
@@ -1582,14 +2457,18 @@ function aiRenderProviderResults(fullList) {
   if (!resultBox) return;
 
   aiLastMatchedProviders = fullList || [];
-  renderAiSeriesTags(aiLastMatchedProviders, aiSeriesFilter);
-
   var list = aiLastMatchedProviders;
   if (aiSeriesFilter) {
     list = list.filter(function(rule) {
       var key = String((rule && rule.series) || '').trim() || '未设置系列';
       return key === aiSeriesFilter;
     });
+  }
+
+  if (list.length <= 1) {
+    renderAiSeriesTags([], '');
+  } else {
+    renderAiSeriesTags(aiLastMatchedProviders, aiSeriesFilter);
   }
 
   if (list.length === 0) {
@@ -1614,10 +2493,16 @@ function aiRenderProviderResults(fullList) {
     var brandName = rule.brand || '未设置品牌';
     var seriesName = (rule.series || '').trim() || '未设置系列';
     var shopName = rule.shop || rule.shopname || '未设置店铺';
+    var providersData = getData(STORAGE_KEYS.PROVIDERS);
+    var globalIndex = providersData.findIndex(function(p) {
+      return ruleRowMatchesEditIdentity(p, shopName, providerName, brandName, seriesName);
+    });
+    var exportBtns = buildRuleCardExportButtons(globalIndex);
     return '<div class="ai-result-card">' +
       '<div class="ai-result-header">' +
         '<span class="ai-result-icon">📌</span>' +
         '<span class="ai-result-title">' + escapeHtmlText(providerName + ' · ' + brandName + ' · ' + seriesName) + '</span>' +
+        (exportBtns ? '<div class="rule-card-actions ai-card-actions">' + exportBtns + '</div>' : '') +
       '</div>' +
       '<div class="ai-result-body">' +
         '<div class="ai-result-section">' +
@@ -1629,6 +2514,7 @@ function aiRenderProviderResults(fullList) {
           '<div class="ai-result-row"><span class="ai-result-label">拆分</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.split)) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">定价</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.pricing)) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">发布时间</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.publishTime)) + '</span></div>' +
+          '<div class="ai-result-row"><span class="ai-result-label">专辑</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(resolveAlbumRule(rule))) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">特例</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.specialCase)) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">其他信息</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.otherInfo)) + '</span></div>' +
         '</div>' +
@@ -1643,6 +2529,65 @@ function selectSeriesFilter(seriesEncoded) {
   var seriesName = seriesEncoded ? decodeURIComponent(seriesEncoded) : '';
   currentEditingSeries = seriesName;
   showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, seriesName);
+}
+
+var _ensureSeriesRuleInflight = false;
+
+/** 书城/本地选中的系列尚无规则卡片时，自动建一条空白占位并刷新展示 */
+async function autoEnsureSeriesRuleAndRefresh(shopName, providerName, brandName, seriesName) {
+  if (_ensureSeriesRuleInflight) return;
+  _ensureSeriesRuleInflight = true;
+  try {
+    shopName = String(shopName || '').trim();
+    providerName = String(providerName || '').trim();
+    brandName = String(brandName || '').trim();
+    seriesName = String(seriesName || '').trim();
+    if (!shopName || !providerName || !brandName || !seriesName) return;
+
+    var providers = getData(STORAGE_KEYS.PROVIDERS);
+    var normSeries = normalizeText(seriesName);
+    var exists = providers.some(function(p) {
+      return isSameContextProvider(p, shopName, providerName) &&
+        brandMatchesUi(p && p.brand, brandName) &&
+        normalizeText(String((p && p.series) || '').trim()) === normSeries;
+    });
+
+    if (!exists) {
+      providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, seriesName));
+      if (typeof persistProviders === 'function') {
+        await persistProviders(providers, { awaitCloud: true });
+      } else {
+        setData(STORAGE_KEYS.PROVIDERS, providers);
+      }
+      if (typeof showToast === 'function') {
+        showToast('已为系列「' + seriesName + '」创建规则卡（已填默认）');
+      }
+    }
+    showRulesByBrandAndShop(brandName, shopName, seriesName, true);
+  } catch (err) {
+    console.error('autoEnsureSeriesRuleAndRefresh 失败:', err);
+    if (typeof showToast === 'function') showToast('创建系列规则失败，请重试');
+  } finally {
+    _ensureSeriesRuleInflight = false;
+  }
+}
+
+function tryAutoEnsureSeriesRuleCard(shopName, providerName, brandName, seriesFilter, forceRefresh) {
+  var seriesLabel = String(seriesFilter || '').trim();
+  if (!seriesLabel || forceRefresh || _ensureSeriesRuleInflight) return false;
+  shopName = String(shopName || '').trim();
+  providerName = String(providerName || '').trim();
+  brandName = String(brandName || '').trim();
+  if (!shopName || !providerName || !brandName) return false;
+
+  var display = document.getElementById('custom-rule-display');
+  if (display) {
+    display.style.display = 'block';
+    display.innerHTML = '<div class="match-hint"><span class="match-icon">⏳</span><span class="match-text">正在为系列「' +
+      escapeHtmlText(seriesLabel) + '」准备规则卡片…</span></div>';
+  }
+  autoEnsureSeriesRuleAndRefresh(shopName, providerName, brandName, seriesLabel);
+  return true;
 }
 
 function selectBrand(brandName) {
@@ -1663,9 +2608,29 @@ function selectBrand(brandName) {
   if (addSeriesBtn) {
     addSeriesBtn.style.display = (shopName && providerName && brandName) ? 'inline-flex' : 'none';
   }
+
+  renderBrandDefaultsPanel(shopName, providerName, brandName);
   
   console.log('calling showRulesByBrandAndShop with:', brandName, shopName);
-  showRulesByBrandAndShop(brandName, shopName, '');
+  var providerNameForBbm = (document.getElementById('provider-search-input')?.value || '').trim();
+  var orgIdForBbm = getBbmOrgIdForCurrentShop();
+  var afterBrandReady = function() {
+    ensureBbmSeriesRuleCardsForBrand(shopName, providerNameForBbm, brandName, { silent: true, awaitCloud: true })
+      .then(function(res) {
+        if (res && res.created > 0 && typeof showToast === 'function') {
+          showToast('已为书城 ' + res.created + ' 个系列创建规则卡（已填默认）');
+        }
+        showRulesByBrandAndShop(brandName, shopName, '');
+      })
+      .catch(function() {
+        showRulesByBrandAndShop(brandName, shopName, '');
+      });
+  };
+  if (orgIdForBbm && window.BbmBrandApi && typeof BbmBrandApi.ensureBrandSeriesInCache === 'function') {
+    BbmBrandApi.ensureBrandSeriesInCache(orgIdForBbm, brandName).then(afterBrandReady).catch(afterBrandReady);
+  } else {
+    afterBrandReady();
+  }
 }
 
 function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh) {
@@ -1731,6 +2696,9 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
   if (!display) return;
   
   if (matched.length === 0) {
+    if (tryAutoEnsureSeriesRuleCard(shopName, providerName, brandName, seriesFilter, forceRefresh)) {
+      return;
+    }
     clearSeriesTags();
     if (targetBrand && targetShopTrim) {
       var shopHit = 0;
@@ -1750,7 +2718,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
         '本地共 <strong>' + providersData.length + '</strong> 条卡片；按当前规则粗算：店铺语境约 <strong>' + shopHit + '</strong> 条，品牌「' +
         escapeHtmlText(brandName) + '」约 <strong>' + brandHit + '</strong> 条，两者同时约 <strong>' + bothHit + '</strong> 条。' +
         (bothHit === 0 && brandHit === 0
-          ? ' 若品牌为 0，多半是<strong>品牌名字与库里不一致</strong>（可在「AI 智能查询」搜王朝霞核对）。'
+          ? ' 若品牌为 0，多半是<strong>品牌名字与库里不一致</strong>（可在「规则快速检索」搜王朝霞核对）。'
           : '') +
         (bothHit === 0 && shopHit === 0
           ? ' 若店铺为 0，请核对库里「店铺/店铺别名/提供者」是否含「洛阳」「朝霞」等关键字。'
@@ -1807,10 +2775,17 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
     });
   }
 
-  renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '');
+  var bbmSeriesNames = getBbmSeriesNamesForBrand(brandName);
+  renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '', undefined, bbmSeriesNames);
   if (matched.length === 0) {
+    if (tryAutoEnsureSeriesRuleCard(shopName, providerName, brandName, seriesFilter, forceRefresh)) {
+      return;
+    }
     display.style.display = 'block';
-    display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">该品牌下未找到所选系列，请点 +新增系列添加。</span></div>';
+    var emptyHint = bbmSeriesNames.length
+      ? '正在同步书城系列规则卡…若仍为空请点选上方系列标签。'
+      : '该品牌下未找到所选系列，请点 +新增系列添加。';
+    display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">' + emptyHint + '</span></div>';
     return;
   }
   
@@ -1838,6 +2813,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       var brandEncoded = encodeURIComponent(p.brand || '');
       var seriesEncoded = encodeURIComponent((p.series || '').trim());
       var actionButtons = '<button type="button" class="rule-edit-btn" data-edit-rule="1" data-index="' + globalIndex + '" data-shop="' + escapeHtmlAttr(shopEncoded) + '" data-provider="' + escapeHtmlAttr(providerEncoded) + '" data-brand="' + escapeHtmlAttr(brandEncoded) + '" data-series="' + escapeHtmlAttr(seriesEncoded) + '">✏️ 修改</button>' +
+                       buildRuleCardExportButtons(globalIndex) +
                        '<button type="button" class="rule-delete-btn" data-delete-rule="1" data-index="' + globalIndex + '">🗑️ 删除</button>';
       html += '<div class="rule-card">';
       html += '  <div class="rule-card-header">';
@@ -1850,6 +2826,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       html += '    <div class="rule-row"><span class="rule-label">拆分：</span><span class="rule-value">' + escapeHtmlText(p.split || '待录入') + '</span></div>';
       html += '    <div class="rule-row"><span class="rule-label">定价：</span><span class="rule-value">' + escapeHtmlText(p.pricing || '待录入') + '</span></div>';
       html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><span class="rule-value">' + escapeHtmlText(p.publishTime || '待录入') + '</span></div>';
+      html += '    <div class="rule-row"><span class="rule-label">专辑：</span><span class="rule-value">' + escapeHtmlText(resolveAlbumRule(p)) + '</span></div>';
       html += '    <div class="rule-row"><span class="rule-label">特例：</span><span class="rule-value">' + escapeHtmlText(p.specialCase || '待录入') + '</span></div>';
       html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><span class="rule-value">' + escapeHtmlText(p.otherInfo || '待录入') + '</span></div>';
       html += '  </div>';
@@ -1885,6 +2862,7 @@ function showRulesByShop(shopName) {
     html += '<div class="rule-result-row"><strong>拆分：</strong>' + (p.split || '-') + '</div>';
     html += '<div class="rule-result-row"><strong>定价：</strong>' + (p.pricing || '-') + '</div>';
     html += '<div class="rule-result-row"><strong>发布时间：</strong>' + (p.publishTime || '-') + '</div>';
+    html += '<div class="rule-result-row"><strong>专辑：</strong>' + escapeHtmlText(resolveAlbumRule(p)) + '</div>';
     html += '<div class="rule-result-row"><strong>特例：</strong>' + (p.specialCase || '-') + '</div>';
     html += '</div>';
   });
@@ -2145,6 +3123,7 @@ function displayBrandRule(brandName) {
       '<div class="rule-item"><span class="label">拆分：</span><span class="value">' + (rule.split || '无') + '</span></div>' +
       '<div class="rule-item"><span class="label">定价：</span><span class="value">' + (rule.pricing || '无') + '</span></div>' +
       '<div class="rule-item"><span class="label">发布时间：</span><span class="value">' + (rule.publishTime || '无') + '</span></div>' +
+      '<div class="rule-item"><span class="label">专辑：</span><span class="value">' + escapeHtmlText(resolveAlbumRule(rule)) + '</span></div>' +
       '<div class="rule-item"><span class="label">特例：</span><span class="value">' + (rule.specialCase || '无') + '</span></div>' +
       '</div>';
   }
@@ -2190,7 +3169,8 @@ function onSeriesChange() {
   console.log('matched:', matched.length);
   
   // 显示规则
-  var currentRule = matched.length > 0 ? matched[0] : {naming: '', split: '', pricing: '', publishTime: '', specialCase: ''};
+  var currentRule = matched.length > 0 ? matched[0] : {album: '', naming: '', split: '', pricing: '', publishTime: '', specialCase: ''};
+  var displayAlbum = resolveAlbumRule(currentRule);
   var displayBox = document.getElementById('custom-rule-display');
   if (displayBox) {
     displayBox.style.display = 'block';
@@ -2203,6 +3183,7 @@ function onSeriesChange() {
         '<div class="rule-item"><span class="label">拆分：</span><span class="value" id="rule-split">' + escapeHtmlText(currentRule.split || '待录入') + '</span></div>' +
         '<div class="rule-item"><span class="label">定价：</span><span class="value" id="rule-pricing">' + escapeHtmlText(currentRule.pricing || '待录入') + '</span></div>' +
         '<div class="rule-item"><span class="label">发布时间：</span><span class="value" id="rule-publishTime">' + escapeHtmlText(currentRule.publishTime || '待录入') + '</span></div>' +
+        '<div class="rule-item"><span class="label">专辑：</span><span class="value" id="rule-album">' + escapeHtmlText(displayAlbum) + '</span></div>' +
         '<div class="rule-item"><span class="label">特例：</span><span class="value" id="rule-specialCase">' + escapeHtmlText(currentRule.specialCase || '待录入') + '</span></div>' +
       '</div>' +
       '<div class="rule-edit-content" id="rule-edit" style="display:none;">' +
@@ -2210,12 +3191,15 @@ function onSeriesChange() {
         '<div class="rule-item"><span class="label">拆分：</span><textarea rows="2" id="edit-split" class="rule-input alt-space-newline"></textarea></div>' +
         '<div class="rule-item"><span class="label">定价：</span><textarea rows="2" id="edit-pricing" class="rule-input alt-space-newline"></textarea></div>' +
         '<div class="rule-item"><span class="label">发布时间：</span><textarea rows="2" id="edit-publishTime" class="rule-input alt-space-newline"></textarea></div>' +
+        '<div class="rule-item"><span class="label">专辑：</span><textarea rows="5" id="edit-album" class="rule-input alt-space-newline"></textarea></div>' +
         '<div class="rule-item"><span class="label">特例：</span><textarea rows="2" id="edit-specialCase" class="rule-input alt-space-newline"></textarea></div>' +
         '<div class="rule-btn-wrap">' +
           '<button class="btn-cancel" onclick="cancelEdit()">取消</button>' +
           '<button class="btn-save" onclick="saveEditRule()">保存</button>' +
         '</div>' +
       '</div>';
+    var albumEl = document.getElementById('edit-album');
+    if (albumEl) albumEl.value = displayAlbum;
     var namingEl = document.getElementById('edit-naming');
     if (namingEl) namingEl.value = currentRule.naming || '';
     var splitEl = document.getElementById('edit-split');
@@ -2252,11 +3236,13 @@ function saveEditRule() {
   var providerInput = document.getElementById('provider-search-input');
   var providerName = providerInput ? providerInput.value : '';
   
+  var elAlbum = document.getElementById('edit-album');
   var elNaming = document.getElementById('edit-naming');
   var elSplit = document.getElementById('edit-split');
   var elPricing = document.getElementById('edit-pricing');
   var elPub = document.getElementById('edit-publishTime');
   var elSpec = document.getElementById('edit-specialCase');
+  var newAlbumRaw = elAlbum ? elAlbum.value.trim() : '';
   var newNaming = elNaming ? elNaming.value.trim() : '';
   var newSplit = elSplit ? elSplit.value.trim() : '';
   var newPricing = elPricing ? elPricing.value.trim() : '';
@@ -2279,6 +3265,7 @@ function saveEditRule() {
   
   if (matchedIndex >= 0) {
     // 更新现有项
+    newProvidersList[matchedIndex].album = resolveAlbumForSave(newAlbumRaw, brandName, seriesName, providerName);
     newProvidersList[matchedIndex].naming = newNaming;
     newProvidersList[matchedIndex].split = newSplit;
     newProvidersList[matchedIndex].pricing = newPricing;
@@ -2290,6 +3277,7 @@ function saveEditRule() {
       name: providerName,
       brand: brandName,
       series: seriesName,
+      album: resolveAlbumForSave(newAlbumRaw, brandName, seriesName, providerName),
       naming: newNaming,
       split: newSplit,
       pricing: newPricing,
@@ -2349,6 +3337,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   html += '    <div class="rule-row"><span class="rule-label">拆分：</span><textarea class="rule-input alt-space-newline" rows="3" id="edit-split"></textarea></div>';
   html += '    <div class="rule-row"><span class="rule-label">定价：</span><textarea class="rule-input alt-space-newline" rows="3" id="edit-pricing"></textarea></div>';
   html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><textarea class="rule-input alt-space-newline" rows="2" id="edit-publishTime"></textarea></div>';
+  html += '    <div class="rule-row"><span class="rule-label">专辑：</span><textarea class="rule-input alt-space-newline" rows="5" id="edit-album"></textarea></div>';
   html += '    <div class="rule-row"><span class="rule-label">特例：</span><textarea class="rule-input alt-space-newline" rows="2" id="edit-specialCase"></textarea></div>';
   html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><textarea class="rule-input alt-space-newline" rows="2" id="edit-otherInfo"></textarea></div>';
   html += '    <div class="rule-row"><button class="rule-save-btn" id="save-rule-btn" data-index="' + resolvedIndex + '">💾 保存</button></div>';
@@ -2356,6 +3345,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   html += '</div>';
   
   display.innerHTML = html;
+  document.getElementById('edit-album').value = resolveAlbumRule(rule);
   document.getElementById('edit-naming').value = rule.naming || '';
   document.getElementById('edit-split').value = rule.split || '';
   document.getElementById('edit-pricing').value = rule.pricing || '';
@@ -2384,6 +3374,7 @@ async function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBr
   }
   try {
     console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
+    var newAlbumRaw = document.getElementById('edit-album') ? document.getElementById('edit-album').value.trim() : '';
     var newNaming = document.getElementById('edit-naming') ? document.getElementById('edit-naming').value.trim() : '';
     var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
     var newPricing = document.getElementById('edit-pricing') ? document.getElementById('edit-pricing').value.trim() : '';
@@ -2410,6 +3401,8 @@ async function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBr
       return;
     }
     
+    var row = providersData[resolvedIndex];
+    providersData[resolvedIndex].album = resolveAlbumForSave(newAlbumRaw, row.brand, row.series, row.name);
     providersData[resolvedIndex].naming = newNaming;
     providersData[resolvedIndex].split = newSplit;
     providersData[resolvedIndex].pricing = newPricing;
@@ -2865,6 +3858,7 @@ function openAddProvider() {
   document.getElementById('new-provider-brand').value = '';
   var seriesEl = document.getElementById('new-provider-series');
   if (seriesEl) seriesEl.value = '';
+  document.getElementById('new-provider-album').value = '';
   document.getElementById('new-provider-naming').value = '';
   document.getElementById('new-provider-split').value = '';
   document.getElementById('new-provider-pricing').value = '';
@@ -2876,6 +3870,13 @@ function openAddProvider() {
   document.getElementById('new-provider-shop').value = currentShop;
   document.getElementById('new-provider-shopname').value = currentShop;
   document.getElementById('new-provider-name').value = currentProvider;
+
+  var brandForAlbum = (document.getElementById('new-provider-brand')?.value || '').trim();
+  var seriesForAlbum = (document.getElementById('new-provider-series')?.value || '').trim();
+  var albumEl = document.getElementById('new-provider-album');
+  if (albumEl) {
+    albumEl.value = buildDefaultAlbumRule(null, currentProvider);
+  }
   
   setNewProviderModalReadOnly(!!currentShop, !!currentProvider);
 
@@ -2906,15 +3907,24 @@ function openDeleteBrand() {
 }
 
 function openAddSeries() {
-  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  var shopName = (document.getElementById('shop-search-input')?.value || currentEditingShop || '').trim();
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
-  var brandName = (document.getElementById('brand-input')?.value || '').trim();
+  var brandName = (document.getElementById('brand-input')?.value || currentEditingBrand || '').trim();
   if (!shopName || !providerName || !brandName) {
     showToast('新增系列前请先填写店铺、提供者、品牌');
     return;
   }
-  var seriesName = window.prompt('请输入系列名称');
-  if (seriesName == null) return;
+  var presetSeries = String(currentEditingSeries || '').trim();
+  var seriesName = presetSeries;
+  if (!seriesName) {
+    seriesName = window.prompt('请输入系列名称');
+    if (seriesName == null) return;
+    seriesName = String(seriesName).trim();
+  }
+  if (!seriesName) {
+    showToast('请输入系列名称');
+    return;
+  }
   saveSeries('', seriesName, brandName, shopName, providerName);
 }
 
@@ -2926,6 +3936,7 @@ async function saveProvider() {
   const name = document.getElementById('new-provider-name')?.value.trim();
   const brandName = document.getElementById('new-provider-brand')?.value.trim();
   const seriesName = document.getElementById('new-provider-series')?.value.trim();
+  const albumRaw = document.getElementById('new-provider-album')?.value.trim();
   const naming = document.getElementById('new-provider-naming')?.value.trim();
   const split = document.getElementById('new-provider-split')?.value.trim();
   const pricing = document.getElementById('new-provider-pricing')?.value.trim();
@@ -2946,6 +3957,7 @@ async function saveProvider() {
     name,
     brand: brandName || '',
     series: seriesName || '',
+    album: resolveAlbumForSave(albumRaw, brandName, seriesName, name),
     naming: naming || '',
     split: split || '',
     pricing: pricing || '',
@@ -2974,7 +3986,7 @@ async function saveProvider() {
   }
 }
 
-function saveBrand(nameInput) {
+async function saveBrand(nameInput) {
   const name = (nameInput || document.getElementById('new-brand-name')?.value || '').trim();
   
   if (!name) {
@@ -2996,7 +4008,7 @@ function saveBrand(nameInput) {
   });
   if (!brandExists) {
     brands.push({ id: Date.now().toString(), name });
-    setData(STORAGE_KEYS.BRANDS, brands);
+    setData(STORAGE_KEYS.BRANDS, brands, { skipCloudSync: true });
   }
 
   // 自动建立品牌与店铺/提供者的关联，确保可被搜索链路命中
@@ -3006,19 +4018,9 @@ function saveBrand(nameInput) {
       normalizeText(p.brand) === normalizeText(name);
   });
   if (!hasLinkedRecord) {
-    providers.push({
-      shop: shopName,
-      name: providerName,
-      brand: name,
-      series: '',
-      naming: '',
-      split: '',
-      pricing: '',
-      publishTime: '',
-      specialCase: '',
-      otherInfo: ''
-    });
-    setData(STORAGE_KEYS.PROVIDERS, providers);
+    providers.push(buildNewProviderRuleCard(shopName, providerName, name, ''));
+    var syncResult = await persistProviders(providers, { awaitCloud: true });
+    toastAfterProviderSync(syncResult);
   }
 
   // 新增后立即刷新当前店铺品牌缓存，避免搜索仍使用旧列表
@@ -3038,8 +4040,8 @@ function saveBrand(nameInput) {
   updateStats();
   if (hasLinkedRecord) {
     showToast(brandExists ? '品牌已存在并已关联到当前店铺/提供者' : '品牌添加成功');
-  } else {
-    showToast(brandExists ? '品牌已存在，已新增当前店铺/提供者关联' : '品牌添加成功');
+  } else if (!brandExists) {
+    showToast('品牌添加成功');
   }
 }
 
@@ -3157,18 +4159,7 @@ async function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, pr
   });
 
   if (!linked) {
-    providers.push({
-      shop: shopName,
-      name: providerName,
-      brand: brandName,
-      series: name,
-      naming: '',
-      split: '',
-      pricing: '',
-      publishTime: '',
-      specialCase: '',
-      otherInfo: ''
-    });
+    providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, name));
     var syncResult = await persistProviders(providers, { awaitCloud: true });
     toastAfterProviderSync(syncResult);
   }
@@ -3203,6 +4194,7 @@ function editProvider(index) {
   document.getElementById('new-provider-name').value = provider.name || '';
   document.getElementById('new-provider-brand').value = provider.brand || '';
   document.getElementById('new-provider-series').value = provider.series || '';
+  document.getElementById('new-provider-album').value = resolveAlbumRule(provider);
   document.getElementById('new-provider-naming').value = provider.naming || '';
   document.getElementById('new-provider-split').value = provider.split || '';
   document.getElementById('new-provider-pricing').value = provider.pricing || '';
@@ -3223,6 +4215,7 @@ function updateProvider() {
   const name = document.getElementById('new-provider-name')?.value.trim();
   const brandName = document.getElementById('new-provider-brand')?.value.trim();
   const seriesName = document.getElementById('new-provider-series')?.value.trim();
+  const albumRaw = document.getElementById('new-provider-album')?.value.trim();
   const naming = document.getElementById('new-provider-naming')?.value.trim();
   const split = document.getElementById('new-provider-split')?.value.trim();
   const pricing = document.getElementById('new-provider-pricing')?.value.trim();
@@ -3244,6 +4237,7 @@ function updateProvider() {
     name,
     brand: brandName,
     series: seriesName || '',
+    album: resolveAlbumForSave(albumRaw, brandName, seriesName, name),
     naming: naming || '',
     split: split || '',
     pricing: pricing || '',
@@ -3297,6 +4291,8 @@ function aiQuery() {
 
   aiSeriesFilter = '';
   aiSeriesTagsExpanded = false;
+
+  const brandSeriesQuery = parseBrandSeriesQuery(query);
   
   const queryLower = query.toLowerCase();
   const normalizedQuery = normalizeForSearch(query);
@@ -3306,7 +4302,21 @@ function aiQuery() {
   // 首先搜索提供者/品牌/系列数据 - 只搜索 localStorage 中的用户保存数据
   var localProviders = getData(STORAGE_KEYS.PROVIDERS);
   var deletedBrandSet = getDeletedBrandSet();
-  
+  var matchedProviders = [];
+
+  // 「品牌 · 系列」精确查询：直接定位唯一规则，不走宽泛模糊匹配
+  if (brandSeriesQuery && brandSeriesQuery.brandHint && brandSeriesQuery.seriesHint) {
+    matchedProviders = localProviders.filter(function(p) {
+      var brand = normalizeText(p && p.brand);
+      if (deletedBrandSet.has(brand)) return false;
+      return providerMatchesBrandSeries(p, brandSeriesQuery.brandHint, brandSeriesQuery.seriesHint);
+    });
+    if (matchedProviders.length > 0) {
+      aiSeriesFilter = brandSeriesQuery.seriesHint;
+    }
+  }
+
+  if (!matchedProviders.length) {
   // 只搜索本地数据（用户保存的规则），不使用 presetData
   var providerCandidates = localProviders
     .filter(function(p) {
@@ -3328,6 +4338,7 @@ function aiQuery() {
         p.series || '',
         p.shop || '',
         p.shopname || '',
+        p.album || '',
         p.naming || '',
         p.split || '',
         p.pricing || '',
@@ -3348,6 +4359,7 @@ function aiQuery() {
         p.series || '',
         p.shop || '',
         p.shopname || '',
+        p.album || '',
         p.naming || '',
         p.split || '',
         p.pricing || '',
@@ -3383,9 +4395,20 @@ function aiQuery() {
     }
   }
 
-  var matchedProviders = providerCandidates
+  matchedProviders = providerCandidates
     .sort(function(a, b) { return b.score - a.score; })
     .map(function(item) { return item.data; });
+  }
+
+  if (brandSeriesQuery && brandSeriesQuery.brandHint && brandSeriesQuery.seriesHint && matchedProviders.length) {
+    var bsNarrow = matchedProviders.filter(function(p) {
+      return providerMatchesBrandSeries(p, brandSeriesQuery.brandHint, brandSeriesQuery.seriesHint);
+    });
+    if (bsNarrow.length > 0) {
+      matchedProviders = bsNarrow;
+      aiSeriesFilter = brandSeriesQuery.seriesHint;
+    }
+  }
 
   // AI 查询与提供者查询保持一致：仅删除“同组已有有效规则”下的空白占位卡
   var hasMeaningfulRuleForAi = providerHasMeaningfulRule;
@@ -3408,12 +4431,14 @@ function aiQuery() {
     return hasMeaningfulRuleForAi(p);
   });
 
-  // 当查询词与品牌存在精确匹配时，仅保留该品牌结果，避免返回“包含但不一致”的品牌卡片
-  var exactBrandMatches = matchedProviders.filter(function(p) {
-    return normalizeForSearch(p && p.brand) === normalizedQuery;
-  });
-  if (exactBrandMatches.length > 0) {
-    matchedProviders = exactBrandMatches;
+  // 当查询词与品牌存在精确匹配时，仅保留该品牌结果（「品牌·系列」组合查询不在此收窄）
+  if (!brandSeriesQuery) {
+    var exactBrandMatches = matchedProviders.filter(function(p) {
+      return normalizeForSearch(p && p.brand) === normalizedQuery;
+    });
+    if (exactBrandMatches.length > 0) {
+      matchedProviders = exactBrandMatches;
+    }
   }
 
   // AI 查询结果去重：同一店铺/提供者/品牌/系列只保留一张卡，优先保留信息更完整的
@@ -3426,6 +4451,7 @@ function aiQuery() {
       return;
     }
     var existingScore = (
+      (String(existing.album || '').trim() ? 1 : 0) +
       (String(existing.naming || '').trim() ? 1 : 0) +
       (String(existing.split || '').trim() ? 1 : 0) +
       (String(existing.pricing || '').trim() ? 1 : 0) +
@@ -3434,6 +4460,7 @@ function aiQuery() {
       (String(existing.otherInfo || '').trim() ? 1 : 0)
     );
     var currentScore = (
+      (String(p.album || '').trim() ? 1 : 0) +
       (String(p.naming || '').trim() ? 1 : 0) +
       (String(p.split || '').trim() ? 1 : 0) +
       (String(p.pricing || '').trim() ? 1 : 0) +
@@ -3557,7 +4584,7 @@ function aiQuery() {
           '<span class="ai-result-title">未找到匹配规则</span>' +
         '</div>' +
         '<div class="ai-result-body">' +
-          '<p class="ai-result-empty-msg">未找到与「' + escapeHtmlText(query) + '」直接相关的规则。请尝试其他关键词，或查看通用规则页面获取完整信息。</p>' +
+          '<p class="ai-result-empty-msg">未找到与「' + escapeHtmlText(query) + '」直接相关的规则。请尝试其他关键词，或查看教辅通用规范获取完整信息。</p>' +
         '</div>' +
       '</div>';
     return;
@@ -3594,6 +4621,28 @@ function normalizeForSearch(text) {
     .toLowerCase()
     .replace(/\s+/g, '')
     .trim();
+}
+
+/** 解析「品牌 · 系列」组合查询，如：众相原创 · 时政热点 */
+function parseBrandSeriesQuery(query) {
+  var raw = String(query || '').trim();
+  if (!raw) return null;
+  var parts = raw.split(/\s*[·•|｜/／>\-—–]+\s*/).map(function(s) { return s.trim(); }).filter(Boolean);
+  if (parts.length >= 2) {
+    return {
+      brandHint: parts[0],
+      seriesHint: parts.slice(1).join('·').trim()
+    };
+  }
+  return null;
+}
+
+function providerMatchesBrandSeries(p, brandHint, seriesHint) {
+  if (!p) return false;
+  var brandOk = brandMatchesUi(p.brand, brandHint) || isEntityMatched(p.brand, brandHint);
+  var seriesVal = String((p.series || '')).trim();
+  var seriesOk = brandMatchesUi(seriesVal, seriesHint) || isEntityMatched(seriesVal, seriesHint);
+  return brandOk && seriesOk;
 }
 
 function buildQueryTerms(query) {
@@ -4019,6 +5068,42 @@ extraStyles.textContent = `
   }
   .rule-edit-btn:hover {
     opacity: 0.8;
+  }
+  .rule-export-btn {
+    background: #7c3aed;
+    color: white;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .rule-export-btn-word {
+    background: #2563eb;
+  }
+  .rule-export-btn:hover {
+    opacity: 0.85;
+  }
+  .rule-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .ai-result-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .ai-result-header .ai-result-title {
+    flex: 1;
+    min-width: 0;
+  }
+  .ai-card-actions {
+    margin-left: auto;
   }
   .rule-card-body {
     padding: 16px;

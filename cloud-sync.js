@@ -19,6 +19,9 @@ const FETCH_CLOUD_PARALLEL_PAGES = 3;
 const CLOUD_SNAPSHOT_KEY = 'rule_library_cloud_snapshot';
 /** 本地条数超过此值且云端拉取为 0 时，禁止自动整表上传（防止 DELETE 清空云端） */
 const BLOCK_UPLOAD_WHEN_REMOTE_EMPTY_MIN_LOCAL = 50;
+/** 本地条数 ≥ 此值且云端可见行数低于本地 × 比例，视为云端不完整（需补全而非整表 DELETE） */
+const CLOUD_DEFICIENT_MIN_LOCAL = 100;
+const CLOUD_DEFICIENT_RATIO = 0.85;
 
 let onCloudSyncReady = null;
 let cloudSyncTimer = null;
@@ -109,6 +112,7 @@ function toLocalProvider(p) {
     name: p.name || '',
     brand: p.brand || '',
     series: p.series || '',
+    album: p.album || '',
     naming: p.naming || '',
     split: p.split || '',
     pricing: p.pricing || '',
@@ -125,6 +129,7 @@ function toCloudProvider(p) {
     name: p.name || '',
     brand: p.brand || '',
     series: p.series || '',
+    album: p.album || '',
     naming: p.naming || '',
     split: p.split || '',
     pricing: p.pricing || '',
@@ -162,6 +167,7 @@ function providerIdentityKey(p) {
 function hasMeaningfulRuleCloud(p) {
   if (!p) return false;
   return !!(
+    String(p.album || '').trim() ||
     String(p.naming || '').trim() ||
     String(p.split || '').trim() ||
     String(p.pricing || '').trim() ||
@@ -174,6 +180,105 @@ function hasMeaningfulRuleCloud(p) {
 /**
  * 从云端拉取时合并本机：保留「仅本机有」或「本机已录入规则、云端仍为空」的行，避免次日打开被旧云端冲掉。
  */
+function isCloudCountDeficient(localCount, remoteCount) {
+  if (typeof remoteCount !== 'number' || isNaN(remoteCount)) return false;
+  if (localCount < CLOUD_DEFICIENT_MIN_LOCAL) return false;
+  return remoteCount < localCount * CLOUD_DEFICIENT_RATIO;
+}
+
+function buildRemoteProvidersByKey(remoteRows) {
+  var byKey = new Map();
+  (remoteRows || []).forEach(function(r) {
+    var lp = toLocalProvider(r);
+    var k = providerIdentityKey(lp);
+    if (!k.replace(/\|/g, '')) return;
+    if (!byKey.has(k)) byKey.set(k, lp);
+  });
+  return byKey;
+}
+
+/**
+ * 云端行数少于本机时：按业务主键补 INSERT 缺失行、PATCH 本机已录入而云端为空的行。
+ * 不 DELETE 全表，避免误删；也不会像 recover 那样盲目 POST 全量造成翻倍。
+ */
+async function syncProvidersGapFillToCloud(localData, opts) {
+  opts = opts || {};
+  var formatted = toCloudProviderListForUpload(localData);
+  var remoteRows = opts.remoteRows;
+  if (!remoteRows) {
+    remoteRows = await fetchCloudProviders();
+  }
+  var remoteByKey = buildRemoteProvidersByKey(remoteRows);
+  var toInsert = [];
+  var toUpsert = [];
+
+  formatted.forEach(function(row) {
+    var k = providerIdentityKey(row);
+    var remote = remoteByKey.get(k);
+    if (!remote) {
+      toInsert.push(row);
+      return;
+    }
+    var localSig = providerContentSignature(row);
+    var remoteSig = providerContentSignature(remote);
+    if (localSig === remoteSig) return;
+    var localLp = toLocalProvider(row);
+    if (hasMeaningfulRuleCloud(localLp) && (!hasMeaningfulRuleCloud(remote) || localSig !== remoteSig)) {
+      var upsert = Object.assign({}, row);
+      upsert.id = remote.id;
+      toUpsert.push(upsert);
+    }
+  });
+
+  var opCount = toInsert.length + toUpsert.length;
+  if (opCount === 0) {
+    if (isCloudCountDeficient(formatted.length, remoteRows.length)) {
+      return {
+        ok: false,
+        reason: 'still_deficient',
+        localCount: formatted.length,
+        remoteCount: remoteRows.length
+      };
+    }
+    persistCloudSnapshot(calcSnapshot(formatted));
+    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+    lastSyncedRawProvidersStr = JSON.stringify(localData);
+    markSyncSuccess('已同步');
+    return { ok: true, inserted: 0, updated: 0 };
+  }
+
+  emitSyncStatus('syncing', '补全云端：新增 ' + toInsert.length + '，更新 ' + toUpsert.length + '…');
+
+  var i;
+  for (i = 0; i < toUpsert.length; i += SYNC_HTTP_CHUNK) {
+    var upChunk = toUpsert.slice(i, i + SYNC_HTTP_CHUNK).map(providerRowForDb);
+    await httpPostProvidersJson(
+      '?on_conflict=id',
+      upChunk,
+      'resolution=merge-duplicates,return=minimal'
+    );
+  }
+  for (i = 0; i < toInsert.length; i += SYNC_HTTP_CHUNK) {
+    var insChunk = toInsert.slice(i, i + SYNC_HTTP_CHUNK).map(function(p) {
+      return toCloudProviderDbRow(p || {});
+    });
+    await httpPostProvidersJson('', insChunk, 'return=minimal');
+  }
+
+  var newRemoteCount = await fetchCloudProvidersDeclaredTotal();
+  persistCloudSnapshot(calcSnapshot(formatted));
+  lastSyncedRawProvidersStr = JSON.stringify(localData);
+  localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+  markSyncSuccess('已补全云端（+' + toInsert.length + ' 更新' + toUpsert.length + '）');
+  console.log('🌥️ 补全完成，云端约 ' + newRemoteCount + ' 条');
+  return {
+    ok: true,
+    inserted: toInsert.length,
+    updated: toUpsert.length,
+    remoteCount: newRemoteCount
+  };
+}
+
 function mergeRemoteProvidersPreservingLocal(localRows, remoteRows) {
   var local = (localRows || []).map(toLocalProvider);
   var remote = (remoteRows || []).map(toLocalProvider);
@@ -622,12 +727,25 @@ async function cloudSync(opts) {
         return;
       }
 
-      /** 云端条数远少于本机时，禁止用云端覆盖本地（避免 2364 条被 1～2 条冲掉） */
+      /** 云端条数远少于本机：自动补全缺失行（不覆盖本机、不 DELETE 全表） */
       if (localProvidersNow.length >= 100 && formatted.length < localProvidersNow.length * 0.5) {
+        console.warn('🌥️ 云端仅 ' + formatted.length + ' 条，本机 ' + localProvidersNow.length + ' 条，尝试补全…');
+        emitSyncStatus('syncing', '云端数据过少，正在补全…');
+        try {
+          var gapPull = await syncProvidersGapFillToCloud(localProvidersNow, { remoteRows: remoteData });
+          if (gapPull && gapPull.ok) {
+            notifyProvidersUpdated('cloud-gap-fill');
+            markSyncSuccess('云端已补全（+' + (gapPull.inserted || 0) + ' 条）');
+            if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
+            return;
+          }
+        } catch (gapPullErr) {
+          console.error('🌥️ 自动补全失败:', gapPullErr);
+        }
         var blockMsg = '已阻止同步：云端仅 ' + formatted.length + ' 条，本机有 ' + localProvidersNow.length +
-          ' 条。请先用 recover.html 从本机恢复云端，勿用少量云端覆盖本机。';
+          ' 条。自动补全未成功，请点「立即同步」重试，或打开 recover.html 手动恢复。';
         console.error('🌥️ ' + blockMsg);
-        emitSyncStatus('error', '云端数据过少，已保护本机');
+        emitSyncStatus('error', '云端数据过少，补全失败');
         if (typeof alert === 'function') alert(blockMsg);
         localStorage.setItem(LOCAL_DIRTY_KEY, '1');
         queuePendingSync(localProvidersNow);
@@ -687,6 +805,11 @@ async function syncProvidersPushLocalChangesOnly(data) {
   delta.deletes = [];
   var opCount = delta.upserts.length + delta.insertsNoId.length;
   if (opCount <= 0) {
+    var rcZero = await fetchCloudProvidersDeclaredTotal();
+    if (isCloudCountDeficient(formatted.length, rcZero)) {
+      var gapZero = await syncProvidersGapFillToCloud(data);
+      return !!(gapZero && gapZero.ok);
+    }
     localStorage.setItem(LOCAL_DIRTY_KEY, '0');
     lastSyncedRawProvidersStr = JSON.stringify(data);
     markSyncSuccess('已同步');
@@ -695,6 +818,15 @@ async function syncProvidersPushLocalChangesOnly(data) {
   await syncProvidersIncrementalApply(delta);
   var stored = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
   var storedFmt = toCloudProviderListForUpload(stored);
+  var rcPush = await fetchCloudProvidersDeclaredTotal();
+  if (isCloudCountDeficient(storedFmt.length, rcPush)) {
+    var gapPush = await syncProvidersGapFillToCloud(stored);
+    if (!gapPush || !gapPush.ok) {
+      localStorage.setItem(LOCAL_DIRTY_KEY, '1');
+      markSyncSuccess('已上传部分，云端仍不足…');
+      return false;
+    }
+  }
   persistCloudSnapshot(calcSnapshot(storedFmt));
   lastSyncedRawProvidersStr = JSON.stringify(stored);
   localStorage.setItem(LOCAL_DIRTY_KEY, '0');
@@ -716,10 +848,9 @@ async function syncProvidersFullTableReplace(data, options) {
     return await syncProvidersPushLocalChangesOnly(data);
   }
   if (typeof remoteCount === 'number' && remoteCount > 0 && remoteCount < formatted.length * 0.5) {
-    console.error('🌥️ 已阻止整表替换：云端现有 ' + remoteCount + ' 条，本地将上传 ' + formatted.length +
-      ' 条。请用 forceRestoreLocalProvidersToCloud() 仅追加写入，或先备份。');
-    emitSyncStatus('error', '已阻止整表删除，云端数据过少');
-    return false;
+    console.warn('🌥️ 整表替换已拦截（云端 ' + remoteCount + ' / 本地 ' + formatted.length + '），改走补全上传');
+    var gapReplace = await syncProvidersGapFillToCloud(data, options);
+    return !!(gapReplace && gapReplace.ok);
   }
 
   const deleteRes = await fetch(SUPABASE_URL + '/rest/v1/providers?id=gt.0', {
@@ -789,6 +920,10 @@ async function trySyncToCloudIncremental(data, formatted) {
   var delta = computeProviderSyncDelta(baselineFormatted, formatted);
   var opCount = delta.deletes.length + delta.upserts.length + delta.insertsNoId.length;
   if (opCount <= 0) {
+    var remoteCountInc = await fetchCloudProvidersDeclaredTotal();
+    if (isCloudCountDeficient(formatted.length, remoteCountInc)) {
+      return false;
+    }
     persistCloudSnapshot(calcSnapshot(formatted));
     localStorage.setItem(LOCAL_DIRTY_KEY, '0');
     lastSyncedRawProvidersStr = JSON.stringify(data);
@@ -838,10 +973,14 @@ async function syncToCloudImpl(data, options) {
 
     const nextSnapshot = calcSnapshot(formatted);
     if (nextSnapshot === lastCloudSnapshot) {
-      localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-      lastSyncedRawProvidersStr = JSON.stringify(data);
-      markSyncSuccess('已同步');
-      return;
+      var remoteCountSnap = await fetchCloudProvidersDeclaredTotal();
+      if (!isCloudCountDeficient(formatted.length, remoteCountSnap)) {
+        localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+        lastSyncedRawProvidersStr = JSON.stringify(data);
+        markSyncSuccess('已同步');
+        return;
+      }
+      console.warn('🌥️ 快照一致但云端仅 ' + remoteCountSnap + ' 条，本机 ' + formatted.length + ' 条，需补全');
     }
 
     var didInc = false;
@@ -857,11 +996,17 @@ async function syncToCloudImpl(data, options) {
 
     if (options.forcePushUpload) {
       var pushedOnly = await syncProvidersPushLocalChangesOnly(data);
-      if (pushedOnly) return;
+      if (pushedOnly) {
+        var rcAfterPush = await fetchCloudProvidersDeclaredTotal();
+        if (!isCloudCountDeficient(formatted.length, rcAfterPush)) return;
+        console.warn('🌥️ 增量推送后云端仍不足（' + rcAfterPush + ' / ' + formatted.length + '），继续补全');
+      }
     }
 
     var ok = await syncProvidersFullTableReplace(data, options);
     if (!ok) {
+      var gapUpload = await syncProvidersGapFillToCloud(data);
+      if (gapUpload && gapUpload.ok) return;
       throw new Error('sync_upload_failed');
     }
 }
@@ -1008,30 +1153,30 @@ window.forceRestoreLocalProvidersToCloud = async function() {
     }
     return;
   }
-  if (typeof confirm === 'function' && !confirm(
-    '将把浏览器里 rule_library_providers 的全部数据分批写入 Supabase（不先清空表）。\n\n确定继续？'
-  )) {
-    return;
-  }
   var localData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
   if (!localData.length) {
     if (typeof alert === 'function') alert('本地无数据，无法恢复');
     return;
   }
+  if (typeof confirm === 'function' && !confirm(
+    '将把本机缺失的规则补写入 Supabase（不 DELETE 全表、不重复已有行）。\n\n本机 ' + localData.length + ' 条，确定继续？'
+  )) {
+    return;
+  }
   isCloudSyncing = true;
-  emitSyncStatus('syncing', '正在恢复写入云端 ' + localData.length + ' 条…');
+  emitSyncStatus('syncing', '正在补全云端 ' + localData.length + ' 条…');
   try {
-    var formatted = toCloudProviderListForUpload(localData);
-    for (var off = 0; off < formatted.length; off += SYNC_HTTP_CHUNK) {
-      var chunk = formatted.slice(off, off + SYNC_HTTP_CHUNK).map(providerRowForDb);
-      await httpPostProvidersJson('', chunk, 'return=minimal');
+    var gapRestore = await syncProvidersGapFillToCloud(localData);
+    if (!gapRestore || !gapRestore.ok) {
+      throw new Error((gapRestore && gapRestore.reason) || 'gap_fill_failed');
     }
-    persistCloudSnapshot(calcSnapshot(formatted));
-    lastSyncedRawProvidersStr = JSON.stringify(localData);
-    localStorage.setItem(LOCAL_DIRTY_KEY, '0');
-    markSyncSuccess('已恢复写入 ' + formatted.length + ' 条');
-    if (typeof showToast === 'function') showToast('已写入 ' + formatted.length + ' 条，请到 Supabase 核对行数');
-    if (typeof alert === 'function') alert('已分批写入 ' + formatted.length + ' 条，请到 Supabase Table Editor 核对 providers 行数');
+    if (typeof showToast === 'function') {
+      showToast('已补全 +' + (gapRestore.inserted || 0) + ' 条，云端约 ' + (gapRestore.remoteCount || '?') + ' 条');
+    }
+    if (typeof alert === 'function') {
+      alert('补全完成：新增 ' + (gapRestore.inserted || 0) + ' 条，更新 ' + (gapRestore.updated || 0) +
+        ' 条。请到 Supabase 核对 providers 行数。');
+    }
   } catch (e) {
     emitSyncStatus('error', String((e && e.message) || e));
     if (typeof alert === 'function') alert('恢复失败：' + String((e && e.message) || e));

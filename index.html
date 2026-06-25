@@ -65,10 +65,10 @@
             <div class="card-icon-wrap">
               <span class="card-icon">📋</span>
             </div>
-            <span class="card-tag">通用</span>
+            <span class="card-tag">规范</span>
           </div>
-          <h3 class="card-title">通用规则</h3>
-          <p class="card-desc">资料拆分、命名规范、专辑设置及特例处理的完整生产规范</p>
+          <h3 class="card-title">教辅通用规范</h3>
+          <p class="card-desc">拆分、命名、定价等共用标准</p>
           <ul class="card-features">
             <li>PDF/PPT/WORD 拆分标准</li>
             <li>专辑命名规范</li>
@@ -84,20 +84,20 @@
           <div class="card-glow"></div>
           <div class="card-header">
             <div class="card-icon-wrap">
-              <span class="card-icon">🔍</span>
+              <span class="card-icon">🔧</span>
             </div>
-            <span class="card-tag">查询</span>
+            <span class="card-tag">维护</span>
           </div>
-          <h3 class="card-title">提供者查询</h3>
-          <p class="card-desc">三级联动筛选：提供者 → 品牌 → 系列，精准匹配个性化规则</p>
+          <h3 class="card-title">店铺规则维护</h3>
+          <p class="card-desc">按店铺 · 品牌 · 系列录入与修改</p>
           <ul class="card-features">
-            <li>提供者管理</li>
-            <li>品牌词筛选</li>
+            <li>店铺管理</li>
+            <li>品牌筛选</li>
             <li>系列联动</li>
             <li>规则编辑</li>
           </ul>
           <div class="card-footer">
-            <span class="card-link">开始查询 <span class="arrow">→</span></span>
+            <span class="card-link">进入维护 <span class="arrow">→</span></span>
           </div>
         </div>
 
@@ -107,20 +107,20 @@
           <div class="card-glow"></div>
           <div class="card-header">
             <div class="card-icon-wrap">
-              <span class="card-icon">🤖</span>
+              <span class="card-icon">🔍</span>
             </div>
-            <span class="card-tag">AI</span>
+            <span class="card-tag">检索</span>
           </div>
-          <h3 class="card-title">AI 智能查询</h3>
-          <p class="card-desc">输入关键词智能匹配，快速定位对应的生产规则</p>
+          <h3 class="card-title">规则快速检索</h3>
+          <p class="card-desc">输入「品牌 · 系列」或关键词，直达规则</p>
           <ul class="card-features">
             <li>关键词匹配</li>
-            <li>智能推荐</li>
+            <li>品牌 · 系列</li>
             <li>快速定位</li>
             <li>多维检索</li>
           </ul>
           <div class="card-footer">
-            <span class="card-link">立即体验 <span class="arrow">→</span></span>
+            <span class="card-link">开始检索 <span class="arrow">→</span></span>
           </div>
         </div>
 
@@ -132,11 +132,11 @@
     </footer>
   </main>
 
-  <!-- 通用规则页面 -->
+  <!-- 教辅通用规范页面 -->
   <section id="page-rules" class="page">
     <div class="page-header">
       <button class="back-btn" onclick="goHome()">← 返回</button>
-      <h1 class="page-title">📋 通用规则</h1>
+      <h1 class="page-title">📋 教辅通用规范</h1>
     </div>
     <div class="page-content">
       <div class="rules-grid">
@@ -288,11 +288,11 @@
     </div>
 </section>
 
-<!-- 提供者查询页面 -->
+<!-- 店铺规则维护页面 -->
   <section id="page-provider" class="page">
     <div class="page-header">
       <button class="back-btn" onclick="goHome()">← 返回</button>
-      <h1 class="page-title">🔍 提供者查询</h1>
+      <h1 class="page-title">🔧 店铺规则维护</h1>
     </div>
     <div class="page-content">
       
@@ -330,6 +330,20 @@
           </div>
           <div id="provider-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>
+
+        <!-- 书城品牌系列（BAPI 代理） -->
+        <div class="filter-group bbm-sync-group">
+          <label class="filter-label">
+            <span class="fl-icon">🔗</span>
+            书城品牌系列
+          </label>
+          <div class="filter-input-wrap">
+            <input type="text" id="org-id-input" class="filter-input" placeholder="机构 ID，如 520495（非品牌 ID）" inputmode="numeric">
+            <button type="button" id="bbm-fetch-btn" class="btn-search" onclick="fetchBbmBrandsForContext()">从书城获取</button>
+          </div>
+          <p class="bbm-fetch-hint">客户池表含两列 ID：<strong>机构ID</strong>（填这里）与 <strong>知识店铺ID</strong>（勿单独使用）。后台新增品牌/系列后请重新点击「从书城获取」（实时拉取，跳过缓存）。</p>
+          <p id="bbm-fetch-status" class="bbm-fetch-status"></p>
+        </div>
         
         <!-- 品牌搜索 -->
         <div class="filter-group">
@@ -347,6 +361,8 @@
           <div id="brand-dropdown" class="search-dropdown" style="display:none;"></div>
         </div>
         <div id="series-tag-container" class="series-tag-container" style="display:none;"></div>
+
+        <div id="brand-defaults-panel" class="brand-defaults-panel" style="display:none;"></div>
         
       </div>
       
@@ -412,6 +428,10 @@
           <textarea id="new-provider-publishtime" class="form-input alt-space-newline" rows="2"></textarea>
         </div>
         <div class="form-group">
+          <label>专辑 <span class="form-hint">（Alt+空格 换行，可编辑）</span></label>
+          <textarea id="new-provider-album" class="form-input alt-space-newline" rows="5" placeholder="默认含专辑简介、封面、其他三项规则"></textarea>
+        </div>
+        <div class="form-group">
           <label>特例 <span class="form-hint">（Alt+空格 换行）</span></label>
           <textarea id="new-provider-special" class="form-input alt-space-newline" rows="2"></textarea>
         </div>
@@ -427,32 +447,32 @@
     </div>
   </div>
 
-  <!-- AI查询页面 -->
+  <!-- 规则快速检索页面 -->
   <section id="page-ai" class="page">
     <div class="page-header">
       <button class="back-btn" onclick="goHome()">← 返回</button>
-      <h1 class="page-title">🤖 AI智能查询</h1>
+      <h1 class="page-title">🔍 规则快速检索</h1>
     </div>
     <div class="page-content">
       <div class="ai-hero">
         <div class="ai-icon-wrap">
-          <span class="ai-main-icon">🤖</span>
+          <span class="ai-main-icon">🔍</span>
           <span class="ai-pulse"></span>
         </div>
-        <h2>AI智能查询</h2>
-        <p>输入品牌名或提供者名称关键字，自动匹配对应的个性化生产规则</p>
+        <h2>规则快速检索</h2>
+        <p>输入「品牌 · 系列」或关键词，直达规则</p>
       </div>
       
       <div class="ai-search-box">
         <div class="ai-input-wrap">
-          <input type="text" id="ai-query" class="ai-input" placeholder="请输入品牌或提供者关键字，例如：木牍中考、安徽木牍...">
+          <input type="text" id="ai-query" class="ai-input" placeholder="品牌 · 系列，如：众相原创 · 时政热点">
           <button class="ai-btn" onclick="aiQuery()">🔍 查询</button>
         </div>
         <div class="ai-suggestions">
           <span class="suggestion-label">试试：</span>
           <span class="suggestion-tag" onclick="setAiQuery('初中数学')">初中数学</span>
           <span class="suggestion-tag" onclick="setAiQuery('高中物理')">高中物理</span>
-          <span class="suggestion-tag" onclick="setAiQuery('中考')">中考</span>
+          <span class="suggestion-tag" onclick="setAiQuery('众相原创 · 时政热点')">众相原创 · 时政热点</span>
           <span class="suggestion-tag" onclick="setAiQuery('高考')">高考</span>
         </div>
       </div>
@@ -487,8 +507,10 @@ function goHome() {
   <script src="db.js"></script>
   <script src="site-config.js?v=20260526"></script>
   <script src="data-bootstrap.js?v=csv-20260526"></script>
-  <script src="cloud-sync.js?v=20260526-13"></script>
-  <script src="app.js?v=20260526-13"></script>
+  <script src="cloud-sync.js?v=20260526-37"></script>
+  <script src="customer-pool-org.js?v=20260526-pool2"></script>
+  <script src="bbm-api.js?v=20260526-37"></script>
+  <script src="app.js?v=20260526-37"></script>
   <script>
     // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (async function() {
@@ -505,6 +527,12 @@ function goHome() {
         await cloudSync();
         if (typeof cleanupBlankPlaceholderProviders === 'function') {
           cleanupBlankPlaceholderProviders();
+        }
+        if (typeof runLegacyAlbumBookPlaceholderMigration === 'function') {
+          await runLegacyAlbumBookPlaceholderMigration();
+        }
+        if (typeof runStandardRuleFillMigration === 'function') {
+          await runStandardRuleFillMigration();
         }
         if (typeof startCloudAutoSync === 'function') {
           startCloudAutoSync();

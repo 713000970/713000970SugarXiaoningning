@@ -148,6 +148,36 @@ body::before {
   color: var(--primary-cyan, #22d3ee);
 }
 
+.sync-btn-export {
+  border-color: rgba(124, 58, 237, 0.35);
+  color: #7c3aed;
+}
+
+.sync-btn-export:hover {
+  background: #7c3aed;
+  border-color: #7c3aed;
+  color: #fff;
+}
+
+.page-header-with-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-header-with-actions .page-title {
+  flex: 1;
+  min-width: 160px;
+}
+
+.page-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
 .btn-muted-sm {
   border-color: rgba(100, 116, 139, 0.35);
   color: var(--text-secondary, #64748b);
@@ -1279,6 +1309,110 @@ body::before {
   font-size: 14px;
   cursor: pointer;
   transition: var(--transition);
+}
+
+.bbm-sync-group {
+  margin-top: 4px;
+}
+
+.bbm-fetch-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted, #64748b);
+}
+
+.bbm-fetch-status {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-muted, #64748b);
+  min-height: 1.2em;
+}
+
+.bbm-fetch-status.is-ok {
+  color: var(--primary-cyan, #0891b2);
+}
+
+.bbm-fetch-status.is-error {
+  color: #dc2626;
+}
+
+.bbm-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  border-radius: 4px;
+  background: rgba(8, 145, 178, 0.12);
+  color: var(--primary-cyan, #0891b2);
+  vertical-align: middle;
+}
+
+#bbm-fetch-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.brand-defaults-panel {
+  margin: 16px 0 8px;
+  padding: 16px 18px;
+  border-radius: var(--radius-md, 10px);
+  border: 1px solid rgba(8, 145, 178, 0.25);
+  background: linear-gradient(135deg, rgba(240, 249, 255, 0.95), rgba(236, 254, 255, 0.85));
+}
+
+.brand-defaults-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.brand-defaults-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #0f172a);
+}
+
+.brand-defaults-source {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.brand-defaults-desc {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.brand-defaults-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.brand-defaults-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #334155;
+}
+
+.brand-defaults-field textarea {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+}
+
+.brand-defaults-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .btn-add-sm:hover {
