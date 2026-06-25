@@ -24,6 +24,35 @@
     return apiBase() + '?brandId=' + encodeURIComponent(String(brandId));
   }
 
+  function parseBbmResponse(res) {
+    return res.text().then(function(text) {
+      var body;
+      try {
+        body = text ? JSON.parse(text) : null;
+      } catch (e) {
+        var snippet = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+        if (res.status === 404) {
+          throw new Error('书城代理未部署（404）。请把 api/bbm-brand.js、lib/bbm-sign.js、vercel.json 一并上传到 GitHub 后等 2 分钟再试。');
+        }
+        throw new Error('接口返回非 JSON（HTTP ' + res.status + '）：' + (snippet || '空响应'));
+      }
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error((body && body.hint) ? body.hint : '书城网关鉴权失败（401），请联系运维确认 bookoms 凭证与 IP 白名单');
+        }
+        if (res.status === 403) {
+          throw new Error((body && body.hint) ? body.hint : '书城网关拒绝访问（403），可能 IP 未白名单');
+        }
+        if (res.status === 503) {
+          throw new Error((body && body.error) ? body.error : '服务端未配置 BAPI 密钥');
+        }
+        var msg = (body && body.error) ? body.error : ('HTTP ' + res.status);
+        throw new Error(msg);
+      }
+      return body;
+    });
+  }
+
   function readJson(key, fallback) {
     try {
       var raw = localStorage.getItem(key);
@@ -244,21 +273,7 @@
     }
 
     return fetch(apiUrlOrg(idStr), { method: 'GET', credentials: 'same-origin', cache: 'no-store' })
-      .then(function(res) {
-        return res.json().then(function(body) {
-          if (!res.ok) {
-            if (res.status === 401) {
-              throw new Error((body && body.hint) ? body.hint : '书城网关鉴权失败（401），请联系运维确认 bookoms 凭证与 IP 白名单');
-            }
-            if (res.status === 403) {
-              throw new Error((body && body.hint) ? body.hint : '书城网关拒绝访问（403），可能 IP 未白名单');
-            }
-            var msg = (body && body.error) ? body.error : ('HTTP ' + res.status);
-            throw new Error(msg);
-          }
-          return body;
-        });
-      })
+      .then(parseBbmResponse)
       .then(function(body) {
         var brands = normalizeBrandList(body);
         idStr.split(',').forEach(function(single) {
@@ -342,15 +357,7 @@
     var id = String(brandId || '').trim();
     if (!id) return Promise.reject(new Error('请填写品牌 ID'));
     return fetch(apiUrlBrand(id), { method: 'GET', credentials: 'same-origin' })
-      .then(function(res) {
-        return res.json().then(function(body) {
-          if (!res.ok) {
-            var msg = (body && body.hint) ? body.hint : ((body && body.error) ? body.error : ('HTTP ' + res.status));
-            throw new Error(msg);
-          }
-          return body;
-        });
-      });
+      .then(parseBbmResponse);
   }
 
   function fetchBbmBrandsForContext(forceRefresh) {
