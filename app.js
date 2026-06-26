@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260526-41';
+var RULE_LIBRARY_BUILD = '20260526-42';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -1119,6 +1119,22 @@ function isSameContextProvider(p, shopName, providerName) {
 
 function looksLikeCompanyShopName(name) {
   return /公司|有限|集团|传媒|图书|文化|出版|策划|责任/.test(String(name || ''));
+}
+
+function pickPreferredShopForProvider(shopNames, providerName) {
+  var names = (shopNames || []).map(function(s) { return String(s || '').trim(); }).filter(Boolean);
+  if (!names.length) return '';
+  var prov = String(providerName || '').trim();
+  var companies = names.filter(function(s) {
+    return s !== prov && looksLikeCompanyShopName(s);
+  });
+  if (companies.length) {
+    companies.sort(function(a, b) { return b.length - a.length; });
+    return companies[0];
+  }
+  var notProvider = names.filter(function(s) { return s !== prov; });
+  if (notProvider.length) return notProvider[0];
+  return names[0];
 }
 
 /** 同提供者下其它规则卡里的公司全称（旧数据 shop 误填提供者时兜底） */
@@ -2895,7 +2911,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       var p = item.data;
       var globalIndex = item.index;
       var ruleName = (p.brand || p.name || '未命名规则') + ' · ' + ((p.series || '').trim() || '未设置系列');
-      var shopForEdit = resolveRuleShopName(p, String(shopName || '').trim());
+      var shopForEdit = String(shopName || '').trim() || String(p.shop || p.shopname || '').trim();
       var shopEncoded = encodeURIComponent(shopForEdit);
       var providerEncoded = encodeURIComponent(p.name || '');
       var brandEncoded = encodeURIComponent(p.brand || '');
@@ -3100,10 +3116,18 @@ function selectProvider(providerName) {
       preferredShop = uniqueShops.find(function(s) { return isEntityMatched(s, currentShopValue); }) || '';
     }
     if (!preferredShop) {
-      preferredShop = uniqueShops[0] || '';
+      preferredShop = pickPreferredShopForProvider(uniqueShops, providerName);
     }
     if (shopInput) {
       if (preferredShop) {
+        // 已有公司全称时不降级为提供者简称（如龙门书局）
+        if (
+          currentShopValue &&
+          looksLikeCompanyShopName(currentShopValue) &&
+          matched.some(function(p) { return rowShopMatchesSearch(p, currentShopValue); })
+        ) {
+          preferredShop = currentShopValue;
+        }
         shopInput.value = preferredShop;
       } else {
         shopInput.value = '';
