@@ -22,10 +22,15 @@ const BLOCK_UPLOAD_WHEN_REMOTE_EMPTY_MIN_LOCAL = 50;
 /** 本地条数 ≥ 此值且云端可见行数低于本地 × 比例，视为云端不完整（需补全而非整表 DELETE） */
 const CLOUD_DEFICIENT_MIN_LOCAL = 100;
 const CLOUD_DEFICIENT_RATIO = 0.85;
+/** 单次 Supabase 请求超时（毫秒） */
+const FETCH_TIMEOUT_MS = 90000;
+/** 整轮同步最长耗时，超时则解除锁定 */
+const SYNC_WATCHDOG_MS = 180000;
 
 let onCloudSyncReady = null;
 let cloudSyncTimer = null;
 let isCloudSyncing = false;
+let syncWatchdogTimer = null;
 let lastCloudSnapshot = '';
 /** 上次与云端对齐后的本地 providers JSON（用于增量 diff）；与 localStorage 内容格式一致 */
 let lastSyncedRawProvidersStr = null;
@@ -45,6 +50,55 @@ function emitSyncStatus(status, message, extra) {
     }, extra || {})
   }));
 }
+
+function fetchWithTimeout(url, options, timeoutMs) {
+  timeoutMs = timeoutMs || FETCH_TIMEOUT_MS;
+  return new Promise(function(resolve, reject) {
+    var timer = setTimeout(function() {
+      reject(new Error('云端请求超时（' + Math.round(timeoutMs / 1000) + ' 秒），请检查网络后点「立即同步」'));
+    }, timeoutMs);
+    fetch(url, options).then(function(res) {
+      clearTimeout(timer);
+      resolve(res);
+    }).catch(function(err) {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
+
+function clearSyncWatchdog() {
+  if (syncWatchdogTimer) {
+    clearTimeout(syncWatchdogTimer);
+    syncWatchdogTimer = null;
+  }
+}
+
+function armSyncWatchdog() {
+  clearSyncWatchdog();
+  syncWatchdogTimer = setTimeout(function() {
+    if (!isCloudSyncing) return;
+    console.warn('🌥️ 同步耗时过长，强制解除锁定');
+    forceResetCloudSync('同步超时，已暂停。数据仍在本地，请点「立即同步」重试');
+  }, SYNC_WATCHDOG_MS);
+}
+
+/** 解除「一直同步中」锁定（控制台可调用 resetCloudSyncStuck()） */
+function forceResetCloudSync(message) {
+  isCloudSyncing = false;
+  pendingSyncData = null;
+  clearRetryTimers();
+  clearSyncWatchdog();
+  if (typeof window !== 'undefined') {
+    window.__RULE_LIB_SUPPRESS_PROVIDER_SYNC = false;
+  }
+  emitSyncStatus('error', message || '同步已暂停，请稍后重试');
+}
+
+window.resetCloudSyncStuck = function() {
+  forceResetCloudSync('已手动解除同步锁定');
+  if (typeof showToast === 'function') showToast('已解除同步锁定，可继续操作');
+};
 
 function clearRetryTimers() {
   if (retryTimer) {
@@ -418,7 +472,7 @@ async function fetchProvidersRange(from, to, withCountExact) {
     'Range': from + '-' + to
   };
   if (withCountExact) headers['Prefer'] = 'count=exact';
-  var res = await fetch(SUPABASE_URL + PROVIDERS_REST_PATH, { headers: headers });
+  var res = await fetchWithTimeout(SUPABASE_URL + PROVIDERS_REST_PATH, { headers: headers });
   if (!res.ok) {
     var errText = await res.text();
     throw new Error('拉取云端失败: ' + res.status + ' ' + errText);
@@ -437,7 +491,7 @@ async function httpPostProvidersJson(pathSuffix, bodyArray, preferPrefer) {
     'Content-Type': 'application/json',
     'Prefer': preferPrefer || 'return=minimal'
   };
-  var res = await fetch(SUPABASE_URL + '/rest/v1/providers' + (pathSuffix || ''), {
+  var res = await fetchWithTimeout(SUPABASE_URL + '/rest/v1/providers' + (pathSuffix || ''), {
     method: 'POST',
     headers: headers,
     body: JSON.stringify(bodyArray)
@@ -499,7 +553,7 @@ function parseContentRangeItems(header) {
 /** 轻量请求：用 Prefer:count=exact 取 providers 总行数（与 RLS 下可见行数一致） */
 async function fetchCloudProvidersDeclaredTotal() {
   try {
-    var res = await fetch(SUPABASE_URL + '/rest/v1/providers?select=id', {
+    var res = await fetchWithTimeout(SUPABASE_URL + '/rest/v1/providers?select=id', {
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': 'Bearer ' + SUPABASE_KEY,
@@ -602,6 +656,7 @@ async function cloudSync(opts) {
 
   if (isCloudSyncing) return;
   isCloudSyncing = true;
+  armSyncWatchdog();
   if (typeof window !== 'undefined') {
     window.__RULE_LIB_SUPPRESS_PROVIDER_SYNC = true;
   }
@@ -780,6 +835,7 @@ async function cloudSync(opts) {
     scheduleRetry();
   } finally {
     isCloudSyncing = false;
+    clearSyncWatchdog();
     if (typeof window !== 'undefined') {
       window.__RULE_LIB_SUPPRESS_PROVIDER_SYNC = false;
     }
@@ -1029,6 +1085,7 @@ async function syncToCloud(data, options) {
   var manageLock = !options.reentrant;
   if (manageLock) {
     isCloudSyncing = true;
+    armSyncWatchdog();
     clearRetryTimers();
     emitSyncStatus('syncing', '正在上传…');
   }
@@ -1046,6 +1103,7 @@ async function syncToCloud(data, options) {
   } finally {
     if (manageLock) {
       isCloudSyncing = false;
+      clearSyncWatchdog();
       flushPendingSync();
     }
   }

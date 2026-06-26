@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260526-38';
+var RULE_LIBRARY_BUILD = '20260526-40';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -1117,6 +1117,29 @@ function isSameContextProvider(p, shopName, providerName) {
   return shopMatched && providerMatched;
 }
 
+/** 导出/展示用店铺名：旧数据常把提供者填进 shop，需结合 shopname 与当前筛选框 */
+function resolveRuleShopName(p, contextShop) {
+  if (!p) return String(contextShop || '').trim() || '-';
+  var shop = String(p.shop || '').trim();
+  var shopname = String(p.shopname || '').trim();
+  var provider = String(p.name || '').trim();
+  var ctx = String(contextShop || '').trim();
+
+  if (ctx && rowShopMatchesSearch(p, ctx)) return ctx;
+
+  if (shopname && shopname !== provider) {
+    if (!shop || shop === provider) return shopname;
+    if (shop !== shopname && /公司|有限|集团|传媒|图书|文化|出版|策划/.test(shopname) && shopname.length >= shop.length) {
+      return shopname;
+    }
+  }
+
+  if (shop && shop !== provider) return shop;
+  if (shopname) return shopname;
+  if (shop) return shop;
+  return ctx || '-';
+}
+
 function setData(key, data, options) {
   options = options || {};
   localStorage.setItem(key, JSON.stringify(data));
@@ -1247,13 +1270,15 @@ function downloadExportBlob(filename, blob) {
   setTimeout(function() { URL.revokeObjectURL(a.href); }, 2000);
 }
 
-function formatRuleExportTextBlock(p, index) {
+function formatRuleExportTextBlock(p, index, contextShop) {
   var album = resolveAlbumRule(p);
+  var shopLabel = resolveRuleShopName(p, contextShop);
+  var providerLabel = String(p.name || '').trim() || '-';
   var lines = [
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    '【' + index + '】' + [p.shop || p.shopname, p.name, p.brand, p.series].filter(Boolean).join(' · '),
-    '店铺：' + (p.shop || p.shopname || '-'),
-    '提供者：' + (p.name || '-'),
+    '【' + index + '】' + [shopLabel, providerLabel, p.brand, p.series].filter(Boolean).join(' · '),
+    '店铺：' + shopLabel,
+    '提供者：' + providerLabel,
     '品牌：' + (p.brand || '-'),
     '系列：' + (p.series || '-'),
     '命名：' + (p.naming || '-'),
@@ -1267,17 +1292,19 @@ function formatRuleExportTextBlock(p, index) {
   return lines.join('\n');
 }
 
-function buildRulesExportWordHtml(list, scopeLabel) {
+function buildRulesExportWordHtml(list, scopeLabel, contextShop) {
   var now = new Date();
   var cards = list.map(function(p, i) {
-    var title = escapeHtmlText([p.shop || p.shopname, p.name, p.brand, p.series].filter(Boolean).join(' · '));
+    var shopLabel = resolveRuleShopName(p, contextShop);
+    var providerLabel = String(p.name || '').trim() || '-';
+    var title = escapeHtmlText([shopLabel, providerLabel, p.brand, p.series].filter(Boolean).join(' · '));
     var album = escapeHtmlText(resolveAlbumRule(p)).replace(/\n/g, '<br/>');
     return (
       '<div class="rule-card">' +
         '<h2>【' + (i + 1) + '】' + title + '</h2>' +
         '<table class="rule-table">' +
-          '<tr><td class="lbl">店铺</td><td>' + escapeHtmlText(p.shop || p.shopname || '-') + '</td></tr>' +
-          '<tr><td class="lbl">提供者</td><td>' + escapeHtmlText(p.name || '-') + '</td></tr>' +
+          '<tr><td class="lbl">店铺</td><td>' + escapeHtmlText(shopLabel) + '</td></tr>' +
+          '<tr><td class="lbl">提供者</td><td>' + escapeHtmlText(providerLabel) + '</td></tr>' +
           '<tr><td class="lbl">品牌</td><td>' + escapeHtmlText(p.brand || '-') + '</td></tr>' +
           '<tr><td class="lbl">系列</td><td>' + escapeHtmlText(p.series || '-') + '</td></tr>' +
           '<tr><td class="lbl">命名</td><td>' + escapeHtmlText(p.naming || '-') + '</td></tr>' +
@@ -1330,27 +1357,45 @@ function resolveRuleForExport(index) {
   return list[index] || null;
 }
 
-function buildRuleCardExportButtons(globalIndex) {
+function buildRuleCardExportButtons(globalIndex, contextShop) {
   if (typeof globalIndex !== 'number' || globalIndex < 0) return '';
-  return '<button type="button" class="rule-export-btn" data-export-txt="1" data-index="' + globalIndex + '" title="导出本条为 TXT">📄 TXT</button>' +
-    '<button type="button" class="rule-export-btn rule-export-btn-word" data-export-word="1" data-index="' + globalIndex + '" title="导出本条为 Word">📘 Word</button>';
+  var shopAttr = contextShop
+    ? ' data-export-shop="' + escapeHtmlAttr(encodeURIComponent(String(contextShop))) + '"'
+    : '';
+  return '<button type="button" class="rule-export-btn" data-export-txt="1" data-index="' + globalIndex + '"' + shopAttr + ' title="导出本条为 TXT">📄 TXT</button>' +
+    '<button type="button" class="rule-export-btn rule-export-btn-word" data-export-word="1" data-index="' + globalIndex + '"' + shopAttr + ' title="导出本条为 Word">📘 Word</button>';
 }
 
-function exportRuleCardByIndex(globalIndex, format) {
+function readExportContextShop(btn) {
+  if (!btn) return '';
+  var enc = btn.getAttribute('data-export-shop');
+  if (!enc) {
+    var shopInput = document.getElementById('shop-search-input');
+    return shopInput ? String(shopInput.value || '').trim() : '';
+  }
+  try {
+    return decodeURIComponent(enc);
+  } catch (e) {
+    return enc;
+  }
+}
+
+function exportRuleCardByIndex(globalIndex, format, contextShop) {
   var p = resolveRuleForExport(globalIndex);
   if (!p) {
     showToast('未找到该规则');
     return;
   }
+  var shopLabel = resolveRuleShopName(p, contextShop);
   var scopeLabel = [p.brand, p.series].filter(Boolean).join(' · ') || '单条规则';
   if (format === 'txt') {
-    var txtBody = formatRuleExportTextBlock(p, 1) + '\n';
+    var txtBody = formatRuleExportTextBlock(p, 1, contextShop) + '\n';
     var blob = new Blob(['\uFEFF' + txtBody], { type: 'text/plain;charset=utf-8' });
     downloadExportBlob(makeSingleRuleExportFilename('txt', p), blob);
     showToast('已导出 TXT');
     return;
   }
-  var html = buildRulesExportWordHtml([p], scopeLabel);
+  var html = buildRulesExportWordHtml([p], scopeLabel, contextShop);
   var wordBlob = new Blob(['\uFEFF' + html], { type: 'application/msword;charset=utf-8' });
   downloadExportBlob(makeSingleRuleExportFilename('doc', p), wordBlob);
   showToast('已导出 Word');
@@ -1372,13 +1417,13 @@ function handleRuleCardExportClick(e) {
   var txtBtn = e.target.closest('[data-export-txt]');
   if (txtBtn) {
     e.preventDefault();
-    exportRuleCardByIndex(parseInt(txtBtn.getAttribute('data-index'), 10), 'txt');
+    exportRuleCardByIndex(parseInt(txtBtn.getAttribute('data-index'), 10), 'txt', readExportContextShop(txtBtn));
     return true;
   }
   var wordBtn = e.target.closest('[data-export-word]');
   if (wordBtn) {
     e.preventDefault();
-    exportRuleCardByIndex(parseInt(wordBtn.getAttribute('data-index'), 10), 'word');
+    exportRuleCardByIndex(parseInt(wordBtn.getAttribute('data-index'), 10), 'word', readExportContextShop(wordBtn));
     return true;
   }
   return false;
@@ -2492,12 +2537,12 @@ function aiRenderProviderResults(fullList) {
     var providerName = rule.name || '未命名提供者';
     var brandName = rule.brand || '未设置品牌';
     var seriesName = (rule.series || '').trim() || '未设置系列';
-    var shopName = rule.shop || rule.shopname || '未设置店铺';
+    var shopName = resolveRuleShopName(rule, '');
     var providersData = getData(STORAGE_KEYS.PROVIDERS);
     var globalIndex = providersData.findIndex(function(p) {
       return ruleRowMatchesEditIdentity(p, shopName, providerName, brandName, seriesName);
     });
-    var exportBtns = buildRuleCardExportButtons(globalIndex);
+    var exportBtns = buildRuleCardExportButtons(globalIndex, shopName);
     return '<div class="ai-result-card">' +
       '<div class="ai-result-header">' +
         '<span class="ai-result-icon">📌</span>' +
@@ -2807,13 +2852,13 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       var p = item.data;
       var globalIndex = item.index;
       var ruleName = (p.brand || p.name || '未命名规则') + ' · ' + ((p.series || '').trim() || '未设置系列');
-      var shopForEdit = String(shopName || '').trim() || (p.shop || '');
+      var shopForEdit = String(shopName || '').trim() || resolveRuleShopName(p, shopName);
       var shopEncoded = encodeURIComponent(shopForEdit);
       var providerEncoded = encodeURIComponent(p.name || '');
       var brandEncoded = encodeURIComponent(p.brand || '');
       var seriesEncoded = encodeURIComponent((p.series || '').trim());
       var actionButtons = '<button type="button" class="rule-edit-btn" data-edit-rule="1" data-index="' + globalIndex + '" data-shop="' + escapeHtmlAttr(shopEncoded) + '" data-provider="' + escapeHtmlAttr(providerEncoded) + '" data-brand="' + escapeHtmlAttr(brandEncoded) + '" data-series="' + escapeHtmlAttr(seriesEncoded) + '">✏️ 修改</button>' +
-                       buildRuleCardExportButtons(globalIndex) +
+                       buildRuleCardExportButtons(globalIndex, shopForEdit) +
                        '<button type="button" class="rule-delete-btn" data-delete-rule="1" data-index="' + globalIndex + '">🗑️ 删除</button>';
       html += '<div class="rule-card">';
       html += '  <div class="rule-card-header">';
