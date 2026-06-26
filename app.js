@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260526-40';
+var RULE_LIBRARY_BUILD = '20260526-41';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -1117,7 +1117,28 @@ function isSameContextProvider(p, shopName, providerName) {
   return shopMatched && providerMatched;
 }
 
-/** 导出/展示用店铺名：旧数据常把提供者填进 shop，需结合 shopname 与当前筛选框 */
+function looksLikeCompanyShopName(name) {
+  return /公司|有限|集团|传媒|图书|文化|出版|策划|责任/.test(String(name || ''));
+}
+
+/** 同提供者下其它规则卡里的公司全称（旧数据 shop 误填提供者时兜底） */
+function inferCompanyShopForProvider(providerName) {
+  var prov = String(providerName || '').trim();
+  if (!prov) return '';
+  var list = getData(STORAGE_KEYS.PROVIDERS);
+  var i;
+  for (i = 0; i < list.length; i++) {
+    var row = list[i];
+    if (!isEntityMatched(row && row.name, prov)) continue;
+    var s = String(row.shop || '').trim();
+    var sn = String(row.shopname || '').trim();
+    if (s && s !== prov && looksLikeCompanyShopName(s)) return s;
+    if (sn && sn !== prov && looksLikeCompanyShopName(sn)) return sn;
+  }
+  return '';
+}
+
+/** 导出/展示用店铺名：旧数据常把提供者填进 shop；筛选框填提供者简称时不应覆盖公司全称 */
 function resolveRuleShopName(p, contextShop) {
   if (!p) return String(contextShop || '').trim() || '-';
   var shop = String(p.shop || '').trim();
@@ -1125,17 +1146,22 @@ function resolveRuleShopName(p, contextShop) {
   var provider = String(p.name || '').trim();
   var ctx = String(contextShop || '').trim();
 
-  if (ctx && rowShopMatchesSearch(p, ctx)) return ctx;
+  if (shop && shop !== provider && looksLikeCompanyShopName(shop)) return shop;
+  if (shopname && shopname !== provider && looksLikeCompanyShopName(shopname)) return shopname;
 
-  if (shopname && shopname !== provider) {
-    if (!shop || shop === provider) return shopname;
-    if (shop !== shopname && /公司|有限|集团|传媒|图书|文化|出版|策划/.test(shopname) && shopname.length >= shop.length) {
-      return shopname;
-    }
+  if (shop && shop !== provider) return shop;
+  if (shopname && shopname !== provider) return shopname;
+
+  var peerShop = inferCompanyShopForProvider(provider);
+  if (peerShop) return peerShop;
+
+  if (ctx && ctx !== provider && looksLikeCompanyShopName(ctx) && rowShopMatchesSearch(p, ctx)) {
+    return ctx;
   }
 
   if (shop && shop !== provider) return shop;
   if (shopname) return shopname;
+  if (ctx && rowShopMatchesSearch(p, ctx) && ctx !== provider) return ctx;
   if (shop) return shop;
   return ctx || '-';
 }
@@ -1366,15 +1392,30 @@ function buildRuleCardExportButtons(globalIndex, contextShop) {
     '<button type="button" class="rule-export-btn rule-export-btn-word" data-export-word="1" data-index="' + globalIndex + '"' + shopAttr + ' title="导出本条为 Word">📘 Word</button>';
 }
 
-function readExportContextShop(btn) {
-  if (!btn) return '';
+function readExportContextShop(btn, ruleRow) {
+  var provider = ruleRow ? String(ruleRow.name || '').trim() : '';
+  var peer = inferCompanyShopForProvider(provider);
+  if (peer) return peer;
+  if (!btn) {
+    var shopInput = document.getElementById('shop-search-input');
+    var provInput = document.getElementById('provider-search-input');
+    var shopVal = shopInput ? String(shopInput.value || '').trim() : '';
+    var provVal = provInput ? String(provInput.value || '').trim() : '';
+    if (shopVal && shopVal !== provVal && looksLikeCompanyShopName(shopVal)) return shopVal;
+    return '';
+  }
   var enc = btn.getAttribute('data-export-shop');
   if (!enc) {
-    var shopInput = document.getElementById('shop-search-input');
-    return shopInput ? String(shopInput.value || '').trim() : '';
+    var shopInput2 = document.getElementById('shop-search-input');
+    var shopVal2 = shopInput2 ? String(shopInput2.value || '').trim() : '';
+    if (shopVal2 && shopVal2 !== provider && looksLikeCompanyShopName(shopVal2)) return shopVal2;
+    return '';
   }
   try {
-    return decodeURIComponent(enc);
+    var decoded = decodeURIComponent(enc);
+    if (decoded && decoded !== provider && looksLikeCompanyShopName(decoded)) return decoded;
+    if (ruleRow) return resolveRuleShopName(ruleRow, '');
+    return decoded;
   } catch (e) {
     return enc;
   }
@@ -1417,13 +1458,15 @@ function handleRuleCardExportClick(e) {
   var txtBtn = e.target.closest('[data-export-txt]');
   if (txtBtn) {
     e.preventDefault();
-    exportRuleCardByIndex(parseInt(txtBtn.getAttribute('data-index'), 10), 'txt', readExportContextShop(txtBtn));
+    var rowTxt = resolveRuleForExport(parseInt(txtBtn.getAttribute('data-index'), 10));
+    exportRuleCardByIndex(parseInt(txtBtn.getAttribute('data-index'), 10), 'txt', readExportContextShop(txtBtn, rowTxt));
     return true;
   }
   var wordBtn = e.target.closest('[data-export-word]');
   if (wordBtn) {
     e.preventDefault();
-    exportRuleCardByIndex(parseInt(wordBtn.getAttribute('data-index'), 10), 'word', readExportContextShop(wordBtn));
+    var rowWord = resolveRuleForExport(parseInt(wordBtn.getAttribute('data-index'), 10));
+    exportRuleCardByIndex(parseInt(wordBtn.getAttribute('data-index'), 10), 'word', readExportContextShop(wordBtn, rowWord));
     return true;
   }
   return false;
@@ -2852,7 +2895,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       var p = item.data;
       var globalIndex = item.index;
       var ruleName = (p.brand || p.name || '未命名规则') + ' · ' + ((p.series || '').trim() || '未设置系列');
-      var shopForEdit = String(shopName || '').trim() || resolveRuleShopName(p, shopName);
+      var shopForEdit = resolveRuleShopName(p, String(shopName || '').trim());
       var shopEncoded = encodeURIComponent(shopForEdit);
       var providerEncoded = encodeURIComponent(p.name || '');
       var brandEncoded = encodeURIComponent(p.brand || '');
