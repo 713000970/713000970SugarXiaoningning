@@ -1082,7 +1082,7 @@ const presetData = {
     { shop: '《学习报》社有限责任公司', name: '《学习报》社有限责任公司', brand: '学习报', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 北京时代圣哲教育科技有限公司
-    { shop: '北京时代圣哲教育科技有限公司', name: '北京时代圣哲教育科技有限公司', brand: '初中同步课堂风暴', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
+    { shop: '崇文阁', name: '北京时代圣哲教育科技有限公司', brand: '初中同步课堂风暴', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },
 
     // 北京知行健教育咨询有限公司
     { shop: '北京知行健教育咨询有限公司', name: '北京知行健教育咨询有限公司', brand: '爱上阅读', series: '', split: '', pricing: '', publishTime: '', specialCase: '' },

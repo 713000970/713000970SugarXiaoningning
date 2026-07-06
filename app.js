@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260526-42';
+var RULE_LIBRARY_BUILD = '20260526-44';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -60,7 +60,9 @@ const STORAGE_KEYS = {
 const APP_LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 const DELETED_BRANDS_KEY = 'rule_library_deleted_brands';
 const DELETED_SHOPS_KEY = 'rule_library_deleted_shops';
-const DELETED_PROVIDERS_KEY = 'rule_library_deleted_providers';
+const STANDARD_RULE_FILL_DONE_KEY = 'rule_library_standard_fill_v1';
+const CHONGWENGE_PROVIDER_NAME = '北京时代圣哲教育科技有限公司';
+const CHONGWENGE_SHOP_NAME = '崇文阁';
 
 function providerHasMeaningfulRule(p) {
   if (!p) return false;
@@ -667,11 +669,16 @@ function migrateUnfilledRuleCards(providers) {
   return { list: list, changed: changed };
 }
 
-async function runStandardRuleFillMigration() {
+async function runStandardRuleFillMigration(options) {
+  options = options || {};
+  if (!options.force && localStorage.getItem(STANDARD_RULE_FILL_DONE_KEY) === '1') {
+    return { list: getData(STORAGE_KEYS.PROVIDERS), changed: 0, skipped: true };
+  }
   var result = migrateUnfilledRuleCards();
   var namingResult = migrateMissingNamingRuleCards(result.list);
   var finalList = namingResult.list;
   var totalChanged = result.changed + namingResult.changed;
+  localStorage.setItem(STANDARD_RULE_FILL_DONE_KEY, '1');
   if (!totalChanged) return { list: finalList, changed: 0 };
   console.log('[规则库] 标准规则填充：全量 ' + result.changed + ' 条，补命名 ' + namingResult.changed + ' 条');
   if (typeof persistProviders === 'function') {
@@ -728,6 +735,45 @@ window.migrateUnfilledRuleCards = migrateUnfilledRuleCards;
 window.migrateMissingNamingRuleCards = migrateMissingNamingRuleCards;
 window.runStandardRuleFillMigration = runStandardRuleFillMigration;
 window.runMissingNamingRuleFillMigration = runMissingNamingRuleFillMigration;
+
+function migrateChongwengeShopName(providers) {
+  var list = Array.isArray(providers) ? providers.slice() : getData(STORAGE_KEYS.PROVIDERS);
+  var changed = 0;
+  list.forEach(function(p, i) {
+    if (!p) return;
+    var providerMatch = isEntityMatched(p.name, CHONGWENGE_PROVIDER_NAME);
+    var oldShopMatch =
+      isEntityMatched(p.shop, CHONGWENGE_PROVIDER_NAME) ||
+      isEntityMatched(p.shopname, CHONGWENGE_PROVIDER_NAME);
+    var alreadyShop =
+      isEntityMatched(p.shop, CHONGWENGE_SHOP_NAME) &&
+      isEntityMatched(p.shopname, CHONGWENGE_SHOP_NAME);
+    if (!providerMatch && !oldShopMatch) return;
+    if (alreadyShop) return;
+    list[i] = Object.assign({}, p, {
+      shop: CHONGWENGE_SHOP_NAME,
+      shopname: CHONGWENGE_SHOP_NAME
+    });
+    changed += 1;
+  });
+  return { list: list, changed: changed };
+}
+
+async function runChongwengeShopNameMigration() {
+  var result = migrateChongwengeShopName();
+  if (!result.changed) return result;
+  console.log('[规则库] 已修正崇文阁店铺名称：' + result.changed + ' 条');
+  if (typeof persistProviders === 'function') {
+    await persistProviders(result.list, { awaitCloud: true });
+  } else {
+    setData(STORAGE_KEYS.PROVIDERS, result.list);
+  }
+  if (typeof updateStats === 'function') updateStats();
+  return result;
+}
+
+window.migrateChongwengeShopName = migrateChongwengeShopName;
+window.runChongwengeShopNameMigration = runChongwengeShopNameMigration;
 
 // 默认数据
 const defaultData = {
