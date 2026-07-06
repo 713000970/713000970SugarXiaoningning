@@ -298,6 +298,13 @@
   }
 
   function fillOrgIdInput(shopName, providerName) {
+    if (typeof global.correctChongwengeInputs === 'function') {
+      global.correctChongwengeInputs({ skipReload: true });
+      var shopEl = document.getElementById('shop-search-input');
+      var providerEl = document.getElementById('provider-search-input');
+      if (shopEl) shopName = shopEl.value;
+      if (providerEl) providerName = providerEl.value;
+    }
     var input = document.getElementById('org-id-input');
     if (!input) return;
     var shop = String(shopName || '').trim();
@@ -361,6 +368,9 @@
   }
 
   function fetchBbmBrandsForContext(forceRefresh) {
+    if (typeof global.correctChongwengeInputs === 'function') {
+      global.correctChongwengeInputs({ skipReload: true });
+    }
     var shopName = (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value || '').trim();
     var orgInput = document.getElementById('org-id-input');
     var orgIdRaw = orgInput ? String(orgInput.value || '').trim() : '';

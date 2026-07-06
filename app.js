@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260526-44';
+var RULE_LIBRARY_BUILD = '20260706-01';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -60,9 +60,11 @@ const STORAGE_KEYS = {
 const APP_LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 const DELETED_BRANDS_KEY = 'rule_library_deleted_brands';
 const DELETED_SHOPS_KEY = 'rule_library_deleted_shops';
+const DELETED_PROVIDERS_KEY = 'rule_library_deleted_providers';
 const STANDARD_RULE_FILL_DONE_KEY = 'rule_library_standard_fill_v1';
 const CHONGWENGE_PROVIDER_NAME = '北京时代圣哲教育科技有限公司';
 const CHONGWENGE_SHOP_NAME = '崇文阁';
+const CHONGWENGE_ORG_ID = '490090';
 
 function providerHasMeaningfulRule(p) {
   if (!p) return false;
@@ -774,6 +776,7 @@ async function runChongwengeShopNameMigration() {
 
 window.migrateChongwengeShopName = migrateChongwengeShopName;
 window.runChongwengeShopNameMigration = runChongwengeShopNameMigration;
+window.correctChongwengeInputs = correctChongwengeInputs;
 
 // 默认数据
 const defaultData = {
@@ -1012,6 +1015,40 @@ function isEntitySameExact(source, target) {
   if (!sourceKey && !targetKey) return true;
   if (!sourceKey || !targetKey) return false;
   return sourceKey === targetKey;
+}
+
+function isChongwengeProviderName(value) {
+  return isEntityMatched(value, CHONGWENGE_PROVIDER_NAME);
+}
+
+function shouldUseChongwengeShop(shopName, providerName, orgId) {
+  return isChongwengeProviderName(shopName) ||
+    isChongwengeProviderName(providerName) ||
+    String(orgId || '').trim() === CHONGWENGE_ORG_ID;
+}
+
+function correctChongwengeInputs(options) {
+  options = options || {};
+  var shopInput = document.getElementById('shop-search-input');
+  var providerInput = document.getElementById('provider-search-input');
+  var orgInput = document.getElementById('org-id-input');
+  var shopVal = shopInput ? String(shopInput.value || '').trim() : '';
+  var providerVal = providerInput ? String(providerInput.value || '').trim() : '';
+  var orgVal = orgInput ? String(orgInput.value || '').trim() : '';
+  if (!shouldUseChongwengeShop(shopVal, providerVal, orgVal)) return false;
+  if (shopInput && shopInput.value !== CHONGWENGE_SHOP_NAME) {
+    shopInput.value = CHONGWENGE_SHOP_NAME;
+  }
+  if (providerInput && !providerVal) {
+    providerInput.value = CHONGWENGE_PROVIDER_NAME;
+  }
+  if (orgInput && !orgVal) {
+    orgInput.value = CHONGWENGE_ORG_ID;
+  }
+  if (!options.skipReload) {
+    loadBrandsByShopAndShowDropdown(CHONGWENGE_SHOP_NAME);
+  }
+  return true;
 }
 
 /**
@@ -1716,6 +1753,17 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ai-query')?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') aiQuery();
   });
+
+  document.getElementById('org-id-input')?.addEventListener('input', function() {
+    correctChongwengeInputs();
+  });
+  document.getElementById('provider-search-input')?.addEventListener('input', function() {
+    correctChongwengeInputs();
+  });
+  document.getElementById('shop-search-input')?.addEventListener('blur', function() {
+    correctChongwengeInputs();
+  });
+  correctChongwengeInputs();
   
   // 点击其他地方关闭下拉框
   document.addEventListener('click', (e) => {
@@ -2268,6 +2316,9 @@ function searchShopByInput() {
 }
 
 function selectShop(shopName) {
+  if (shouldUseChongwengeShop(shopName, '', '')) {
+    shopName = CHONGWENGE_SHOP_NAME;
+  }
   var input = document.getElementById('shop-search-input');
   var dropdown = document.getElementById('shop-dropdown');
   if (input) input.value = shopName;
@@ -2311,6 +2362,10 @@ function getBbmOrgIdForCurrentShop() {
   var provider = (document.getElementById('provider-search-input') && document.getElementById('provider-search-input').value || '').trim();
   var orgInput = document.getElementById('org-id-input');
   var typed = orgInput ? String(orgInput.value || '').trim() : '';
+  if (shouldUseChongwengeShop(shop, provider, typed)) {
+    correctChongwengeInputs({ skipReload: true });
+    return CHONGWENGE_ORG_ID;
+  }
   if (typed) return typed;
   if (window.BbmBrandApi && shop) {
     var saved = BbmBrandApi.getOrgIdForShop(shop);
@@ -3099,6 +3154,7 @@ function openAddProviderDirect(name) {
 }
 
 function selectProvider(providerName) {
+  var forceChongwenge = shouldUseChongwengeShop('', providerName, '');
   var dropdown = document.getElementById('provider-dropdown');
   if (dropdown) dropdown.style.display = 'none';
   
@@ -3163,6 +3219,9 @@ function selectProvider(providerName) {
     }
     if (!preferredShop) {
       preferredShop = pickPreferredShopForProvider(uniqueShops, providerName);
+    }
+    if (forceChongwenge) {
+      preferredShop = CHONGWENGE_SHOP_NAME;
     }
     if (shopInput) {
       if (preferredShop) {
