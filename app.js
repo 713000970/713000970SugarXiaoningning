@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260708-06';
+var RULE_LIBRARY_BUILD = '20260708-07';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -68,6 +68,7 @@ const CHONGWENGE_SHOP_NAME = '崇文阁';
 const CHONGWENGE_ORG_ID = '490090';
 const YIBEN_CULTURE_SHOP_NAME = '山东一本图书文化有限公司';
 const YIBEN_CULTURE_ORG_ID = '655943';
+const YIBEN_CULTURE_CACHE_FIX_KEY = 'rule_library_yiben_culture_cache_fix_20260708_07';
 
 function providerHasMeaningfulRule(p) {
   if (!p) return false;
@@ -390,6 +391,18 @@ function isStaleBbmSeriesForCurrentOrg(p, seriesList, orgId) {
   if (name && lookup.byName[name]) return false;
   if (p.bbmOrgId && orgId && String(p.bbmOrgId) === String(orgId)) return false;
   return true;
+}
+
+function isRuleAllowedForStrictBbmOrgContext(p, seriesList, orgId) {
+  if (!p) return false;
+  if (!String((p && p.series) || '').trim()) return true;
+  if (orgId && String(p.bbmOrgId || '') === String(orgId)) return true;
+  if (!seriesList || !seriesList.length) return false;
+  var lookup = buildBbmSeriesLookup(seriesList);
+  var id = String(p.bbmSeriesId || '').trim();
+  if (id && lookup.byId[id]) return true;
+  var name = normalizeText((p && p.series) || '');
+  return !!(name && lookup.byName[name]);
 }
 
 function pruneStaleBbmSeriesRuleCardsForContext(providers, shopName, providerName, brandName, seriesList, orgId) {
@@ -1591,6 +1604,14 @@ function shouldUseYibenCultureShop(shopName, providerName, orgId) {
     String(orgId || '').trim() === YIBEN_CULTURE_ORG_ID;
 }
 
+function clearYibenCultureBbmCacheOnce() {
+  if (localStorage.getItem(YIBEN_CULTURE_CACHE_FIX_KEY) === '1') return;
+  if (window.BbmBrandApi && typeof BbmBrandApi.clearCacheEntry === 'function') {
+    BbmBrandApi.clearCacheEntry(YIBEN_CULTURE_ORG_ID);
+  }
+  localStorage.setItem(YIBEN_CULTURE_CACHE_FIX_KEY, '1');
+}
+
 function correctYibenCultureInputs(options) {
   options = options || {};
   var shopInput = document.getElementById('shop-search-input');
@@ -1612,6 +1633,7 @@ function correctYibenCultureInputs(options) {
   if (window.BbmBrandApi && typeof BbmBrandApi.saveShopOrgId === 'function') {
     BbmBrandApi.saveShopOrgId(YIBEN_CULTURE_SHOP_NAME, YIBEN_CULTURE_ORG_ID);
   }
+  clearYibenCultureBbmCacheOnce();
   if (!options.skipReload) {
     loadBrandsByShopAndShowDropdown(YIBEN_CULTURE_SHOP_NAME);
   }
@@ -3504,6 +3526,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
   var relaxedHintHtml = '';
   var currentBbmOrgId = getBbmOrgIdForCurrentShop();
   var currentBbmSeriesList = getBbmSeriesListForBrand(brandName);
+  var strictBbmOrgScope = shouldUseYibenCultureShop(targetShopTrim, providerName, currentBbmOrgId);
 
   if (targetShopTrim && providerName && brandName) {
     if (currentBbmSeriesList.length) {
@@ -3527,6 +3550,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
     var brandMatched = brandMatchesUi(p && p.brand, brandName);
     var shopMatched = !targetShopTrim || rowShopMatchesSearch(p, shopName);
     var providerMatched = !providerName || isEntityMatched(p && p.name, providerName);
+    if (strictBbmOrgScope && !isRuleAllowedForStrictBbmOrgContext(p, currentBbmSeriesList, currentBbmOrgId)) return;
     if (currentBbmSeriesList.length && isStaleBbmSeriesForCurrentOrg(p, currentBbmSeriesList, currentBbmOrgId)) return;
     if (brandMatched && shopMatched && providerMatched) {
       matched.push({ data: p, index: i });
@@ -3540,6 +3564,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       if (isRuleCardDeleted(p, shopName)) return;
       if (!brandMatchesUi(p && p.brand, brandName)) return;
       if (!rowShopMatchesSearch(p, shopName)) return;
+      if (strictBbmOrgScope && !isRuleAllowedForStrictBbmOrgContext(p, currentBbmSeriesList, currentBbmOrgId)) return;
       if (currentBbmSeriesList.length && isStaleBbmSeriesForCurrentOrg(p, currentBbmSeriesList, currentBbmOrgId)) return;
       retry.push({ data: p, index: i });
     });
@@ -3553,6 +3578,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
   if (matched.length === 0 && !targetShopTrim) {
     providersData.forEach(function(p, i) {
       if (isRuleCardDeleted(p, shopName)) return;
+      if (strictBbmOrgScope && !isRuleAllowedForStrictBbmOrgContext(p, currentBbmSeriesList, currentBbmOrgId)) return;
       if (currentBbmSeriesList.length && isStaleBbmSeriesForCurrentOrg(p, currentBbmSeriesList, currentBbmOrgId)) return;
       if (brandMatchesUi(p && p.brand, brandName)) {
         matched.push({ data: p, index: i });
@@ -3660,9 +3686,11 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       return;
     }
     display.style.display = 'block';
-    var emptyHint = bbmSeriesNames.length
-      ? '正在同步书城系列规则卡…若仍为空请点选上方系列标签。'
-      : '该品牌下未找到所选系列，请点 +新增系列添加。';
+    var emptyHint = strictBbmOrgScope && !bbmSeriesNames.length
+      ? '该新机构暂未读取到书城系列，请点击「从书城获取品牌系列」实时拉取。'
+      : (bbmSeriesNames.length
+        ? '正在同步书城系列规则卡…若仍为空请点选上方系列标签。'
+        : '该品牌下未找到所选系列，请点 +新增系列添加。');
     display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">' + emptyHint + '</span></div>';
     return;
   }
