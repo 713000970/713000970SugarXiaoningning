@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260708-01';
+var RULE_LIBRARY_BUILD = '20260708-02';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -1004,36 +1004,72 @@ function normalizeEntityKey(value) {
   return normalizeText(value).replace(/[()（）\s]/g, '');
 }
 
+var _deletedRuleCardSetCacheRaw = null;
+var _deletedRuleCardSetCache = null;
+
 function getDeletedRuleCardSet() {
+  var raw = localStorage.getItem(DELETED_RULE_CARDS_KEY) || '[]';
+  if (_deletedRuleCardSetCache && _deletedRuleCardSetCacheRaw === raw) {
+    return _deletedRuleCardSetCache;
+  }
   var arr;
   try {
-    arr = JSON.parse(localStorage.getItem(DELETED_RULE_CARDS_KEY) || '[]');
+    arr = JSON.parse(raw);
   } catch (e) {
     arr = [];
   }
-  return new Set((arr || []).map(function(key) { return String(key || ''); }).filter(Boolean));
+  _deletedRuleCardSetCacheRaw = raw;
+  _deletedRuleCardSetCache = new Set((arr || []).map(function(key) { return String(key || ''); }).filter(Boolean));
+  return _deletedRuleCardSetCache;
 }
 
 function saveDeletedRuleCardSet(setObj) {
-  localStorage.setItem(DELETED_RULE_CARDS_KEY, JSON.stringify(Array.from(setObj || [])));
+  var raw = JSON.stringify(Array.from(setObj || []));
+  localStorage.setItem(DELETED_RULE_CARDS_KEY, raw);
+  _deletedRuleCardSetCacheRaw = raw;
+  _deletedRuleCardSetCache = new Set(Array.from(setObj || []));
 }
 
 function resolveRuleCardDeletionShop(p, contextShop) {
   var ctx = String(contextShop || '').trim();
-  if (ctx && rowShopMatchesSearch(p, ctx)) return ctx;
-  var resolved = resolveRuleShopName(p, ctx);
-  if (resolved && resolved !== '-') return resolved;
-  return String((p && (p.shop || p.shopname)) || ctx || '').trim();
+  if (ctx) return ctx;
+  return String((p && (p.shop || p.shopname)) || '').trim();
+}
+
+function buildRuleCardDeletionKeyFromParts(shop, provider, brand, series) {
+  var shopKey = normalizeEntityKey(shop);
+  var providerKey = normalizeEntityKey(provider);
+  var brandKey = normalizeText(brand);
+  var seriesKey = normalizeText(series || '');
+  if (!shopKey && !providerKey && !brandKey && !seriesKey) return '';
+  return [shopKey, providerKey, brandKey, seriesKey].join('|');
+}
+
+function ruleCardDeletionKeys(p, contextShop) {
+  if (!p) return [];
+  var shops = [
+    contextShop,
+    p && p.shop,
+    p && p.shopname
+  ].map(function(value) {
+    return String(value || '').trim();
+  }).filter(Boolean);
+  if (!shops.length) shops = [''];
+
+  var seen = {};
+  var keys = [];
+  shops.forEach(function(shop) {
+    var key = buildRuleCardDeletionKeyFromParts(shop, p && p.name, p && p.brand, (p && p.series) || '');
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    keys.push(key);
+  });
+  return keys;
 }
 
 function ruleCardDeletionKey(p, contextShop) {
-  if (!p) return '';
-  var shopKey = normalizeEntityKey(resolveRuleCardDeletionShop(p, contextShop));
-  var providerKey = normalizeEntityKey(p && p.name);
-  var brandKey = normalizeText(p && p.brand);
-  var seriesKey = normalizeText((p && p.series) || '');
-  if (!shopKey && !providerKey && !brandKey && !seriesKey) return '';
-  return [shopKey, providerKey, brandKey, seriesKey].join('|');
+  var keys = ruleCardDeletionKeys(p, contextShop);
+  return keys[0] || '';
 }
 
 function buildRuleCardDeletionProbe(shop, provider, brand, series) {
@@ -1048,31 +1084,26 @@ function buildRuleCardDeletionProbe(shop, provider, brand, series) {
 }
 
 function markRuleCardDeleted(rule, contextShop) {
-  var key = ruleCardDeletionKey(rule, contextShop);
-  if (!key) return;
+  var keys = ruleCardDeletionKeys(rule, contextShop);
+  if (!keys.length) return;
   var setObj = getDeletedRuleCardSet();
-  setObj.add(key);
-  var nativeKey = ruleCardDeletionKey(rule, '');
-  if (nativeKey) setObj.add(nativeKey);
+  keys.forEach(function(key) { setObj.add(key); });
   saveDeletedRuleCardSet(setObj);
 }
 
 function unmarkRuleCardDeleted(rule, contextShop) {
-  var key = ruleCardDeletionKey(rule, contextShop);
-  var nativeKey = ruleCardDeletionKey(rule, '');
-  if (!key && !nativeKey) return;
+  var keys = ruleCardDeletionKeys(rule, contextShop);
+  if (!keys.length) return;
   var setObj = getDeletedRuleCardSet();
-  if (key) setObj.delete(key);
-  if (nativeKey) setObj.delete(nativeKey);
+  keys.forEach(function(key) { setObj.delete(key); });
   saveDeletedRuleCardSet(setObj);
 }
 
 function isRuleCardDeleted(rule, contextShop) {
-  var key = ruleCardDeletionKey(rule, contextShop);
-  var nativeKey = ruleCardDeletionKey(rule, '');
-  if (!key && !nativeKey) return false;
+  var keys = ruleCardDeletionKeys(rule, contextShop);
+  if (!keys.length) return false;
   var setObj = getDeletedRuleCardSet();
-  return (key && setObj.has(key)) || (nativeKey && setObj.has(nativeKey));
+  return keys.some(function(key) { return setObj.has(key); });
 }
 
 /** 公司/店铺名对齐：常见「文化」与「文化传媒」混用；「洛阳市」与「洛阳」工商/点评差异 */
