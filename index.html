@@ -510,7 +510,7 @@ function goHome() {
   <script src="cloud-sync.js?v=20260706-01"></script>
   <script src="customer-pool-org.js?v=20260526-pool2"></script>
   <script src="bbm-api.js?v=20260706-01"></script>
-  <script src="app.js?v=20260708-03"></script>
+  <script src="app.js?v=20260708-05"></script>
   <script>
     // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (async function() {
@@ -527,6 +527,9 @@ function goHome() {
         await cloudSync();
         if (typeof cleanupBlankPlaceholderProviders === 'function') {
           cleanupBlankPlaceholderProviders();
+        }
+        if (typeof runProviderDuplicateCleanupMigration === 'function') {
+          await runProviderDuplicateCleanupMigration({ silent: true, awaitCloud: true });
         }
         if (typeof runLegacyAlbumBookPlaceholderMigration === 'function') {
           await runLegacyAlbumBookPlaceholderMigration();
@@ -553,6 +556,9 @@ function goHome() {
           console.log('🚀 云端仍不足，已用官方 CSV 兜底:', boot.source, boot.count, '条');
           if (typeof runChongwengeShopNameMigration === 'function') {
             await runChongwengeShopNameMigration();
+          }
+          if (typeof runProviderDuplicateCleanupMigration === 'function') {
+            await runProviderDuplicateCleanupMigration({ silent: true, awaitCloud: true });
           }
           if (typeof cloudSync === 'function') await cloudSync();
         } catch (e) {

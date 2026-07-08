@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260708-03';
+var RULE_LIBRARY_BUILD = '20260708-05';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -304,6 +304,12 @@ function mergeRuleCardData(base, incoming) {
     next.id = incoming.id;
     changed = true;
   }
+  ['shop', 'shopname', 'name', 'brand', 'series'].forEach(function(field) {
+    if (!String(next[field] || '').trim() && String((incoming && incoming[field]) || '').trim()) {
+      next[field] = incoming[field];
+      changed = true;
+    }
+  });
   ['album', 'naming', 'split', 'pricing', 'publishTime', 'specialCase', 'otherInfo'].forEach(function(field) {
     if (field === 'album') {
       if (!String(next.album || '').trim() && String((incoming && incoming.album) || '').trim()) {
@@ -428,6 +434,128 @@ function dedupeMatchedRuleItemsForDisplay(items, shopName, providerName) {
     }
   });
   return result;
+}
+
+function providerDuplicateIdentityKey(p) {
+  var shopKey = normalizeEntityKey((p && p.shopname) || (p && p.shop) || (p && p.name));
+  var providerKey = normalizeEntityKey(p && p.name);
+  var brandKey = normalizeText(p && p.brand);
+  var seriesKey = normalizeText((p && p.series) || '');
+  if (!shopKey && !providerKey && !brandKey && !seriesKey) return '';
+  return [shopKey, providerKey, brandKey, seriesKey].join('|');
+}
+
+function providerSuspectIdentityKey(p) {
+  var providerKey = normalizeEntityKey(p && p.name);
+  var brandKey = normalizeText(p && p.brand);
+  var seriesKey = normalizeText((p && p.series) || '');
+  if (!providerKey && !brandKey && !seriesKey) return '';
+  return [providerKey, brandKey, seriesKey].join('|');
+}
+
+function providerRuleCompletenessScore(p) {
+  if (!p) return 0;
+  var score = 0;
+  if (String(p.id || '').trim()) score += 1;
+  if (String(p.bbmSeriesId || '').trim()) score += 2;
+  if (String(p.shop || '').trim()) score += 1;
+  if (String(p.shopname || '').trim()) score += 1;
+  if (String(p.album || '').trim()) score += 1;
+  ['naming', 'split', 'pricing', 'publishTime', 'specialCase', 'otherInfo'].forEach(function(field) {
+    if (!isPlaceholderRuleField(field, p && p[field])) score += 3;
+    else if (String((p && p[field]) || '').trim()) score += 1;
+  });
+  return score;
+}
+
+function compactDuplicateProviderRules(providers) {
+  var list = Array.isArray(providers) ? providers.slice() : getData(STORAGE_KEYS.PROVIDERS);
+  var groups = {};
+  list.forEach(function(p, i) {
+    var key = providerDuplicateIdentityKey(p);
+    if (!key) return;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(i);
+  });
+
+  var removeIdx = {};
+  var duplicateGroups = 0;
+  var removed = 0;
+  var changed = false;
+
+  Object.keys(groups).forEach(function(key) {
+    var indices = groups[key];
+    if (indices.length <= 1) return;
+    duplicateGroups += 1;
+    var keep = indices[0];
+    indices.forEach(function(i) {
+      if (providerRuleCompletenessScore(list[i]) > providerRuleCompletenessScore(list[keep])) keep = i;
+    });
+    indices.forEach(function(i) {
+      if (i === keep) return;
+      var merged = mergeRuleCardData(list[keep], list[i]);
+      if (merged.changed) {
+        list[keep] = merged.data;
+        changed = true;
+      }
+      removeIdx[i] = true;
+      removed += 1;
+    });
+  });
+
+  if (removed > 0) {
+    list = list.filter(function(_, i) { return !removeIdx[i]; });
+    changed = true;
+  }
+
+  return {
+    list: list,
+    changed: changed,
+    duplicateGroups: duplicateGroups,
+    removed: removed,
+    before: Array.isArray(providers) ? providers.length : getData(STORAGE_KEYS.PROVIDERS).length,
+    after: list.length
+  };
+}
+
+function auditProviderDuplicateStats(providers) {
+  var list = Array.isArray(providers) ? providers : getData(STORAGE_KEYS.PROVIDERS);
+  var groups = {};
+  var suspectGroups = {};
+  var seriesRows = 0;
+  var blankSeriesRows = 0;
+  (list || []).forEach(function(p) {
+    var key = providerDuplicateIdentityKey(p);
+    if (key) groups[key] = (groups[key] || 0) + 1;
+    var suspectKey = providerSuspectIdentityKey(p);
+    if (suspectKey) suspectGroups[suspectKey] = (suspectGroups[suspectKey] || 0) + 1;
+    if (String((p && p.series) || '').trim()) seriesRows += 1;
+    else blankSeriesRows += 1;
+  });
+  var duplicateGroups = 0;
+  var duplicateRows = 0;
+  var suspectDuplicateGroups = 0;
+  var suspectDuplicateRows = 0;
+  Object.keys(groups).forEach(function(key) {
+    if (groups[key] <= 1) return;
+    duplicateGroups += 1;
+    duplicateRows += groups[key] - 1;
+  });
+  Object.keys(suspectGroups).forEach(function(key) {
+    if (suspectGroups[key] <= 1) return;
+    suspectDuplicateGroups += 1;
+    suspectDuplicateRows += suspectGroups[key] - 1;
+  });
+  return {
+    total: (list || []).length,
+    duplicateGroups: duplicateGroups,
+    duplicateRows: duplicateRows,
+    unique: (list || []).length - duplicateRows,
+    suspectDuplicateGroups: suspectDuplicateGroups,
+    suspectDuplicateRows: suspectDuplicateRows,
+    seriesRows: seriesRows,
+    blankSeriesRows: blankSeriesRows
+  };
 }
 
 /** 书城系列改名后：按 bbmSeriesId / 1:1 孤儿匹配重命名本地卡，并合并重复系列卡 */
@@ -2029,10 +2157,40 @@ function cleanupBlankPlaceholderProviders() {
   }
 }
 
+async function runProviderDuplicateCleanupMigration(options) {
+  options = options || {};
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var beforeAudit = auditProviderDuplicateStats(providers);
+  console.log('[规则库] 当前运行数据审计（清理前）：' + JSON.stringify(beforeAudit));
+  var result = compactDuplicateProviderRules(providers);
+  if (!result.changed) {
+    console.log('[规则库] 重复规则卡检查：总数 ' + result.before + '，安全重复 ' + beforeAudit.duplicateRows + ' 条，疑似同系列重复 ' + beforeAudit.suspectDuplicateRows + ' 条');
+    return result;
+  }
+  var afterAudit = auditProviderDuplicateStats(result.list);
+  console.log('[规则库] 已合并重复规则卡：' + result.removed + ' 条，' + result.before + ' → ' + result.after + '；清理后：' + JSON.stringify(afterAudit));
+  if (typeof persistProviders === 'function') {
+    await persistProviders(result.list, { awaitCloud: !!options.awaitCloud });
+  } else {
+    setData(STORAGE_KEYS.PROVIDERS, result.list);
+  }
+  if (typeof updateStats === 'function') updateStats();
+  if (typeof loadProviders === 'function') loadProviders();
+  if (!options.silent && typeof showToast === 'function') {
+    showToast('已合并重复规则卡 ' + result.removed + ' 条');
+  }
+  return result;
+}
+
+window.auditProviderDuplicateStats = auditProviderDuplicateStats;
+window.compactDuplicateProviderRules = compactDuplicateProviderRules;
+window.runProviderDuplicateCleanupMigration = runProviderDuplicateCleanupMigration;
+
 document.addEventListener('DOMContentLoaded', () => {
   initData();
   if (typeof cloudSync !== 'function') {
     cleanupBlankPlaceholderProviders();
+    runProviderDuplicateCleanupMigration({ silent: true });
   }
   if (typeof initCollapsibles === 'function') initCollapsibles();
   loadProviderSelect();
