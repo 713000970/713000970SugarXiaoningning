@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260706-01';
+var RULE_LIBRARY_BUILD = '20260708-01';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -61,6 +61,7 @@ const APP_LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 const DELETED_BRANDS_KEY = 'rule_library_deleted_brands';
 const DELETED_SHOPS_KEY = 'rule_library_deleted_shops';
 const DELETED_PROVIDERS_KEY = 'rule_library_deleted_providers';
+const DELETED_RULE_CARDS_KEY = 'rule_library_deleted_rule_cards';
 const STANDARD_RULE_FILL_DONE_KEY = 'rule_library_standard_fill_v1';
 const CHONGWENGE_PROVIDER_NAME = '北京时代圣哲教育科技有限公司';
 const CHONGWENGE_SHOP_NAME = '崇文阁';
@@ -277,18 +278,22 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
   var renamed = 0;
 
   providers.forEach(function(p, i) {
+    if (isRuleCardDeleted(p, shopName)) return;
     if (!isSameContextProvider(p, shopName, providerName)) return;
     if (!brandMatchesUi(p && p.brand, brandName)) return;
     if (!p.bbmSeriesId) return;
     var bbm = seriesList.find(function(s) { return String(s.id) === String(p.bbmSeriesId); });
     if (!bbm) return;
     if (normalizeText(p.series) !== normalizeText(bbm.name)) {
-      providers[i] = Object.assign({}, p, { series: bbm.name });
+      var renamedRule = Object.assign({}, p, { series: bbm.name });
+      if (isRuleCardDeleted(renamedRule, shopName)) return;
+      providers[i] = renamedRule;
       renamed += 1;
     }
   });
 
   providers.forEach(function(p, i) {
+    if (isRuleCardDeleted(p, shopName)) return;
     if (!isSameContextProvider(p, shopName, providerName)) return;
     if (!brandMatchesUi(p && p.brand, brandName)) return;
     if (p.bbmSeriesId) return;
@@ -301,6 +306,7 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
   function matchedBbmIdSet() {
     var set = {};
     providers.forEach(function(p) {
+      if (isRuleCardDeleted(p, shopName)) return;
       if (!isSameContextProvider(p, shopName, providerName)) return;
       if (!brandMatchesUi(p && p.brand, brandName)) return;
       if (!String(p.series || '').trim()) return;
@@ -318,6 +324,7 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
 
   var orphanLocals = [];
   providers.forEach(function(p) {
+    if (isRuleCardDeleted(p, shopName)) return;
     if (!isSameContextProvider(p, shopName, providerName)) return;
     if (!brandMatchesUi(p && p.brand, brandName)) return;
     if (!String(p.series || '').trim()) return;
@@ -332,11 +339,14 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
     var orphanKey = normalizeText(orphanLocals[0].series);
     var target = unmatchedBbm[0];
     providers.forEach(function(p, i) {
+      if (isRuleCardDeleted(p, shopName)) return;
       if (!isSameContextProvider(p, shopName, providerName)) return;
       if (!brandMatchesUi(p && p.brand, brandName)) return;
       if (p.bbmSeriesId) return;
       if (normalizeText(p.series) !== orphanKey) return;
-      providers[i] = Object.assign({}, p, { series: target.name, bbmSeriesId: target.id });
+      var renamedOrphan = Object.assign({}, p, { series: target.name, bbmSeriesId: target.id });
+      if (isRuleCardDeleted(renamedOrphan, shopName)) return;
+      providers[i] = renamedOrphan;
       renamed += 1;
     });
   }
@@ -344,6 +354,7 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
   var deduped = 0;
   var groups = {};
   providers.forEach(function(p, i) {
+    if (isRuleCardDeleted(p, shopName)) return;
     if (!isSameContextProvider(p, shopName, providerName)) return;
     if (!brandMatchesUi(p && p.brand, brandName)) return;
     if (!String(p.series || '').trim()) return;
@@ -379,7 +390,10 @@ function isSeriesRuleBlank(p) {
 
 function seriesRuleExists(providers, shop, provider, brand, seriesName, bbmSeriesId) {
   var normSeries = normalizeText(seriesName);
+  var probe = buildRuleCardDeletionProbe(shop, provider, brand, seriesName);
+  if (isRuleCardDeleted(probe, shop)) return true;
   return providers.some(function(p) {
+    if (isRuleCardDeleted(p, shop)) return false;
     if (!isSameContextProvider(p, shop, provider)) return false;
     if (!brandMatchesUi(p && p.brand, brand)) return false;
     if (bbmSeriesId != null && bbmSeriesId !== '' && String(p.bbmSeriesId) === String(bbmSeriesId)) return true;
@@ -412,7 +426,9 @@ async function ensureBbmSeriesRuleCardsForBrand(shopName, providerName, brandNam
     seriesList.forEach(function(item) {
       var seriesName = item.name;
       if (seriesRuleExists(providers, shopName, providerName, brandName, seriesName, item.id)) return;
-      providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, seriesName, item.id));
+      var candidate = buildNewProviderRuleCard(shopName, providerName, brandName, seriesName, item.id);
+      if (isRuleCardDeleted(candidate, shopName)) return;
+      providers.push(candidate);
       created += 1;
     });
 
@@ -988,6 +1004,77 @@ function normalizeEntityKey(value) {
   return normalizeText(value).replace(/[()（）\s]/g, '');
 }
 
+function getDeletedRuleCardSet() {
+  var arr;
+  try {
+    arr = JSON.parse(localStorage.getItem(DELETED_RULE_CARDS_KEY) || '[]');
+  } catch (e) {
+    arr = [];
+  }
+  return new Set((arr || []).map(function(key) { return String(key || ''); }).filter(Boolean));
+}
+
+function saveDeletedRuleCardSet(setObj) {
+  localStorage.setItem(DELETED_RULE_CARDS_KEY, JSON.stringify(Array.from(setObj || [])));
+}
+
+function resolveRuleCardDeletionShop(p, contextShop) {
+  var ctx = String(contextShop || '').trim();
+  if (ctx && rowShopMatchesSearch(p, ctx)) return ctx;
+  var resolved = resolveRuleShopName(p, ctx);
+  if (resolved && resolved !== '-') return resolved;
+  return String((p && (p.shop || p.shopname)) || ctx || '').trim();
+}
+
+function ruleCardDeletionKey(p, contextShop) {
+  if (!p) return '';
+  var shopKey = normalizeEntityKey(resolveRuleCardDeletionShop(p, contextShop));
+  var providerKey = normalizeEntityKey(p && p.name);
+  var brandKey = normalizeText(p && p.brand);
+  var seriesKey = normalizeText((p && p.series) || '');
+  if (!shopKey && !providerKey && !brandKey && !seriesKey) return '';
+  return [shopKey, providerKey, brandKey, seriesKey].join('|');
+}
+
+function buildRuleCardDeletionProbe(shop, provider, brand, series) {
+  shop = String(shop || '').trim();
+  return {
+    shop: shop,
+    shopname: shop,
+    name: String(provider || '').trim(),
+    brand: String(brand || '').trim(),
+    series: String(series || '').trim()
+  };
+}
+
+function markRuleCardDeleted(rule, contextShop) {
+  var key = ruleCardDeletionKey(rule, contextShop);
+  if (!key) return;
+  var setObj = getDeletedRuleCardSet();
+  setObj.add(key);
+  var nativeKey = ruleCardDeletionKey(rule, '');
+  if (nativeKey) setObj.add(nativeKey);
+  saveDeletedRuleCardSet(setObj);
+}
+
+function unmarkRuleCardDeleted(rule, contextShop) {
+  var key = ruleCardDeletionKey(rule, contextShop);
+  var nativeKey = ruleCardDeletionKey(rule, '');
+  if (!key && !nativeKey) return;
+  var setObj = getDeletedRuleCardSet();
+  if (key) setObj.delete(key);
+  if (nativeKey) setObj.delete(nativeKey);
+  saveDeletedRuleCardSet(setObj);
+}
+
+function isRuleCardDeleted(rule, contextShop) {
+  var key = ruleCardDeletionKey(rule, contextShop);
+  var nativeKey = ruleCardDeletionKey(rule, '');
+  if (!key && !nativeKey) return false;
+  var setObj = getDeletedRuleCardSet();
+  return (key && setObj.has(key)) || (nativeKey && setObj.has(nativeKey));
+}
+
 /** 公司/店铺名对齐：常见「文化」与「文化传媒」混用；「洛阳市」与「洛阳」工商/点评差异 */
 function alignCompanyMatchKey(value) {
   var k = normalizeEntityKey(value);
@@ -1158,6 +1245,8 @@ function getAllProvidersForSearch() {
   var result = [];
   merged.forEach(function(p) {
     if (!p) return;
+    if (deletedBrandSet.has(normalizeText(p && p.brand))) return;
+    if (isRuleCardDeleted(p)) return;
     var key = [
       normalizeText(p.shop),
       normalizeText(p.shopname),
@@ -2390,6 +2479,7 @@ function loadBrandsByShopAndShowDropdown(shopName) {
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
   var hasShop = String(shopName || '').trim();
   var matched = providersData.filter(function(p) {
+    if (isRuleCardDeleted(p, shopName)) return false;
     if (!hasShop && !providerName) return false;
     if (hasShop && !rowShopMatchesSearch(p, shopName)) return false;
     if (providerName && !isEntityMatched(p && p.name, providerName)) return false;
@@ -2752,13 +2842,19 @@ async function autoEnsureSeriesRuleAndRefresh(shopName, providerName, brandName,
     var providers = getData(STORAGE_KEYS.PROVIDERS);
     var normSeries = normalizeText(seriesName);
     var exists = providers.some(function(p) {
+      if (isRuleCardDeleted(p, shopName)) return false;
       return isSameContextProvider(p, shopName, providerName) &&
         brandMatchesUi(p && p.brand, brandName) &&
         normalizeText(String((p && p.series) || '').trim()) === normSeries;
     });
 
     if (!exists) {
-      providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, seriesName));
+      var newRule = buildNewProviderRuleCard(shopName, providerName, brandName, seriesName);
+      if (isRuleCardDeleted(newRule, shopName)) {
+        showRulesByBrandAndShop(brandName, shopName, seriesName, true);
+        return;
+      }
+      providers.push(newRule);
       if (typeof persistProviders === 'function') {
         await persistProviders(providers, { awaitCloud: true });
       } else {
@@ -2866,6 +2962,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
   // 过滤：品牌 + 店铺语境 + 提供者（与 loadBrandsByShopAndShowDropdown 一致，避免「有品牌名、规则卡片为 0」）
   var matched = [];
   providersData.forEach(function(p, i) {
+    if (isRuleCardDeleted(p, shopName)) return;
     var brandMatched = brandMatchesUi(p && p.brand, brandName);
     var shopMatched = !targetShopTrim || rowShopMatchesSearch(p, shopName);
     var providerMatched = !providerName || isEntityMatched(p && p.name, providerName);
@@ -2878,6 +2975,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
   if (matched.length === 0 && providerName && targetShopTrim) {
     var retry = [];
     providersData.forEach(function(p, i) {
+      if (isRuleCardDeleted(p, shopName)) return;
       if (!brandMatchesUi(p && p.brand, brandName)) return;
       if (!rowShopMatchesSearch(p, shopName)) return;
       retry.push({ data: p, index: i });
@@ -2891,6 +2989,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
   // 仅在“未选择店铺”时才允许按品牌兜底，避免跨店铺串数据
   if (matched.length === 0 && !targetShopTrim) {
     providersData.forEach(function(p, i) {
+      if (isRuleCardDeleted(p, shopName)) return;
       if (brandMatchesUi(p && p.brand, brandName)) {
         matched.push({ data: p, index: i });
       }
@@ -2910,6 +3009,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       var brandHit = 0;
       var bothHit = 0;
       providersData.forEach(function(p) {
+        if (isRuleCardDeleted(p, shopName)) return;
         var s = rowShopMatchesSearch(p, shopName);
         var b = brandMatchesUi(p && p.brand, brandName);
         if (s) shopHit += 1;
@@ -2929,7 +3029,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
           ? ' 若店铺为 0，请核对库里「店铺/店铺别名/提供者」是否含「洛阳」「朝霞」等关键字。'
           : '') +
         '</div>' +
-        buildRoughMatchSamplesHtml(providersData, ['朝霞', '王朝霞', '洛阳朝霞']);
+        buildRoughMatchSamplesHtml(providersData.filter(function(p) { return !isRuleCardDeleted(p, shopName); }), ['朝霞', '王朝霞', '洛阳朝霞']);
     } else {
       display.style.display = 'none';
     }
@@ -2980,7 +3080,9 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
     });
   }
 
-  var bbmSeriesNames = getBbmSeriesNamesForBrand(brandName);
+  var bbmSeriesNames = getBbmSeriesNamesForBrand(brandName).filter(function(seriesName) {
+    return !isRuleCardDeleted(buildRuleCardDeletionProbe(shopName, providerName, brandName, seriesName), shopName);
+  });
   renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '', undefined, bbmSeriesNames);
   if (matched.length === 0) {
     if (tryAutoEnsureSeriesRuleCard(shopName, providerName, brandName, seriesFilter, forceRefresh)) {
@@ -3290,8 +3392,10 @@ function onBrandChange() {
   var providerName = providerInput ? providerInput.value : '';
   
   // 从预置数据和本地存储中匹配
-  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
-  var allProviders = [...getPresetProvidersSafe(), ...localProviders];
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS).filter(function(p) { return !isRuleCardDeleted(p); });
+  var allProviders = getPresetProvidersSafe()
+    .filter(function(p) { return !isRuleCardDeleted(p); })
+    .concat(localProviders);
   
   var matched;
   if (providerName && providerName.trim() !== '') {
@@ -3321,6 +3425,7 @@ function displayBrandRule(brandName) {
   if (!brandName) return;
   
   var matched = getPresetProvidersSafe().filter(function(p) {
+    if (isRuleCardDeleted(p)) return false;
     if (providerName) {
       return p.brand === brandName && p.name === providerName;
     }
@@ -3368,8 +3473,10 @@ function onSeriesChange() {
   }
   
   // 检查 presetData 和 localStorage
-  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
-  var allProviders = [...getPresetProvidersSafe(), ...localProviders];
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS).filter(function(p) { return !isRuleCardDeleted(p); });
+  var allProviders = getPresetProvidersSafe()
+    .filter(function(p) { return !isRuleCardDeleted(p); })
+    .concat(localProviders);
   
   // 获取匹配的规则数据：宽松匹配（包含关系）
   var matched = allProviders.filter(function(p) {
@@ -3488,9 +3595,10 @@ function saveEditRule() {
     newProvidersList[matchedIndex].pricing = newPricing;
     newProvidersList[matchedIndex].publishTime = newPublishTime;
     newProvidersList[matchedIndex].specialCase = newSpecialCase;
+    unmarkRuleCardDeleted(newProvidersList[matchedIndex]);
   } else {
     // 新增项
-    newProvidersList.push({
+    var newEditedRule = {
       name: providerName,
       brand: brandName,
       series: seriesName,
@@ -3500,7 +3608,9 @@ function saveEditRule() {
       pricing: newPricing,
       publishTime: newPublishTime,
       specialCase: newSpecialCase
-    });
+    };
+    unmarkRuleCardDeleted(newEditedRule);
+    newProvidersList.push(newEditedRule);
   }
   
   setData(STORAGE_KEYS.PROVIDERS, newProvidersList);
@@ -3652,12 +3762,19 @@ function deleteRuleByIndex(globalIndex) {
   
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : [];
-  if (!providersData[globalIndex]) {
+  var deletedRule = providersData[globalIndex];
+  if (!deletedRule) {
     showToast('未找到该规则');
     return;
   }
   
-  providersData.splice(globalIndex, 1);
+  markRuleCardDeleted(deletedRule, currentEditingShop);
+  var deletedKey = ruleCardDeletionKey(deletedRule, currentEditingShop);
+  providersData = providersData.filter(function(p, i) {
+    if (i === globalIndex) return false;
+    if (isRuleCardDeleted(p, currentEditingShop)) return false;
+    return ruleCardDeletionKey(p, currentEditingShop) !== deletedKey;
+  });
   setData(STORAGE_KEYS.PROVIDERS, providersData);
   showToast('删除成功');
   showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries, true);
@@ -4168,7 +4285,7 @@ async function saveProvider() {
   
   const providers = getData(STORAGE_KEYS.PROVIDERS);
   var shopnameVal = document.getElementById('new-provider-shopname')?.value.trim() || shop || '';
-  providers.push({
+  var newProviderRule = {
     shop: shop || '',
     shopname: shopnameVal,
     name,
@@ -4181,7 +4298,9 @@ async function saveProvider() {
     publishTime: publishTime || '',
     specialCase: specialCase || '',
     otherInfo: otherInfo || ''
-  });
+  };
+  unmarkRuleCardDeleted(newProviderRule, shop);
+  providers.push(newProviderRule);
   var syncResult = await persistProviders(providers, { awaitCloud: true });
   toastAfterProviderSync(syncResult);
   closeModal('modal-provider');
@@ -4231,13 +4350,18 @@ async function saveBrand(nameInput) {
   // 自动建立品牌与店铺/提供者的关联，确保可被搜索链路命中
   var providers = getData(STORAGE_KEYS.PROVIDERS);
   var hasLinkedRecord = providers.some(function(p) {
+    if (isRuleCardDeleted(p, shopName)) return false;
     return isSameContextProvider(p, shopName, providerName) &&
       normalizeText(p.brand) === normalizeText(name);
   });
   if (!hasLinkedRecord) {
-    providers.push(buildNewProviderRuleCard(shopName, providerName, name, ''));
+    var newBrandRule = buildNewProviderRuleCard(shopName, providerName, name, '');
+    unmarkRuleCardDeleted(newBrandRule, shopName);
+    providers.push(newBrandRule);
     var syncResult = await persistProviders(providers, { awaitCloud: true });
     toastAfterProviderSync(syncResult);
+  } else {
+    unmarkRuleCardDeleted(buildRuleCardDeletionProbe(shopName, providerName, name, ''), shopName);
   }
 
   // 新增后立即刷新当前店铺品牌缓存，避免搜索仍使用旧列表
@@ -4376,9 +4500,13 @@ async function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, pr
   });
 
   if (!linked) {
-    providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, name));
+    var newSeriesRule = buildNewProviderRuleCard(shopName, providerName, brandName, name);
+    unmarkRuleCardDeleted(newSeriesRule, shopName);
+    providers.push(newSeriesRule);
     var syncResult = await persistProviders(providers, { awaitCloud: true });
     toastAfterProviderSync(syncResult);
+  } else {
+    unmarkRuleCardDeleted(buildRuleCardDeletionProbe(shopName, providerName, brandName, name), shopName);
   }
 
   var seriesSelect = document.getElementById('series-select');
@@ -4447,7 +4575,7 @@ function updateProvider() {
   
   const providers = getData(STORAGE_KEYS.PROVIDERS);
   var prev = providers[editingProviderIndex] || {};
-  providers[editingProviderIndex] = {
+  var updatedRule = {
     id: prev.id,
     shop: shop || '',
     shopname: shopname || '',
@@ -4462,6 +4590,8 @@ function updateProvider() {
     specialCase: specialCase || '',
     otherInfo: otherInfo || ''
   };
+  unmarkRuleCardDeleted(updatedRule, shop);
+  providers[editingProviderIndex] = updatedRule;
   setData(STORAGE_KEYS.PROVIDERS, providers);
   
   closeModal('modal-provider');
@@ -4517,7 +4647,9 @@ function aiQuery() {
   const isStrictMultiTermQuery = queryTerms.length >= 2;
   
   // 首先搜索提供者/品牌/系列数据 - 只搜索 localStorage 中的用户保存数据
-  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS).filter(function(p) {
+    return !isRuleCardDeleted(p);
+  });
   var deletedBrandSet = getDeletedBrandSet();
   var matchedProviders = [];
 
