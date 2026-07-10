@@ -1,590 +1,1555 @@
 ﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>教辅店铺个性化生产规则库</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='48'%3E📚%3C/text%3E%3C/svg%3E">
-  <!-- 不使用 Google Fonts，避免国内网络 ERR_CONNECTION_TIMED_OUT -->
-  <link rel="stylesheet" href="style.css?v=20260521-05">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>教辅生产月度数据</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:#f5f5f5; --surface:#fff; --ink:#222; --muted:#888;
+      --line:#e8e8e8; --green-bg:#eef8f0; --green-border:#d0e8d6;
+      --y25:#c45c26; --y26:#1e5f74; --up:#2d6a4f; --down:#d94f4f;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:"DM Sans","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+    .wrap{max-width:1400px;margin:0 auto;padding:28px 20px 60px;display:flex;flex-direction:column}
+    .page-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
+    .page-title{display:flex;align-items:center;justify-content:center;gap:12px;min-width:0}
+    .page-header .logo{height:40px;width:auto;display:block;flex-shrink:0}
+    h1{font-family:"Noto Serif SC",serif;font-size:28px;margin-bottom:0}
+    .share-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .share-btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:8px 14px;font-size:13px;font-family:inherit;font-weight:600;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+    .share-btn:hover{border-color:var(--green-border);background:var(--green-bg)}
+    .share-status{font-size:12px;color:var(--muted);max-width:260px;line-height:1.5}
+    .section-nav{order:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:4px 0 24px;padding:14px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.05)}
+    .section-nav::before{content:"项目目录";grid-column:1/-1;font-size:15px;font-weight:800;color:var(--ink);letter-spacing:.02em}
+    .section-nav a{display:flex;align-items:center;justify-content:space-between;min-height:56px;padding:0 18px;border:1px solid var(--green-border);border-radius:10px;background:linear-gradient(180deg,#f8fcf9,#fff);color:var(--ink);font-size:17px;font-weight:800;text-decoration:none;box-shadow:0 2px 10px rgba(45,106,79,.06);transition:transform .15s,background .15s,border-color .15s,color .15s}
+    .section-nav a::after{content:"›";font-size:24px;line-height:1;color:var(--up)}
+    .section-nav a:hover{transform:translateY(-1px);background:#eef8f0;border-color:#9bc9aa;color:var(--up)}
+    .page-header{order:0}
+    #overall-anchor,#overall-summary-anchor,#overall-detail-anchor,#collection-anchor,#production-anchor,#price-anchor,#publish-anchor,#unpub-anchor,#provider-overview-anchor{scroll-margin-top:18px}
+    #overall-anchor{order:10;scroll-margin-top:16px}
+    .overall-section-main{order:11}
+    .overall-section-detail{order:12}
+    #provider-anchor{order:20;scroll-margin-top:16px}
+    .provider-overview-section{order:21}
+    #provider-detail{order:22;scroll-margin-top:16px}
+    #july-anchor{order:30;scroll-margin-top:16px}
+    #july-section{order:31}
+    .side-toc{position:fixed;right:18px;top:112px;width:204px;z-index:30;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.08);backdrop-filter:blur(6px)}
+    .side-toc-title{font-size:13px;font-weight:700;color:var(--ink);margin-bottom:8px}
+    .side-toc a,.side-toc button{width:100%;display:flex;align-items:center;min-height:30px;border:0;background:transparent;color:#555;text-decoration:none;text-align:left;font-family:inherit;font-size:12px;line-height:1.35;border-radius:7px;padding:6px 8px;cursor:pointer}
+    .side-toc a:hover,.side-toc button:hover{background:var(--green-bg);color:var(--up)}
+    .side-toc .toc-main{font-weight:700;color:var(--ink)}
+    .side-toc .toc-sub{padding-left:18px;color:#666}
+    .side-toc .toc-divider{height:1px;background:var(--line);margin:7px 0}
+    .side-toc button{margin-top:6px;justify-content:center;background:#f7faf8;border:1px solid var(--green-border);font-weight:700;color:var(--up)}
+    .sub{color:var(--muted);font-size:14px;margin-bottom:20px}
+    .tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+    .tag{font-size:12px;padding:4px 10px;background:#fff;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+    .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:32px}
+    .metric-card{background:linear-gradient(180deg,#eef8f0,#e4f3e8);border:1px solid var(--green-border);border-radius:12px;padding:26px 20px 20px;text-align:center;box-shadow:0 2px 10px rgba(45,106,79,.07)}
+    .metric-title{font-size:14px;color:#666;margin-bottom:14px}
+    .metric-value{font-size:40px;font-weight:700;line-height:1;margin-bottom:16px}
+    .compare-box{display:inline-block;background:#fff;border:1px solid #e0e0e0;border-radius:6px;padding:8px 24px}
+    .compare-label{display:block;font-size:12px;color:#888;margin-bottom:2px}
+    .compare-val{font-size:15px;font-weight:600}
+    .compare-val.up{color:var(--up)} .compare-val.down{color:var(--down)} .compare-val.flat{color:#888}
+    .section{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:20px}
+    .section-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+    .section-title{font-size:17px;font-weight:600}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    input,select{padding:8px 12px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;min-width:200px}
+    .provider-combobox{position:relative;min-width:320px;max-width:420px;width:100%}
+    .provider-combobox input{width:100%;min-width:0;padding-right:32px}
+    .provider-combobox .combo-arrow{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#aaa;pointer-events:none;font-size:12px}
+    .provider-dropdown{position:absolute;left:0;right:0;top:calc(100% + 4px);max-height:280px;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.1);z-index:20;list-style:none}
+    .provider-dropdown[hidden]{display:none}
+    .provider-dropdown-hint{padding:8px 12px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--line);background:#fafafa;position:sticky;top:0}
+    .provider-option{padding:9px 12px;font-size:13px;cursor:pointer;border-bottom:1px solid #f3f3f3}
+    .provider-option:last-child{border-bottom:none}
+    .provider-option:hover,.provider-option.highlight{background:#eef8f0}
+    .provider-option.active{font-weight:600;color:var(--up)}
+    .provider-empty{padding:16px 12px;text-align:center;color:var(--muted);font-size:13px}
+    .chart{width:100%;height:340px}
+    .chart.enhanced{height:380px}
+    .table-wrap{overflow:auto;max-height:520px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+    th{position:sticky;top:0;background:#fafafa;font-weight:600;color:#666;font-size:12px;z-index:1}
+    tr:hover td{background:#fafafa}
+    tr.active td{background:#eef8f0}
+    .num{text-align:right;font-variant-numeric:tabular-nums}
+    .pill{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+    .pill.up{background:#e8f5ec;color:var(--up)} .pill.down{background:#fdeaea;color:var(--down)}
+    .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:10px}
+    .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+    .dot.y25{background:var(--y25)} .dot.y26{background:var(--y26)}
+    .page-meta{display:none}
+    .rules{font-size:12px;color:var(--muted);margin-bottom:20px;line-height:1.7}
+    .chart-desc{font-size:12px;color:var(--muted);margin:-8px 0 12px}
+    /* 店铺明细 */
+    .provider-name{font-size:18px;font-weight:600;margin-bottom:16px;color:var(--ink)}
+    .provider-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+    .prov-kpi{background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:16px}
+    .prov-kpi-title{font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:600}
+    .prov-kpi-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px;font-size:13px}
+    .prov-kpi-row .yr{font-weight:600;min-width:36px}
+    .prov-kpi-row .yr.y25{color:var(--y25)} .prov-kpi-row .yr.y26{color:var(--y26)}
+    .prov-kpi-row .val{font-variant-numeric:tabular-nums;font-weight:600}
+    .prov-kpi-yoy{text-align:center;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+    .chart-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+    .publish-scene-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+    .publish-scene-grid .publish-panel{grid-column:1 / -1}
+    .publish-scene-grid .scene-table-panel{padding-top:12px}
+    .chart-panel{background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:16px}
+    .chart-panel-title{font-size:14px;font-weight:600;margin-bottom:4px}
+    .tables-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+    .table-panel{background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:hidden}
+    .table-panel-title{font-size:14px;font-weight:600;margin-bottom:12px}
+    .table-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    .table-panel-head .table-panel-title{margin-bottom:0}
+    .table-panel-head input{min-width:220px}
+    .subsection{margin-top:8px;padding-top:20px;border-top:2px solid var(--line)}
+    .subsection-title{font-size:15px;font-weight:600;margin-bottom:14px}
+    /* 对比表格 */
+    .compare-table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+    .compare-table th,.compare-table td{padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+    .compare-table thead th{background:#f5f5f5;font-weight:600;font-size:11px;color:#666;text-align:center}
+    .compare-table thead tr:first-child th{border-bottom:1px solid var(--line);padding:8px}
+    .compare-table thead tr:last-child th{padding:6px 10px}
+    .compare-table tbody td{text-align:center;font-variant-numeric:tabular-nums}
+    .compare-table tbody td:first-child{text-align:left;font-weight:500;background:#fff;position:sticky;left:0;z-index:1}
+    .compare-table tbody tr:last-child td{border-bottom:none}
+    .compare-table tbody tr:hover td{background:#f9f9f9}
+    .compare-table tbody tr:hover td:first-child{background:#f9f9f9}
+    .th-upload{background:rgba(196,92,38,.08)!important;color:var(--y25)!important}
+    .th-book{background:rgba(45,106,79,.08)!important;color:var(--up)!important}
+    .th-price{background:rgba(30,95,116,.08)!important;color:var(--y26)!important}
+    .col-25{background:rgba(196,92,38,.04)}
+    .col-26{background:rgba(30,95,116,.04)}
+    .col-yoy{background:#fafafa;font-weight:600}
+    .table-wrap.compare{max-height:480px;border-radius:8px}
+    .part-header{font-family:"Noto Serif SC",serif;font-size:22px;font-weight:700;margin:36px 0 18px;padding-bottom:10px;border-bottom:3px solid var(--green-border);color:var(--ink)}
+    .part-header:first-of-type{margin-top:8px}
+    .stat-banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding:14px 16px;background:#fafafa;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;font-size:14px}
+    .stat-banner.stat-banner-cum{background:#f5f8f6;border-color:var(--green-border)}
+    .stat-banner .stat-tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px;background:#fff;border:1px solid var(--line);color:#666}
+    .stat-banner .stat-tag.month{color:var(--y26);border-color:rgba(30,95,116,.25);background:rgba(30,95,116,.06)}
+    .stat-banner .stat-tag.cum{color:var(--up);border-color:var(--green-border);background:var(--green-bg)}
+    .unpub-panel{margin-top:20px;background:linear-gradient(180deg,#fafcfb,#fff);border:1px solid var(--green-border);border-radius:12px;padding:18px 18px 16px;box-shadow:0 2px 12px rgba(45,106,79,.06)}
+    .unpub-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;flex-wrap:wrap}
+    .unpub-panel-title{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:4px}
+    .unpub-panel-note{font-size:12px;color:var(--muted);line-height:1.6;max-width:720px}
+    .unpub-head-right{display:flex;align-items:stretch;gap:10px;flex-shrink:0;flex-wrap:wrap}
+    .unpub-total-chip{text-align:center;background:linear-gradient(135deg,#eef8f0,#e4f3e8);border:1px solid var(--green-border);border-radius:10px;padding:10px 18px;min-width:108px}
+    .unpub-total-chip .chip-label{font-size:11px;color:#666;margin-bottom:2px}
+    .unpub-total-chip .chip-val{font-size:24px;font-weight:700;color:var(--up);line-height:1.1;font-variant-numeric:tabular-nums}
+    .unpub-total-chip .chip-unit{font-size:11px;color:#666;margin-top:2px}
+    .unpub-peak-chip{text-align:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-width:96px}
+    .unpub-peak-chip .chip-label{font-size:11px;color:#666;margin-bottom:2px}
+    .unpub-peak-chip .chip-val{font-size:15px;font-weight:700;color:var(--y26);line-height:1.2}
+    .unpub-peak-chip .chip-unit{font-size:11px;color:#888;margin-top:2px}
+    .unpub-table-wrap{border:1px solid var(--line);border-radius:10px;background:#fff;overflow:hidden}
+    .unpub-list-head{display:none}
+    .unpub-list{display:flex;align-items:stretch;gap:10px;padding:16px 14px 14px;overflow-x:auto;overflow-y:hidden}
+    .unpub-row{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:7px;min-width:78px;height:238px;padding:12px 8px 10px;border:1px solid #edf1ee;border-radius:10px;background:#fbfdfb;transition:background .12s,transform .12s}
+    .unpub-row:nth-child(even){background:#f7fbf8}
+    .unpub-row:hover{background:#f1f8f4;transform:translateY(-1px)}
+    .unpub-row.total-row{min-width:92px;background:#f3f8f5;border-color:var(--green-border);font-weight:600}
+    .unpub-month{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:32px;text-align:center;font-size:13px;font-weight:600;color:var(--ink);line-height:1.25}
+    .unpub-month-dot{width:7px;height:7px;border-radius:50%;background:var(--y26);flex-shrink:0}
+    .unpub-row-bar{display:flex;align-items:flex-end;justify-content:center;width:100%;height:122px;min-width:0}
+    .unpub-bar-track{display:flex;align-items:flex-end;justify-content:center;width:18px;height:116px;background:#edf2ef;border-radius:999px;overflow:hidden}
+    .unpub-bar-fill{width:100%;border-radius:999px;background:linear-gradient(180deg,#1e5f74,#6aab85);min-height:3px}
+    .unpub-qty{text-align:center;font-size:15px;font-weight:800;color:var(--y26);font-variant-numeric:tabular-nums;white-space:nowrap}
+    .unpub-pct{text-align:center;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+    .unpub-row.total-row .unpub-month-dot{background:var(--up)}
+    .unpub-row.total-row .unpub-qty{color:var(--up)}
+    .stat-banner .stat-main{font-size:22px;font-weight:700;color:var(--ink)}
+    .stat-banner .stat-sub{font-size:12px;color:var(--muted)}
+    .stat-banner .stat-extra{font-size:12px;color:#666}
+    .overall-table td.analysis{text-align:left;max-width:280px;white-space:normal;color:#555;font-size:12px}
+    .overall-table .metric-name{font-weight:600;text-align:left}
+    .overall-table .sub-val{font-size:11px;color:var(--muted);display:block;margin-top:2px}
+    .block-title{font-size:15px;font-weight:600;margin:20px 0 12px;color:var(--ink)}
+    .block-title:first-child{margin-top:0}
+    .overall-sub-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px;flex-wrap:wrap}
+    .overall-sub-head .sub-head-text{flex:1;min-width:200px}
+    .view-toggle{display:inline-flex;background:#f0f0f0;border:1px solid var(--line);border-radius:8px;padding:3px;flex-shrink:0}
+    .view-toggle-btn{border:none;background:transparent;padding:7px 18px;font-size:13px;font-family:inherit;font-weight:500;color:var(--muted);border-radius:6px;cursor:pointer;transition:background .15s,color .15s}
+    .view-toggle-btn:hover{color:var(--ink)}
+    .view-toggle-btn.active{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    .scene-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+    .scene-month-toggle .view-toggle-btn{padding:6px 12px;font-size:12px}
+    .overall-kpi-grid{display:grid;gap:16px;width:100%}
+    .overall-kpi-grid.cols-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+    .overall-kpi-grid.cols-5{grid-template-columns:repeat(5,minmax(0,1fr))}
+    .overall-kpi-card{background:linear-gradient(180deg,#eef8f0 0%,#e6f2ea 100%);border:1px solid var(--green-border);border-radius:12px;padding:18px 16px 16px;box-shadow:0 2px 8px rgba(45,106,79,.06);transition:transform .15s,box-shadow .15s;display:flex;flex-direction:column;align-items:stretch;min-height:152px}
+    .overall-kpi-card:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(45,106,79,.1)}
+    .overall-kpi-title{font-size:13px;color:#555;font-weight:500;line-height:1.35;min-height:36px;display:flex;align-items:center;justify-content:center;text-align:center}
+    .overall-kpi-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:8px 0 10px}
+    .overall-kpi-value{font-size:28px;font-weight:700;color:var(--ink);line-height:1.15;font-variant-numeric:tabular-nums;word-break:break-all}
+    .overall-kpi-card.is-simple .overall-kpi-value{font-size:32px}
+    .overall-kpi-value .unit{font-size:12px;font-weight:500;color:#888;margin-left:3px}
+    .overall-kpi-sub{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.45;max-width:100%;min-height:16px}
+    .overall-kpi-sub.is-placeholder{visibility:hidden}
+    .overall-kpi-foot{display:flex;justify-content:center;align-items:center;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+    .overall-kpi-foot.is-empty{min-height:32px;visibility:hidden}
+    .overall-kpi-chip{font-size:11px;padding:5px 10px;border-radius:6px;background:#fff;border:1px solid #e5e5e5;color:#666;line-height:1.2}
+    .overall-kpi-chip b{font-weight:600;margin-left:2px}
+    .overall-kpi-chip.up{color:var(--up);border-color:#c8e6d0;background:#f4fbf6}
+    .overall-kpi-chip.down{color:var(--down);border-color:#f5d0d0;background:#fef8f8}
+    .overall-kpi-chip.flat{color:#888}
+    .overall-kpi-chip.ref-y25{color:var(--y25);border-color:rgba(196,92,38,.25);background:rgba(196,92,38,.06)}
+    .mini-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:18px}
+    .mini-kpi-card{background:linear-gradient(180deg,#fafcfb,#fff);border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
+    .mini-kpi-title{font-size:12px;color:var(--muted);margin-bottom:8px}
+    .mini-kpi-value{font-size:24px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+    .mini-kpi-foot{font-size:12px;color:#666;margin-top:6px}
+    .scene-share-table{margin-top:14px}
+    .scene-share-table .compare-table tbody td:first-child{min-width:120px}
+    .provider-insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+    .provider-insight-panel{background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:16px;overflow:hidden}
+    .provider-insight-title{font-size:14px;font-weight:700;margin-bottom:10px}
+    .provider-period-switch{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .provider-period-btn{border:1px solid var(--line);background:#fff;color:#555;border-radius:7px;padding:7px 10px;font-size:12px;font-family:inherit;cursor:pointer;line-height:1}
+    .provider-period-btn:hover{background:#f3f8f5;color:var(--up)}
+    .provider-period-btn.active{background:var(--up);border-color:var(--up);color:#fff;font-weight:700}
+    .provider-insight-title.up{color:var(--up)}
+    .provider-insight-title.down{color:var(--down)}
+    .july-kpi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:18px}
+    .july-kpi-card{background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:16px;text-align:center}
+    .july-kpi-label{font-size:12px;color:var(--muted);margin-bottom:8px}
+    .july-kpi-value{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+    @media(max-width:1200px){
+      .overall-kpi-grid.cols-5{grid-template-columns:repeat(3,minmax(0,1fr))}
+      .overall-kpi-grid.cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+    }
+    @media(max-width:768px){
+      .page-header{align-items:flex-start;flex-direction:column}
+      .page-title{justify-content:flex-start;width:100%}
+      .share-actions{align-items:flex-start;flex-wrap:wrap;width:100%}
+      .share-status{max-width:none;width:100%}
+      .kpi-grid{grid-template-columns:1fr}
+      .provider-kpi-grid{grid-template-columns:1fr}
+      .chart-grid-2,.tables-grid-2{grid-template-columns:1fr}
+      .publish-scene-grid,.provider-insight-grid{grid-template-columns:1fr}
+      .publish-scene-grid .publish-panel{grid-column:auto}
+      .overall-kpi-grid.cols-4,.overall-kpi-grid.cols-5,.july-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .mini-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .unpub-list{gap:8px;padding:14px 10px}
+      .unpub-row{min-width:68px;height:220px;padding-left:8px;padding-right:8px}
+      .unpub-row.total-row{min-width:78px}
+      .section-nav{grid-template-columns:1fr}
+      .section-nav::before{width:100%;margin-bottom:2px}
+      .side-toc{display:none}
+    }
+    @media(max-width:1500px){
+      .side-toc{right:14px;top:auto;bottom:16px;width:178px}
+    }
+  </style>
 </head>
 <body>
-
-  <!-- 顶部导航 -->
-  <header class="topbar">
-    <div class="topbar-inner">
-      <div class="topbar-brand">
-        <span class="brand-icon">📚</span>
-        <span class="brand-text">教辅店铺生产规则库</span>
-      </div>
-      <div class="topbar-meta">
-        <span class="version-badge" id="app-build-badge" title="与控制台 [规则库] build 一致即为最新脚本">加载中…</span>
-        <button id="manual-sync-btn" class="sync-btn" type="button" title="上传本机修改并拉取他人更新">立即同步</button>
-        <button id="force-pull-btn" class="sync-btn sync-btn-alt" type="button" title="用云端全表覆盖本机（多人协作下已隐藏）" data-dangerous-sync="1">以云端为准</button>
-        <span id="multi-user-hint" class="multi-user-hint" hidden>多人协作</span>
-        <span class="status-indicator" id="sync-status-indicator">
-          <span class="status-dot" id="sync-status-dot"></span>
-          <span class="status-text" id="sync-status-text">等待同步</span>
-        </span>
-      </div>
+<div class="wrap">
+  <header class="page-header">
+    <div class="page-title">
+      <img class="logo" src="assets/logo.png" alt="学科网书城" />
+      <h1>教辅生产月度数据</h1>
+    </div>
+    <div class="share-actions" aria-live="polite">
+      <button type="button" class="share-btn" id="copy-share-link">复制分享链接</button>
+      <span class="share-status" id="share-status"></span>
     </div>
   </header>
+  <nav class="section-nav" aria-label="页面板块导航">
+    <a href="#overall-anchor">整体数据分析</a>
+    <a href="#provider-anchor">具体店铺分析</a>
+    <a href="#july-anchor">同期次月生产数据</a>
+  </nav>
+  <aside class="side-toc" aria-label="右侧页面目录">
+    <div class="side-toc-title">快速定位</div>
+    <a class="toc-main" href="#overall-anchor">整体数据分析</a>
+    <a class="toc-sub" href="#overall-summary-anchor">整体分析</a>
+    <a class="toc-sub" href="#overall-detail-anchor">具体数据</a>
+    <a class="toc-sub" href="#collection-anchor">图书征集</a>
+    <a class="toc-sub" href="#production-anchor">资料生产</a>
+    <a class="toc-sub" href="#price-anchor">资料定价</a>
+    <a class="toc-sub" href="#publish-anchor">资料发布</a>
+    <a class="toc-sub" href="#unpub-anchor">待发布资源盘点</a>
+    <div class="toc-divider"></div>
+    <a class="toc-main" href="#provider-anchor">具体店铺分析</a>
+    <a class="toc-sub" href="#provider-overview-anchor">全部店铺概览</a>
+    <a class="toc-sub" href="#provider-detail">店铺明细分析</a>
+    <div class="toc-divider"></div>
+    <a class="toc-main" href="#july-anchor">同期次月生产数据</a>
+    <a class="toc-sub" href="#july-section">生产与图书征集</a>
+    <button type="button" id="back-to-top">返回顶部</button>
+  </aside>
+  <div class="page-meta">
+  <p class="sub" id="period-desc"></p>
+  <div class="tags" id="meta-tags"></div>
+  <div class="rules" id="rules"></div>
+  </div>
 
-  <!-- 首页 -->
-  <main id="page-home" class="page active">
-    <div class="hero-section">
-      <div class="hero-bg"></div>
-      <div class="hero-content">
-        <h1 class="hero-title">教辅店铺个性化生产规则库</h1>
-        <p class="hero-subtitle">标准化 · 智能化 · 可视化</p>
-        <div class="hero-stats">
-          <div class="stat-item">
-            <span class="stat-num" id="stat-providers">0</span>
-            <span class="stat-label">规则卡片</span>
+  <div class="part-header" id="overall-anchor">（一）整体数据分析</div>
+
+  <div class="section overall-section-main" id="overall-summary-anchor">
+    <div class="section-head">
+      <div class="section-title">1、整体分析</div>
+    </div>
+    <div class="overall-sub-head">
+      <div class="sub-head-text">
+        <div class="block-title" style="margin-top:0" id="overall-view-title">当月数据（6月）</div>
+        <p class="chart-desc" id="overall-view-note" style="margin-bottom:0"></p>
+      </div>
+      <div class="view-toggle" role="tablist">
+        <button type="button" class="view-toggle-btn active" data-view="month" role="tab" aria-selected="true">月度</button>
+        <button type="button" class="view-toggle-btn" data-view="cumulative" role="tab" aria-selected="false">年度累计</button>
+      </div>
+      <div class="view-toggle scene-month-toggle" id="overall-month-toggle" role="tablist" aria-label="选择分析月份">
+        <button type="button" class="view-toggle-btn" data-overall-mm="01" role="tab">1月</button>
+        <button type="button" class="view-toggle-btn" data-overall-mm="02" role="tab">2月</button>
+        <button type="button" class="view-toggle-btn" data-overall-mm="03" role="tab">3月</button>
+        <button type="button" class="view-toggle-btn" data-overall-mm="04" role="tab">4月</button>
+        <button type="button" class="view-toggle-btn" data-overall-mm="05" role="tab">5月</button>
+        <button type="button" class="view-toggle-btn active" data-overall-mm="06" role="tab" aria-selected="true">6月</button>
+      </div>
+    </div>
+    <div class="overall-kpi-grid" id="overall-kpi-grid"></div>
+  </div>
+
+  <div class="section overall-section-detail" id="overall-detail-anchor">
+    <div class="section-head"><div class="section-title">2、具体数据</div></div>
+
+    <div class="block-title" id="collection-anchor">（1）图书征集</div>
+    <div class="stat-banner" id="stat-collection-month"></div>
+    <div class="stat-banner stat-banner-cum" id="stat-collection-cumulative"></div>
+    <p class="chart-desc" id="stat-collection-desc">分月对比 · 各月征集量 · 虚线为当月同比</p>
+    <div class="legend"><span><i class="dot y25"></i>2025</span><span><i class="dot y26"></i>2026</span><span><i class="dot" style="background:#888"></i>同比</span></div>
+    <div id="chart-collection" class="chart enhanced"></div>
+
+    <div class="block-title" id="production-anchor">（2）资料生产</div>
+    <div class="stat-banner" id="stat-production-month"></div>
+    <div class="stat-banner stat-banner-cum" id="stat-production-cumulative"></div>
+    <p class="chart-desc" id="stat-production-desc">分月对比 · 各月生产量 · 虚线为当月同比</p>
+    <div class="legend"><span><i class="dot y25"></i>2025</span><span><i class="dot y26"></i>2026</span><span><i class="dot" style="background:#888"></i>同比</span></div>
+    <div id="chart-production" class="chart enhanced"></div>
+
+    <div class="block-title" id="price-anchor">（3）资料定价</div>
+    <p class="chart-desc">月度平均均价（元）· 柱顶标注 · 虚线同比</p>
+    <div class="legend"><span><i class="dot y25"></i>2025</span><span><i class="dot y26"></i>2026</span><span><i class="dot" style="background:#888"></i>同比</span></div>
+    <div id="chart-price-global" class="chart enhanced"></div>
+
+    <div class="chart-grid-2">
+      <div class="chart-panel">
+        <div class="chart-panel-title">定价维度占比 · 当月</div>
+        <p class="chart-desc" style="margin:0 0 10px">6月 · 免费 · 3元以下 · 3-5元 · 5-10元 · 10-20元 · 20元以上</p>
+        <div id="chart-price-dist-month" class="chart"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-title">定价维度占比 · 累计</div>
+        <p class="chart-desc" style="margin:0 0 10px">1-6月 · 免费 · 3元以下 · 3-5元 · 5-10元 · 10-20元 · 20元以上</p>
+        <div id="chart-price-dist" class="chart"></div>
+      </div>
+    </div>
+
+    <div class="chart-grid-2">
+      <div class="chart-panel">
+        <div class="chart-panel-title">定价分布变化 · 当月</div>
+        <p class="chart-desc" style="margin:0 0 10px">6月各价位段占比变化（百分点）</p>
+        <div id="chart-price-dist-change-month" class="chart"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-title">定价分布变化 · 累计</div>
+        <p class="chart-desc" style="margin:0 0 10px">1-6月各价位段占比变化（百分点）</p>
+        <div id="chart-price-dist-change" class="chart"></div>
+      </div>
+    </div>
+
+    <div class="block-title" id="publish-anchor">（4）资料发布</div>
+    <div class="stat-banner" id="stat-publish-month"></div>
+    <div class="stat-banner stat-banner-cum" id="stat-publish-cumulative"></div>
+    <div class="publish-scene-grid">
+      <div class="chart-panel publish-panel">
+        <div class="chart-panel-title">发布总量对比</div>
+        <p class="chart-desc" style="margin:0 0 10px">2025 / 2026 发布量 · 虚线同比</p>
+        <div class="legend"><span><i class="dot y25"></i>2025</span><span><i class="dot y26"></i>2026</span></div>
+        <div id="chart-publish" class="chart"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="scene-panel-head">
+          <div>
+            <div class="chart-panel-title">场景分布</div>
+            <p class="chart-desc" style="margin:0" id="scene-chart-desc">一级场景 Top10 · 2025 / 2026 · <span id="scene-month-label">6月</span></p>
           </div>
-          <div class="stat-divider"></div>
-          <div class="stat-item">
-            <span class="stat-num" id="stat-brands">0</span>
-            <span class="stat-label">品牌</span>
+          <div class="view-toggle scene-month-toggle" id="scene-month-toggle" role="tablist">
+            <button type="button" class="view-toggle-btn" data-mm="01" role="tab">1月</button>
+            <button type="button" class="view-toggle-btn" data-mm="02" role="tab">2月</button>
+            <button type="button" class="view-toggle-btn" data-mm="03" role="tab">3月</button>
+            <button type="button" class="view-toggle-btn" data-mm="04" role="tab">4月</button>
+            <button type="button" class="view-toggle-btn" data-mm="05" role="tab">5月</button>
+            <button type="button" class="view-toggle-btn active" data-mm="06" role="tab" aria-selected="true">6月</button>
+            <button type="button" class="view-toggle-btn" data-mm="cumulative" role="tab">累计</button>
           </div>
-          <div class="stat-divider"></div>
-          <div class="stat-item">
-            <span class="stat-num" id="stat-shops">0</span>
-            <span class="stat-label">店铺</span>
-          </div>
+        </div>
+        <div id="chart-scene" class="chart"></div>
+      </div>
+      <div class="chart-panel scene-table-panel">
+        <div class="chart-panel-title">主要场景占比 / 同比</div>
+        <div class="scene-share-table table-wrap compare">
+          <table id="table-scene-share" class="compare-table">
+            <thead>
+              <tr>
+                <th>主要场景</th>
+                <th class="col-25">2025占比</th>
+                <th class="col-26">2026占比</th>
+                <th class="col-yoy">占比变化</th>
+                <th class="col-yoy">数量同比</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
       </div>
     </div>
 
-    <div class="cards-section">
-      <div class="cards-grid">
-        
-        <div class="feature-card" onclick="goPage('rules')" data-color="blue">
-          <div class="card-glow"></div>
-          <div class="card-header">
-            <div class="card-icon-wrap">
-              <span class="card-icon">📋</span>
-            </div>
-            <span class="card-tag">规范</span>
+    <div class="block-title" id="unpub-anchor">（5）待发布资源盘点</div>
+    <div class="unpub-panel">
+      <div class="unpub-panel-head">
+        <div>
+          <div class="unpub-panel-title">待发布资源盘点</div>
+          <p class="unpub-panel-note" id="unpub-schedule-note"></p>
+        </div>
+        <div class="unpub-head-right">
+          <div class="unpub-peak-chip">
+            <div class="chip-label">峰值月份</div>
+            <div class="chip-val" id="unpub-schedule-peak">—</div>
+            <div class="chip-unit" id="unpub-schedule-peak-val"></div>
           </div>
-          <h3 class="card-title">教辅通用规范</h3>
-          <p class="card-desc">拆分、命名、定价等共用标准</p>
-          <ul class="card-features">
-            <li>PDF/PPT/WORD 拆分标准</li>
-            <li>专辑命名规范</li>
-            <li>上传与发布时间规则</li>
-            <li>特例处理方案</li>
-          </ul>
-          <div class="card-footer">
-            <span class="card-link">查看详情 <span class="arrow">→</span></span>
+          <div class="unpub-total-chip">
+            <div class="chip-label">本月上传待发布</div>
+            <div class="chip-val" id="unpub-current-month">—</div>
+            <div class="chip-unit">份</div>
           </div>
-        </div>
-
-        <div class="feature-card" onclick="goPage('provider')" data-color="cyan">
-          <div class="card-glow"></div>
-          <div class="card-header">
-            <div class="card-icon-wrap">
-              <span class="card-icon">🔧</span>
-            </div>
-            <span class="card-tag">维护</span>
+          <div class="unpub-total-chip">
+            <div class="chip-label">1-6月上传待发布</div>
+            <div class="chip-val" id="unpub-cumulative">—</div>
+            <div class="chip-unit">份</div>
           </div>
-          <h3 class="card-title">店铺规则维护</h3>
-          <p class="card-desc">按店铺 · 品牌 · 系列录入与修改</p>
-          <ul class="card-features">
-            <li>店铺管理</li>
-            <li>品牌筛选</li>
-            <li>系列联动</li>
-            <li>规则编辑</li>
-          </ul>
-          <div class="card-footer">
-            <span class="card-link">进入维护 <span class="arrow">→</span></span>
-          </div>
-        </div>
-
-        
-
-        <div class="feature-card" onclick="goPage('ai')" data-color="purple">
-          <div class="card-glow"></div>
-          <div class="card-header">
-            <div class="card-icon-wrap">
-              <span class="card-icon">🔍</span>
-            </div>
-            <span class="card-tag">检索</span>
-          </div>
-          <h3 class="card-title">规则快速检索</h3>
-          <p class="card-desc">输入「品牌 · 系列」或关键词，直达规则</p>
-          <ul class="card-features">
-            <li>关键词匹配</li>
-            <li>品牌 · 系列</li>
-            <li>快速定位</li>
-            <li>多维检索</li>
-          </ul>
-          <div class="card-footer">
-            <span class="card-link">开始检索 <span class="arrow">→</span></span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <footer class="home-footer">
-      <p>最后更新：2026-04-13 · 教辅店铺运营系统</p>
-    </footer>
-  </main>
-
-  <!-- 教辅通用规范页面 -->
-  <section id="page-rules" class="page">
-    <div class="page-header">
-      <button class="back-btn" onclick="goHome()">← 返回</button>
-      <h1 class="page-title">📋 教辅通用规范</h1>
-    </div>
-    <div class="page-content">
-      <div class="rules-grid">
-        
-        <!-- 卡片1：预处理 -->
-        <div class="rule-card material">
-          <div class="rule-card-header">
-            <span class="icon">🧪</span>
-            <span class="title">预处理</span>
-          </div>
-          <div class="rule-card-body">
-            <div class="rule-row">1、预上传，测试是否重复。若有问题：</div>
-            <div class="rule-row">（1）资料缺失（兼职——晶晶——运营，在一周内给确切处理结果，若不处理，则任务挂起）</div>
-            <div class="rule-row">（2）资料重复（运营核实版权归属——晶晶——下线/退稿）涉及重复率标准，出版物/非出版</div>
-          </div>
-        </div>
-
-        <!-- 卡片2：拆分 -->
-        <div class="rule-card material">
-          <div class="rule-card-header">
-            <span class="icon">✂️</span>
-            <span class="title">拆分</span>
-          </div>
-          <div class="rule-card-body">
-            <div class="rule-row">1、<span class="badge badge-pdf">PDF</span>按目录，若无，按标题，<strong>杜绝单页</strong></div>
-            <div class="rule-row">2、<span class="badge badge-ppt">PPT</span>检查删除敏感信息（联系方式、二维码等），然后直接上传</div>
-            <div class="rule-row">3、<span class="badge badge-word">WORD</span>检查删除敏感信息（联系方式、二维码等），然后直接上传</div>
-            <hr class="divider">
-            <div class="rule-note">
-              ⚠️ <strong>备注：</strong>以上三种格式有存在主书+小册子的情况，小册子拆分后，需<strong>单独建立专辑上传</strong>
-            </div>
-          </div>
-        </div>
-
-        <!-- 卡片3：命名 -->
-        <div class="rule-card material">
-          <div class="rule-card-header">
-            <span class="icon">🏷️</span>
-            <span class="title">命名</span>
-          </div>
-          <div class="rule-card-body">
-            <div class="rule-block">
-              <div class="rule-block-title">1、专辑命名</div>
-              <div class="rule-row">（1）【品牌】学年 + 年级 + 学科 + 对应封面名称（版本）</div>
-              <div class="rule-row">（2）【品牌】学年 + 年级 + 学科 + 对应文件名称（版本）</div>
-            </div>
-            <hr class="divider">
-            <div class="rule-block">
-              <div class="rule-block-title">2、资料命名</div>
-              <div class="rule-row" style="white-space: nowrap;">（1）具体标题（第X章+第X节+标题名）-专辑名</div>
-              <div class="rule-row">（2）若资料名与书籍名重复，则<strong>无需后缀</strong></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 卡片4：专辑规则 -->
-        <div class="rule-card album">
-          <div class="rule-card-header">
-            <span class="icon">📁</span>
-            <span class="title">专辑规则</span>
-          </div>
-          <div class="rule-card-body">
-            <div class="rule-block">
-              <div class="rule-block-title">1、专辑目录</div>
-              <div class="rule-row">（1）有目录书籍 → 1:1 还原，资料按顺序排序</div>
-              <div class="rule-row">（2）同步书籍 → 获取主数据目录，资料放对应目录下</div>
-            </div>
-            <hr class="divider">
-            <div class="rule-block">
-              <div class="rule-block-title">2、专辑简介</div>
-              <div class="rule-row rule-intro-template">
-                XXXX（书籍名称）系列资料由XXXX（提供者名称）提供，并授权学科网在互联网进行发布，侵权必究！
-              </div>
-            </div>
-            <hr class="divider">
-            <div class="rule-block">
-              <div class="rule-block-title">3、专辑封面</div>
-              <div class="rule-row">（1）无封面 → 使用去年同期产品封面</div>
-              <div class="rule-row">（2）去年无 → 智能平台生成，要求最下标必须写 <span class="badge badge-warn">学科网书城</span>，<a href="https://bar.xkw.com/cover/size" target="_blank" class="rule-link">点击制作封面 →</a></div>
-            </div>
-            <hr class="divider">
-            <div class="rule-block">
-              <div class="rule-block-title">4、其他</div>
-              <div class="rule-row">（1）专辑"热点""推荐"等该栏标签 <span class="badge badge-red">不做任何勾选</span></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 卡片5：上传规则 -->
-        <div class="rule-card material">
-          <div class="rule-card-header">
-            <span class="icon">💰</span>
-            <span class="title">上传规则</span>
-          </div>
-          <div class="rule-card-body">
-            <div class="rule-block">
-              <div class="rule-block-title">1、定价</div>
-              <div class="rule-row">（1）参考定价文档：</div>
-              <div class="rule-row">
-                <a href="https://docs.qq.com/doc/DUVNLeVZ0TXl5S1VT" target="_blank" class="rule-link">📄 点击查看定价文档 →</a>
-              </div>
-            </div>
-            <hr class="divider">
-            <div class="rule-block">
-              <div class="rule-block-title">2、发布时间</div>
-              <div class="rule-row">（1）专辑：立即发布</div>
-              <div class="rule-row">（2）资料：立即发布1/10，剩余按教学进度发布，一般以月为颗粒度同步</div>
-              <div class="rule-row">
-                <a href="https://docs.qq.com/sheet/DQW1jb2FtaGVGbHZr?nlc=1&tab=m5junw" target="_blank" class="rule-link">📊 教学中高考进度统计表 →</a>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 卡片6：特例 -->
-        <div class="rule-card special">
-          <div class="rule-card-header">
-            <span class="icon">⚠️</span>
-            <span class="title">特例 · 试卷 / 中职 / 音视频</span>
-          </div>
-          <div class="rule-card-body">
-            <div class="special-item">
-              <span class="tag-pill tag-red">真题试卷</span>非教辅版权试卷<br>
-              • <strong>高考：</strong>不处理上传<br>
-              • <strong>中考 / 小升初：</strong>发布后在 XMP 后台加入网校通
-            </div>
-            <div class="special-item warn">
-              <span class="tag-pill tag-orange">普通真题卷</span>校考 / 省市区县统考卷<br>
-              资料打标作者 <strong>"教辅精选"</strong>，发布后在 XMP 后台加入网校通
-            </div>
-            <div class="special-item">
-              <span class="tag-pill tag-blue">中职产品</span>
-              发布后在 XMP 后台加入网校通
-            </div>
-            <div class="special-item success">
-              <span class="tag-pill tag-green">音视频</span>
-              勾选 <strong>禁止下载</strong> 标签
-            </div>
-            <div class="special-item">
-              <span class="tag-pill tag-blue">其他</span>
-              如遇特殊店铺生产侧需增加全书预审，之后在按照正常生产流程操作
-            </div>
-          </div>
-        </div>
-
-
-
-      </div>
-    </div>
-</section>
-
-<!-- 店铺规则维护页面 -->
-  <section id="page-provider" class="page">
-    <div class="page-header">
-      <button class="back-btn" onclick="goHome()">← 返回</button>
-      <h1 class="page-title">🔧 店铺规则维护</h1>
-    </div>
-    <div class="page-content">
-      
-      <!-- 搜索筛选 -->
-      <div class="query-filters">
-        
-        <!-- 店铺搜索 -->
-        <div class="filter-group">
-          <label class="filter-label">
-            <span class="fl-icon">🏪</span>
-            店铺名称
-          </label>
-          <div class="filter-input-wrap">
-            <input type="text" id="shop-search-input" class="filter-input" placeholder="输入店铺名称搜索..." oninput="onShopSearchInput()">
-            <button class="btn-search" onclick="searchShopByInput()">搜索</button>
-            <button class="btn-add-sm" onclick="openAddShop()">＋ 新增店铺名称</button>
-            <button class="btn-add-sm btn-muted-sm" type="button" onclick="renameShopInContext()">✎ 修改</button>
-            <button class="btn-add-sm btn-danger-sm" type="button" onclick="deleteShopInContext()">－ 删除</button>
-          </div>
-          <div id="shop-dropdown" class="search-dropdown" style="display:none;"></div>
-        </div>
-        
-        <!-- 提供者搜索 -->
-        <div class="filter-group">
-          <label class="filter-label">
-            <span class="fl-icon">👤</span>
-            提供者
-          </label>
-          <div class="filter-input-wrap">
-            <input type="text" id="provider-search-input" class="filter-input" placeholder="输入提供者名称搜索..." oninput="onProviderSearchInput()">
-            <button class="btn-search" onclick="searchProviderByInput()">搜索</button>
-            <button class="btn-add-sm" onclick="openAddProvider()">＋ 新增提供者</button>
-            <button class="btn-add-sm btn-muted-sm" type="button" onclick="renameProviderInContext()">✎ 修改</button>
-            <button class="btn-add-sm btn-danger-sm" type="button" onclick="deleteProviderInContext()">－ 删除</button>
-          </div>
-          <div id="provider-dropdown" class="search-dropdown" style="display:none;"></div>
-        </div>
-
-        <!-- 书城品牌系列（BAPI 代理） -->
-        <div class="filter-group bbm-sync-group">
-          <label class="filter-label">
-            <span class="fl-icon">🔗</span>
-            书城品牌系列
-          </label>
-          <div class="filter-input-wrap">
-            <input type="text" id="org-id-input" class="filter-input" placeholder="机构 ID，如 520495（非品牌 ID）" inputmode="numeric">
-            <button type="button" id="bbm-fetch-btn" class="btn-search" onclick="fetchBbmBrandsForContext()">从书城获取</button>
-          </div>
-          <p class="bbm-fetch-hint">客户池表含两列 ID：<strong>机构ID</strong>（填这里）与 <strong>知识店铺ID</strong>（勿单独使用）。后台新增品牌/系列后请重新点击「从书城获取」（实时拉取，跳过缓存）。</p>
-          <p id="bbm-fetch-status" class="bbm-fetch-status"></p>
-        </div>
-        
-        <!-- 品牌搜索 -->
-        <div class="filter-group">
-          <label class="filter-label">
-            <span class="fl-icon">🏷️</span>
-            品牌
-          </label>
-          <div class="filter-input-wrap">
-            <input type="text" id="brand-input" class="filter-input" placeholder="请先选择店铺..." oninput="onBrandInput()">
-            <button id="brand-list-btn" onclick="showBrandList(event)" style="background:var(--primary-cyan);color:white;padding:12px 16px;border:none;border-radius:var(--radius-md);cursor:pointer;font-size:14px;">▼ 品牌</button>
-            <button class="btn-add-sm" onclick="openAddBrand()">＋ 新增品牌</button>
-            <button class="btn-add-sm" onclick="openDeleteBrand()">－ 删除品牌</button>
-            <button id="add-series-btn" class="btn-add-sm" onclick="openAddSeries()" style="display:none;">＋ 新增系列</button>
-          </div>
-          <div id="brand-dropdown" class="search-dropdown" style="display:none;"></div>
-        </div>
-        <div id="series-tag-container" class="series-tag-container" style="display:none;"></div>
-
-        <div id="brand-defaults-panel" class="brand-defaults-panel" style="display:none;"></div>
-        
-      </div>
-      
-      <!-- 规则显示区域 -->
-      <div id="custom-rule-display" class="custom-rule-display" style="display:none;"></div>
-      
-      <!-- 提供者列表 -->
-      <div id="provider-list-container" style="display:none;">
-        <div class="provider-list-header" style="display:flex;justify-content:space-between;align-items:center;margin:24px 0 16px;">
-          <span style="font-size:16px;font-weight:600;color:var(--text-primary);">提供者列表</span>
-          <span id="provider-count" class="count-badge">0</span>
-        </div>
-        <div id="provider-list" class="provider-list"></div>
-      </div>
-      <div id="manual-input-section" class="filter-section-title mt-20" style="display:none;">✏️ 手动录入信息</div>
-    </div>
-    <button type="button" id="provider-scroll-top" class="scroll-top-btn" title="返回顶部" aria-label="返回顶部" style="display:none;">返回顶部</button>
-  </section>
-
-  <!-- 新增提供者弹窗 -->
-  <div id="modal-provider" class="modal" style="display:none;">
-    <div class="modal-overlay" onclick="closeModal('modal-provider')"></div>
-    <div class="modal-box">
-      <div class="modal-header">
-        <h3 id="modal-provider-title">新增提供者</h3>
-        <button class="modal-close" onclick="closeModal('modal-provider')">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>提供者名称</label>
-          <input type="text" id="new-provider-name" class="form-input">
-        </div>
-        <div class="form-group">
-          <label>店铺</label>
-          <input type="text" id="new-provider-shop" class="form-input">
-        </div>
-        <div class="form-group">
-          <label>店铺别名</label>
-          <input type="text" id="new-provider-shopname" class="form-input" placeholder="可与店铺相同，或填工商全称">
-        </div>
-        <div class="form-group">
-          <label>品牌</label>
-          <input type="text" id="new-provider-brand" class="form-input">
-        </div>
-        <div class="form-group">
-          <label>系列</label>
-          <input type="text" id="new-provider-series" class="form-input" placeholder="例如：中考冲刺卷">
-        </div>
-        <div class="form-group">
-          <label>命名 <span class="form-hint">（Alt+空格 换行）</span></label>
-          <textarea id="new-provider-naming" class="form-input alt-space-newline" rows="2" placeholder="专辑/资料命名规范"></textarea>
-        </div>
-        <div class="form-group">
-          <label>拆分规则 <span class="form-hint">（Alt+空格 换行）</span></label>
-          <textarea id="new-provider-split" class="form-input alt-space-newline" rows="2" placeholder="多条可换行"></textarea>
-        </div>
-        <div class="form-group">
-          <label>定价规则 <span class="form-hint">（Alt+空格 换行）</span></label>
-          <textarea id="new-provider-pricing" class="form-input alt-space-newline" rows="2"></textarea>
-        </div>
-        <div class="form-group">
-          <label>发布时间 <span class="form-hint">（Alt+空格 换行）</span></label>
-          <textarea id="new-provider-publishtime" class="form-input alt-space-newline" rows="2"></textarea>
-        </div>
-        <div class="form-group">
-          <label>专辑 <span class="form-hint">（Alt+空格 换行，可编辑）</span></label>
-          <textarea id="new-provider-album" class="form-input alt-space-newline" rows="5" placeholder="默认含专辑简介、封面、其他三项规则"></textarea>
-        </div>
-        <div class="form-group">
-          <label>特例 <span class="form-hint">（Alt+空格 换行）</span></label>
-          <textarea id="new-provider-special" class="form-input alt-space-newline" rows="2"></textarea>
-        </div>
-        <div class="form-group">
-          <label>其他信息 <span class="form-hint">（Alt+空格 换行）</span></label>
-          <textarea id="new-provider-otherinfo" class="form-input alt-space-newline" rows="2"></textarea>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn-cancel" onclick="closeModal('modal-provider')">取消</button>
-        <button class="btn-save" onclick="saveProvider()">保存</button>
+      <div class="unpub-panel-title" style="margin:4px 0 10px">① 待发布资源上传月份分布</div>
+      <div class="unpub-table-wrap">
+        <div class="unpub-list-head">
+          <span>上传月份</span>
+          <span>分布</span>
+          <span>数量</span>
+          <span>占比</span>
+        </div>
+        <div class="unpub-list" id="unpub-upload-list"></div>
+      </div>
+
+      <div class="unpub-panel-title" style="margin:18px 0 10px">② 本月上传待发布资源发布月份分布</div>
+      <div class="unpub-table-wrap">
+        <div class="unpub-list-head">
+          <span>发布月份</span>
+          <span>分布</span>
+          <span>数量</span>
+          <span>占比</span>
+        </div>
+        <div class="unpub-list" id="unpub-release-list"></div>
       </div>
     </div>
   </div>
 
-  <!-- 规则快速检索页面 -->
-  <section id="page-ai" class="page">
-    <div class="page-header">
-      <button class="back-btn" onclick="goHome()">← 返回</button>
-      <h1 class="page-title">🔍 规则快速检索</h1>
-    </div>
-    <div class="page-content">
-      <div class="ai-hero">
-        <div class="ai-icon-wrap">
-          <span class="ai-main-icon">🔍</span>
-          <span class="ai-pulse"></span>
-        </div>
-        <h2>规则快速检索</h2>
-        <p>输入「品牌 · 系列」或关键词，直达规则</p>
-      </div>
-      
-      <div class="ai-search-box">
-        <div class="ai-input-wrap">
-          <input type="text" id="ai-query" class="ai-input" placeholder="品牌 · 系列，如：众相原创 · 时政热点">
-          <button class="ai-btn" onclick="aiQuery()">🔍 查询</button>
-        </div>
-        <div class="ai-suggestions">
-          <span class="suggestion-label">试试：</span>
-          <span class="suggestion-tag" onclick="setAiQuery('初中数学')">初中数学</span>
-          <span class="suggestion-tag" onclick="setAiQuery('高中物理')">高中物理</span>
-          <span class="suggestion-tag" onclick="setAiQuery('众相原创 · 时政热点')">众相原创 · 时政热点</span>
-          <span class="suggestion-tag" onclick="setAiQuery('高考')">高考</span>
-        </div>
-      </div>
-      
-      <div id="ai-series-tag-container" class="series-tag-container" style="display:none;"></div>
-      <div id="ai-result" class="ai-result"></div>
-    </div>
-    <button type="button" id="ai-scroll-top" class="scroll-top-btn" title="回到顶部" aria-label="回到顶部" style="display:none;">回到顶部</button>
-  </section>
+  <div class="part-header" id="july-anchor">（三）同期次月生产数据</div>
 
-  <!-- Toast 提示 -->
-  <div id="toast" class="toast" style="display:none;">
-    <span class="toast-icon">✓</span>
-    <span class="toast-message"></span>
+  <div class="section" id="july-section">
+    <div class="section-head">
+      <div>
+        <div class="section-title" id="july-title">同期次月生产与图书征集</div>
+        <p class="chart-desc" id="july-note" style="margin:4px 0 0"></p>
+      </div>
+      <div class="toolbar">
+        <input type="search" id="search-july-book" placeholder="搜索店铺或图书名称…" />
+      </div>
+    </div>
+    <div class="july-kpi-grid" id="july-kpi-grid"></div>
+    <div class="chart-grid-2">
+      <div class="chart-panel">
+        <div class="chart-panel-title">店铺生产/征集 Top</div>
+        <div class="chart" id="chart-july-provider"></div>
+      </div>
+      <div class="table-panel">
+        <div class="table-panel-title">店铺维度汇总</div>
+        <div class="table-wrap" style="max-height:340px">
+          <table id="table-july-providers">
+            <thead><tr><th>店铺</th><th class="num">生产资料</th><th class="num">生产图书</th><th class="num">征集图书</th><th class="num">均定价</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="table-panel">
+      <div class="table-panel-head">
+        <div class="table-panel-title">图书明细（按店铺维度）</div>
+        <input type="search" id="search-july-book-provider" placeholder="搜索店铺名称…" />
+      </div>
+      <div class="table-wrap" style="max-height:460px">
+        <table id="table-july-books">
+          <thead><tr><th>店铺</th><th>album_id</th><th>图书名称</th><th>学科</th><th>年级</th><th>场景</th><th class="num">资料数</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
-  <script>
-function goPage(pageId) {
-  document.querySelectorAll('.page').forEach(page => {
-    page.classList.remove('active');
+  <div class="part-header" id="provider-anchor">（二）具体店铺数据分析</div>
+
+  <div class="section provider-overview-section" id="provider-overview-anchor">
+    <div class="section-head">
+      <div class="section-title">具体店铺整体分析</div>
+      <div class="toolbar">
+        <div class="provider-period-switch" id="provider-period-switch">
+          <button class="provider-period-btn active" data-provider-period="total">累计</button>
+          <button class="provider-period-btn" data-provider-period="01">1月</button>
+          <button class="provider-period-btn" data-provider-period="02">2月</button>
+          <button class="provider-period-btn" data-provider-period="03">3月</button>
+          <button class="provider-period-btn" data-provider-period="04">4月</button>
+          <button class="provider-period-btn" data-provider-period="05">5月</button>
+          <button class="provider-period-btn" data-provider-period="06">6月</button>
+        </div>
+        <input type="search" id="search-provider" placeholder="搜索店铺名称…" />
+      </div>
+    </div>
+    <div class="provider-insight-grid" id="provider-overall-kpis"></div>
+    <div class="section-title" style="font-size:15px;margin:4px 0 12px">全部店铺概览</div>
+    <div class="table-wrap compare">
+      <table id="table-providers" class="compare-table">
+        <thead>
+          <tr>
+            <th rowspan="2">店铺</th>
+            <th colspan="3" class="th-upload">发布数据 (res_id)</th>
+            <th colspan="3" class="th-book">书籍数 (album)</th>
+            <th colspan="3" class="th-price">均定价 (元)</th>
+          </tr>
+          <tr>
+            <th class="col-25">2025</th><th class="col-26">2026</th><th class="col-yoy">同比</th>
+            <th class="col-25">2025</th><th class="col-26">2026</th><th class="col-yoy">同比</th>
+            <th class="col-25">2025</th><th class="col-26">2026</th><th class="col-yoy">同比</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section" id="provider-detail">
+    <div class="section-head">
+      <div class="section-title">店铺明细分析</div>
+      <div class="toolbar">
+        <div class="provider-combobox" id="provider-combobox">
+          <input type="search" id="select-provider-input" placeholder="搜索店铺名称…" autocomplete="off" />
+          <span class="combo-arrow">▼</span>
+          <ul class="provider-dropdown" id="provider-dropdown" hidden></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="provider-name" id="provider-name"></div>
+    <div class="provider-kpi-grid" id="provider-summary"></div>
+
+    <div class="chart-grid-2">
+      <div class="chart-panel">
+        <div class="chart-panel-title">月度上传对比</div>
+        <p class="chart-desc" style="margin:0 0 10px">2025 / 2026 分组柱对比 · 柱顶为上传量 · 虚线同比</p>
+        <div class="legend"><span><i class="dot y25"></i>2025</span><span><i class="dot y26"></i>2026</span><span><i class="dot" style="background:#888"></i>同比</span></div>
+        <div id="chart-provider" class="chart enhanced"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="chart-panel-title">月度平均均价</div>
+        <p class="chart-desc" style="margin:0 0 10px">2025 / 2026 均价（元）· 虚线同比</p>
+        <div class="legend"><span><i class="dot y25"></i>2025</span><span><i class="dot y26"></i>2026</span><span><i class="dot" style="background:#888"></i>同比</span></div>
+        <div id="chart-price-provider" class="chart enhanced"></div>
+      </div>
+    </div>
+
+    <div class="tables-grid-2">
+      <div class="table-panel">
+        <div class="table-panel-title">月度上传对比表</div>
+        <div class="table-wrap compare" style="max-height:280px">
+          <table id="table-monthly-upload" class="compare-table">
+            <thead><tr><th>月份</th><th class="col-25">2025</th><th class="col-26">2026</th><th class="col-yoy">同比</th><th>增减</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="table-panel">
+        <div class="table-panel-title">月度均价对比表</div>
+        <div class="table-wrap compare" style="max-height:280px">
+          <table id="table-monthly-price" class="compare-table">
+            <thead><tr><th>月份</th><th class="col-25">2025 (元)</th><th class="col-26">2026 (元)</th><th class="col-yoy">同比</th><th>差值 (元)</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">品牌拆分明细</div>
+      <div class="table-wrap compare">
+        <table id="table-brands" class="compare-table">
+          <thead>
+            <tr>
+              <th rowspan="2">品牌【】</th>
+              <th colspan="3" class="th-upload">上传量</th>
+              <th colspan="3" class="th-book">书籍数</th>
+              <th colspan="3" class="th-price">均定价 (元)</th>
+            </tr>
+            <tr>
+              <th class="col-25">2025</th><th class="col-26">2026</th><th class="col-yoy">同比</th>
+              <th class="col-25">2025</th><th class="col-26">2026</th><th class="col-yoy">同比</th>
+              <th class="col-25">2025</th><th class="col-26">2026</th><th class="col-yoy">同比</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const C25="#c45c26", C26="#1e5f74", CUP="#2d6a4f", CDOWN="#d94f4f";
+let DATA=null;
+let chartCollection=null, chartProduction=null, chartPriceGlobal=null, chartPriceDist=null, chartPriceDistChange=null;
+let chartPriceDistMonth=null, chartPriceDistChangeMonth=null;
+let chartPublish=null, chartScene=null, chartProvider=null, chartPriceProvider=null, chartJulyProvider=null, activeProvider=null;
+let providerOverallPeriod="total";
+
+const fmt=n=>n>=10000?(n/10000).toFixed(1)+"万":n.toLocaleString("zh-CN");
+const fmtExact=n=>Number(n).toLocaleString("zh-CN");
+const yoy=(a,b)=>b===0?(a>0?100:0):+(((a-b)/b)*100).toFixed(1);
+const yoyHtml=(v)=>{const c=v>0?"up":v<0?"down":"flat";return`<span class="pill ${c}">${v>0?"+":""}${v}%</span>`};
+
+/** 按自然月对齐 2025/2026，计算同比 */
+function buildMonthlyYoY(monthly){
+  const map25={}, map26={};
+  monthly.months.forEach((m,i)=>{
+    const mm=m.slice(5);
+    if(m.startsWith("2025")) map25[mm]=monthly["2025"][i];
+    if(m.startsWith("2026")) map26[mm]=monthly["2026"][i];
   });
-  var target = document.getElementById('page-' + pageId);
-  if (target) {
-    target.classList.add('active');
+  const keys=[...new Set([...Object.keys(map25),...Object.keys(map26)])].sort();
+  return keys.map(mm=>({
+    label:parseInt(mm,10)+"月",
+    mm,
+    v25:map25[mm]||0,
+    v26:map26[mm]||0,
+    delta:(map26[mm]||0)-(map25[mm]||0),
+    yoyPct:yoy(map26[mm]||0,map25[mm]||0)
+  }));
+}
+
+function comboTooltip(params, rows){
+  const i=params[0].dataIndex;
+  const d=rows[i];
+  return `<div style="font-size:13px;line-height:1.8">
+    <b>${d.label}</b><br/>
+    <span style="color:${C25}">■</span> 2025：${fmt(d.v25)}<br/>
+    <span style="color:${C26}">■</span> 2026：${fmt(d.v26)}<br/>
+    增减：${d.delta>=0?"+":""}${fmt(d.delta)}<br/>
+    <b>同比：${d.yoyPct>0?"+":""}${d.yoyPct}%</b>
+  </div>`;
+}
+
+function axisFmt(v){
+  if(v>=10000) return (v/10000).toFixed(0)+"万";
+  return v;
+}
+
+function volumeAxisRange(rows){
+  const vals=rows.flatMap(d=>[d.v25,d.v26]).filter(v=>v!=null&&v>0);
+  if(!vals.length) return{min:0,max:100};
+  const min=Math.min(...vals), max=Math.max(...vals);
+  const span=max-min||max*0.2;
+  const pad=Math.max(span*0.15,max*0.08);
+  return{min:Math.max(0,Math.floor(min-pad)),max:Math.ceil(max+pad)};
+}
+
+function volumeBarStyle(base, top){
+  const grad=typeof echarts!=="undefined"?new echarts.graphic.LinearGradient(0,0,0,1,[
+    {offset:0,color:top},{offset:1,color:base}
+  ]):base;
+  return{color:grad,borderRadius:[5,5,0,0],shadowColor:"rgba(0,0,0,.06)",shadowBlur:4,shadowOffsetY:2};
+}
+
+function yoyLineSeries(rows, compact){
+  return{
+    name:"同比",type:"line",yAxisIndex:1,smooth:false,symbol:"circle",symbolSize:compact?6:8,
+    data:rows.map(d=>d.yoyPct),connectNulls:false,z:10,
+    lineStyle:{width:2,type:"dashed",color:"#999"},
+    itemStyle:{color:(p)=>{const v=rows[p.dataIndex].yoyPct;return v==null?"#bbb":v>=0?CUP:CDOWN;},borderWidth:2,borderColor:"#fff"},
+    label:{show:true,position:"top",distance:compact?8:12,fontSize:compact?10:11,fontWeight:700,
+      backgroundColor:"rgba(255,255,255,.92)",borderRadius:3,padding:[2,5],
+      formatter:p=>p.value==null?"":(p.value>0?"+":"")+p.value+"%",
+      color:(p)=>{const v=rows[p.dataIndex].yoyPct;return v==null?"#999":v>=0?CUP:CDOWN;}}
+  };
+}
+
+function volumeComboChartOption(title, rows, opts={}){
+  const compact=!!opts.compact;
+  const range=volumeAxisRange(rows);
+  const labels=rows.map(d=>d.label);
+  const bw=compact?20:28;
+  const mainSeries=[
+    {name:"2025",type:"bar",barGap:"22%",barMaxWidth:bw,
+      data:rows.map(d=>d.v25),itemStyle:volumeBarStyle(C25,"#e8a882"),
+      label:{show:true,position:"top",fontSize:compact?10:11,fontWeight:600,color:C25,formatter:p=>fmt(p.value)}},
+    {name:"2026",type:"bar",barMaxWidth:bw,
+      data:rows.map(d=>d.v26),itemStyle:volumeBarStyle(C26,"#7eb3c4"),
+      label:{show:true,position:"top",fontSize:compact?10:11,fontWeight:600,color:C26,formatter:p=>fmt(p.value)}}
+  ];
+  return{
+    title:title?{text:title,left:"center",textStyle:{fontSize:14,fontWeight:600}}:undefined,
+    tooltip:{trigger:"axis",formatter:p=>comboTooltip(p,rows)},
+    legend:{data:["2025","2026","同比"],bottom:0,textStyle:{fontSize:12},itemWidth:14,itemHeight:10},
+    grid:{left:compact?52:62,right:compact?52:62,top:title?56:40,bottom:52},
+    xAxis:{type:"category",data:labels,boundaryGap:true,axisTick:{alignWithLabel:true},
+      axisLabel:{fontSize:12,color:"#666"}},
+    yAxis:[
+      {type:"value",name:"上传量",min:range.min,max:range.max,
+        axisLabel:{formatter:axisFmt,color:"#888"},splitLine:{lineStyle:{type:"dashed",color:"#eee"}}},
+      {type:"value",name:"同比",axisLabel:{formatter:"{value}%",color:"#888"},splitLine:{show:false}}
+    ],
+    series:[...mainSeries,yoyLineSeries(rows,compact)]
+  };
+}
+
+function buildPriceRows(priceData){
+  return priceData.labels.map((label,i)=>{
+    const v25=priceData["2025"][i], v26=priceData["2026"][i];
+    const a=v25??0, b=v26??0;
+    return{label,v25:v25,v26:v26,delta:+(b-a).toFixed(3),yoyPct:v25==null||v26==null?null:yoy(b,a)};
+  });
+}
+
+function priceTooltip(params, rows){
+  const i=params[0].dataIndex, d=rows[i];
+  const yoyTxt=d.yoyPct==null?"—":(d.yoyPct>0?"+":"")+d.yoyPct+"%";
+  return `<div style="font-size:13px;line-height:1.8">
+    <b>${d.label}</b><br/>
+    <span style="color:${C25}">■</span> 2025：${d.v25??"—"} 元<br/>
+    <span style="color:${C26}">■</span> 2026：${d.v26??"—"} 元<br/>
+    差值：${d.v25==null||d.v26==null?"—":(d.delta>=0?"+":"")+d.delta+" 元"}<br/>
+    <b>同比：${yoyTxt}</b>
+  </div>`;
+}
+
+function priceAxisRange(rows){
+  const vals=rows.flatMap(d=>[d.v25,d.v26]).filter(v=>v!=null&&!isNaN(v));
+  if(!vals.length) return{min:0,max:5};
+  const min=Math.min(...vals), max=Math.max(...vals);
+  const span=max-min||0.2;
+  const pad=Math.max(span*0.45,0.12);
+  return{min:+(min-pad).toFixed(2),max:+(max+pad).toFixed(2)};
+}
+
+/** 均价专用：Y 轴缩放至数据区间，柱顶标注数值，同比折线不平滑 */
+function priceComboChartOption(title, rows){
+  const range=priceAxisRange(rows);
+  const labels=rows.map(d=>d.label);
+  return{
+    title:title?{text:title,left:"center",textStyle:{fontSize:14,fontWeight:600}}:undefined,
+    tooltip:{trigger:"axis",formatter:p=>priceTooltip(p,rows)},
+    legend:{data:["2025","2026","同比"],bottom:0,textStyle:{fontSize:12}},
+    grid:{left:62,right:62,top:title?56:36,bottom:52},
+    xAxis:{type:"category",data:labels,boundaryGap:true},
+    yAxis:[
+      {type:"value",name:"均价(元)",min:range.min,max:range.max,
+        axisLabel:{formatter:v=>Number(v).toFixed(2)},
+        splitLine:{lineStyle:{type:"dashed",color:"#eee"}}},
+      {type:"value",name:"同比",axisLabel:{formatter:"{value}%"},
+        splitLine:{show:false}}
+    ],
+    series:[
+      {name:"2025",type:"bar",barGap:"18%",barWidth:28,
+        data:rows.map(d=>d.v25),
+        itemStyle:{color:C25,borderRadius:[4,4,0,0]},
+        label:{show:true,position:"top",fontSize:11,fontWeight:600,color:C25,
+          formatter:p=>p.value==null?"":Number(p.value).toFixed(2)}},
+      {name:"2026",type:"bar",barWidth:28,
+        data:rows.map(d=>d.v26),
+        itemStyle:{color:C26,borderRadius:[4,4,0,0]},
+        label:{show:true,position:"top",fontSize:11,fontWeight:600,color:C26,
+          formatter:p=>p.value==null?"":Number(p.value).toFixed(2)}},
+      yoyLineSeries(rows)
+    ]
+  };
+}
+
+function seriesToRows(m,yoyArr=null){
+  return m.labels.map((label,i)=>{
+    const v25=m["2025"][i]??0, v26=m["2026"][i]??0;
+    const yoyPct=yoyArr?yoyArr[i]:yoy(v26,v25);
+    return{label,v25,v26,delta:v26-v25,yoyPct};
+  });
+}
+
+function statBannerPeriod(periodTag, periodClass, label, val26, val25, unit, yoyV, extra=""){
+  return`<span class="stat-tag ${periodClass}">${periodTag}</span>
+    <span class="stat-sub">${label}</span>
+    <span class="stat-main">${fmt(val26)} ${unit}</span>
+    <span>同比 ${yoyHtml(yoyV)}</span>
+    <span class="stat-extra">2026 ${fmt(val26)} ${unit} · 2025 ${fmt(val25)} ${unit}${extra?` · ${extra}`:""}</span>`;
+}
+
+function summaryMetric(name){
+  return(DATA.overall.summary_table||[]).find(r=>r.metric.includes(name));
+}
+
+const OVERALL_VIEWS={
+  month:{
+    key:"month_view",
+    title:"月度数据",
+    col25:"2025年",
+    col26:"2026年",
+    noteKey:"month"
+  },
+  cumulative:{
+    key:"cumulative_view",
+    title:"年度累计数据（1-6月）",
+    col25:"2025年1-6月",
+    col26:"2026年1-6月",
+    noteKey:"cumulative"
   }
-  window.scrollTo(0, 0);
+};
+let overallViewMode="month";
+let overallMonth="06";
+
+function metricShortName(metric){
+  return metric.replace(/（[^）]+）/,"");
 }
-function goHome() {
-  goPage('home');
+
+function yoyChipClass(y){
+  return y>0?"up":y<0?"down":"flat";
 }
-  </script>
-  <script src="db.js"></script>
-  <script src="site-config.js?v=20260526"></script>
-  <script src="data-bootstrap.js?v=csv-20260526"></script>
-  <script src="cloud-sync.js?v=20260706-01"></script>
-  <script src="customer-pool-org.js?v=20260526-pool2"></script>
-  <script src="bbm-api.js?v=20260706-01"></script>
-  <script src="app.js?v=20260710-01"></script>
-  <script>
-    // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
-    (async function() {
-      console.log('🚀 开始初始化...');
 
-      /** 新电脑/空缓存：先 cloudSync 拉 Supabase（约 2358 条），避免先灌 CSV 再误上传覆盖云端 */
-      var localCount = 0;
-      try {
-        localCount = JSON.parse(localStorage.getItem('rule_library_providers') || '[]').length;
-      } catch (e) { localCount = 0; }
+function renderOverallKpiCards(rows, viewKey, cfg){
+  const visible=rows.filter(r=>!(r.month_only&&viewKey==="cumulative_view"));
+  const monthViews=DATA.overall?.month_views?.[overallMonth]||{};
+  const grid=document.getElementById("overall-kpi-grid");
+  const n=visible.length;
+  grid.className=`overall-kpi-grid cols-${n<=4?4:5}`;
+  grid.innerHTML=visible.map(r=>{
+    let v=r[viewKey];
+    if(viewKey==="month_view"){
+      if(r.metric.includes("上新店铺")) v=monthViews.provider||v;
+      if(r.metric.includes("图书征集")) v=monthViews.collection||v;
+      if(r.metric.includes("资料生产")) v=monthViews.production||v;
+      if(r.metric.includes("资料发布")) v=monthViews.publish||v;
+    }
+    if(!v) return "";
+    const fmtVal=v.use_exact_fmt?fmtExact:fmt;
+    const title=metricShortName(r.metric);
+    const simple=!!r.single_value;
+    const main=simple?fmtVal(v.v2026):`${fmtVal(v.v2026)}<span class="unit">${r.unit}</span>`;
+    let sub="";
+    if(!simple&&!r.month_only&&v.published_2026!=null) sub=`已发布 ${fmt(v.published_2026)} · 待发布 ${fmt(v.unpublished_2026)}`;
+    const subHtml=!simple
+      ?(sub?`<div class="overall-kpi-sub">${sub}</div>`:`<div class="overall-kpi-sub is-placeholder">—</div>`)
+      :"";
+    let foot="";
+    if(!simple&&v.yoy!=null){
+      const yoyCls=yoyChipClass(v.yoy);
+      const yoySign=v.yoy>0?"+":"";
+      foot=`<div class="overall-kpi-foot">
+        <span class="overall-kpi-chip ${yoyCls}">同比 <b>${yoySign}${v.yoy}%</b></span>
+        <span class="overall-kpi-chip ref-y25">2025 <b>${fmtVal(v.v2025)}</b></span>
+      </div>`;
+    }else{
+      foot=`<div class="overall-kpi-foot is-empty"></div>`;
+    }
+    return`<div class="overall-kpi-card${simple?" is-simple":""}">
+      <div class="overall-kpi-title">${title}</div>
+      <div class="overall-kpi-body">
+        <div class="overall-kpi-value">${main}</div>
+        ${subHtml}
+      </div>
+      ${foot}
+    </div>`;
+  }).join("");
+}
 
-      if (typeof cloudSync === 'function') {
-        console.log('🚀 调用 cloudSync...');
-        await cloudSync();
-        if (typeof cleanupBlankPlaceholderProviders === 'function') {
-          cleanupBlankPlaceholderProviders();
-        }
-        if (typeof runProviderDuplicateCleanupMigration === 'function') {
-          await runProviderDuplicateCleanupMigration({ silent: true, awaitCloud: true });
-        }
-        if (typeof runLegacyAlbumBookPlaceholderMigration === 'function') {
-          await runLegacyAlbumBookPlaceholderMigration();
-        }
-        if (typeof runStandardRuleFillMigration === 'function') {
-          await runStandardRuleFillMigration();
-        }
-        if (typeof runChongwengeShopNameMigration === 'function') {
-          await runChongwengeShopNameMigration();
-        }
-        if (typeof startCloudAutoSync === 'function') {
-          startCloudAutoSync();
-        }
-      } else {
-        console.log('🚀 cloudSync 未定义');
-      }
+function setOverallView(mode){
+  if(!OVERALL_VIEWS[mode]||!DATA?.overall) return;
+  overallViewMode=mode;
+  const cfg=OVERALL_VIEWS[mode];
+  const notes=DATA.overall.period_notes||{};
+  const monthLabel=`${parseInt(overallMonth,10)}月`;
+  document.getElementById("overall-view-title").textContent=mode==="month"?`月度数据（${monthLabel}）`:cfg.title;
+  document.getElementById("overall-view-note").textContent=
+    notes[cfg.noteKey]||(mode==="month"?`月度口径：2025年${monthLabel} vs 2026年${monthLabel}`:"累计口径：2025年1-6月 vs 2026年1-6月");
+  const monthToggle=document.getElementById("overall-month-toggle");
+  if(monthToggle) monthToggle.style.display=mode==="month"?"flex":"none";
+  document.querySelectorAll("[data-view]").forEach(btn=>{
+    const active=btn.dataset.view===mode;
+    btn.classList.toggle("active",active);
+    btn.setAttribute("aria-selected",active?"true":"false");
+  });
+  document.querySelectorAll("[data-overall-mm]").forEach(btn=>{
+    const active=btn.dataset.overallMm===overallMonth;
+    btn.classList.toggle("active",active);
+    btn.setAttribute("aria-selected",active?"true":"false");
+  });
+  renderOverallKpiCards(DATA.overall.summary_table, cfg.key, cfg);
+}
 
-      try {
-        localCount = JSON.parse(localStorage.getItem('rule_library_providers') || '[]').length;
-      } catch (e) { localCount = 0; }
-      if (localCount < 500 && typeof ensureOfficialProvidersLoaded === 'function') {
-        try {
-          var boot = await ensureOfficialProvidersLoaded({ minCount: 500, markDirty: true });
-          console.log('🚀 云端仍不足，已用官方 CSV 兜底:', boot.source, boot.count, '条');
-          if (typeof runChongwengeShopNameMigration === 'function') {
-            await runChongwengeShopNameMigration();
-          }
-          if (typeof runProviderDuplicateCleanupMigration === 'function') {
-            await runProviderDuplicateCleanupMigration({ silent: true, awaitCloud: true });
-          }
-          if (typeof cloudSync === 'function') await cloudSync();
-        } catch (e) {
-          console.warn('🚀 CSV 官方表未载入:', e);
-        }
-      }
-      
-      console.log('🚀 检查数据...');
-      
-      var existingProviders = localStorage.getItem('rule_library_providers');
-      if ((!existingProviders || existingProviders === '[]') && typeof presetData !== 'undefined') {
-        console.log('Initializing fallback from db.js');
-        localStorage.setItem('rule_library_providers', JSON.stringify(presetData.providers));
-        localStorage.setItem('rule_library_brands', JSON.stringify(presetData.brands.map(function(n, i) { return { id: String(i+1), name: n }; })));
-      }
-      
-      if (typeof updateStats === 'function') {
-        updateStats();
-      }
-      var badge = document.getElementById('app-build-badge');
-      if (badge && window.RULE_LIBRARY_BUILD) {
-        badge.textContent = 'build ' + window.RULE_LIBRARY_BUILD;
-      }
-      var sp = document.getElementById('stat-providers');
-      if (sp) console.log('🚀 首页规则卡片数: ' + sp.textContent + ' | build=' + (window.RULE_LIBRARY_BUILD || '?'));
-    })();
-  </script>
+function initOverallViewToggle(){
+  document.querySelectorAll("[data-view]").forEach(btn=>{
+    btn.addEventListener("click",()=>setOverallView(btn.dataset.view));
+  });
+  document.querySelectorAll("[data-overall-mm]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      overallMonth=btn.dataset.overallMm;
+      setOverallView("month");
+    });
+  });
+}
+
+function renderOverallSummary(){
+  setOverallView(overallViewMode);
+}
+
+function renderOverallStats(){
+  const c=DATA.overall.collection,p=DATA.overall.production,u=DATA.overall.publish;
+  const prodRow=summaryMetric("生产");
+  const pm=prodRow?.month_view||{};
+  const pc=prodRow?.cumulative_view||{};
+
+  document.getElementById("stat-collection-month").innerHTML=statBannerPeriod(
+    "6月当月","month","图书征集",c.month_2026??c.may_2026,c.month_2025??c.may_2025,"本",c.yoy_month??c.yoy_may);
+  document.getElementById("stat-collection-cumulative").innerHTML=statBannerPeriod(
+    "1-6月累计","cum","图书征集",c.total_2026_period,c.total_2025_period,"本",c.yoy,
+    `2025全年参考 ${fmt(c.total_2025_full)} 本`);
+
+  const prodMonthExtra=pm.published_2026!=null
+    ?`已发布 ${fmt(pm.published_2026)} · 待发布 ${fmt(pm.unpublished_2026)}`:"";
+  const prodCumExtra=pc.published_2026!=null
+    ?`已发布 ${fmt(pc.published_2026)} · 待发布 ${fmt(pc.unpublished_2026)}`:"";
+  document.getElementById("stat-production-month").innerHTML=statBannerPeriod(
+    "6月当月","month","资料生产",p.month_2026??p.may_2026,p.month_2025??p.may_2025,"份",p.yoy_month??p.yoy_may,prodMonthExtra);
+  document.getElementById("stat-production-cumulative").innerHTML=statBannerPeriod(
+    "1-6月累计","cum","资料生产",p.total_2026_period,p.total_2025_period,"份",p.yoy,prodCumExtra);
+
+  document.getElementById("stat-publish-month").innerHTML=statBannerPeriod(
+    "6月当月","month","资料发布",u.month_2026??u.may_2026,u.month_2025??u.may_2025,"份",u.yoy_month??u.yoy_may);
+  document.getElementById("stat-publish-cumulative").innerHTML=statBannerPeriod(
+    "1-6月累计","cum","资料发布",u.total_2026_period,u.total_2025_period,"份",u.yoy);
+
+  document.getElementById("stat-collection-desc").textContent="分月对比 · 各月征集量 · 虚线为当月同比";
+  document.getElementById("stat-production-desc").textContent="分月对比 · 各月生产量 · 虚线为当月同比";
+  renderUnpubScheduleTable();
+}
+
+function renderUnpubScheduleTable(){
+  const p=DATA.overall.production;
+  const d=p.unpublished_schedule;
+  const uploadDist=p.monthly_unpublished||{};
+  const prodRow=summaryMetric("生产");
+  const monthView=prodRow?.month_view||{};
+  const cumulativeView=prodRow?.cumulative_view||{};
+  if(!d) return;
+  document.getElementById("unpub-schedule-note").textContent=
+    "待发布资源 · 上传月份按本月/累计口径统计；发布月份按 min_online_time 排期统计";
+  document.getElementById("unpub-current-month").textContent=fmt(monthView.unpublished_2026||0);
+  document.getElementById("unpub-cumulative").textContent=fmt(cumulativeView.unpublished_2026||0);
+  const labels=uploadDist.labels||[];
+  const values=uploadDist["2026"]||[];
+  const total=values.reduce((sum,v)=>sum+(Number(v)||0),0);
+  const rows=labels.map((label,i)=>({label,val:Number(values[i])||0}));
+  const peak=rows.reduce((a,b)=>b.val>a.val?b:a,rows[0]||{label:"—",val:0});
+  document.getElementById("unpub-schedule-peak").textContent=peak.label;
+  document.getElementById("unpub-schedule-peak-val").textContent=`${fmt(peak.val)} 份`;
+  renderUnpubList("unpub-upload-list", rows);
+  const releaseRows=(d.labels||[]).map((label,i)=>({label,val:Number(d.values?.[i])||0}));
+  renderUnpubList("unpub-release-list", releaseRows);
+}
+
+function renderUnpubList(id, rows){
+  const total=rows.reduce((sum,r)=>sum+(Number(r.val)||0),0);
+  const maxVal=Math.max(...rows.map(r=>r.val),1);
+  const list=document.getElementById(id);
+  if(!list) return;
+  list.innerHTML=rows.map(r=>{
+    const pct=total?((r.val/total)*100).toFixed(1):"0.0";
+    const barW=Math.max(3,Math.round((r.val/maxVal)*100));
+    return`<div class="unpub-row">
+      <span class="unpub-qty">${fmt(r.val)}</span>
+      <span class="unpub-pct">${pct}%</span>
+      <div class="unpub-row-bar">
+        <div class="unpub-bar-track"><div class="unpub-bar-fill" style="height:${barW}%"></div></div>
+      </div>
+      <span class="unpub-month"><i class="unpub-month-dot"></i>${r.label}</span>
+    </div>`;
+  }).join("")+
+  `<div class="unpub-row total-row">
+    <span class="unpub-qty">${fmt(total)}</span>
+    <span class="unpub-pct">100%</span>
+    <div class="unpub-row-bar"><div class="unpub-bar-track"><div class="unpub-bar-fill" style="height:100%;opacity:.4"></div></div></div>
+    <span class="unpub-month"><i class="unpub-month-dot"></i>合计</span>
+  </div>`;
+}
+
+let sceneMonthMode="06";
+
+function renderSceneChart(mm=sceneMonthMode){
+  const sm=DATA.overall.publish.scenes_monthly;
+  const sc=(!sm||mm==="cumulative")?DATA.overall.publish.scenes
+    :(sm.months[mm]||sm.cumulative);
+  const monthLabel=mm==="cumulative"?(sm?.cumulative?.label||"1-5月累计")
+    :(sc.label||`${parseInt(mm,10)}月`);
+  document.getElementById("scene-month-label").textContent=monthLabel;
+  if(!chartScene) chartScene=echarts.init(document.getElementById("chart-scene"));
+  chartScene.setOption({
+    tooltip:{trigger:"axis"},
+    legend:{data:["2025","2026"],bottom:0},
+    grid:{left:100,right:30,top:20,bottom:40},
+    xAxis:{type:"value",axisLabel:{formatter:axisFmt}},
+    yAxis:{type:"category",data:sc.labels,inverse:true,axisLabel:{width:90,overflow:"truncate"}},
+    series:[
+      {name:"2025",type:"bar",data:sc["2025"],itemStyle:{color:C25},barMaxWidth:14},
+      {name:"2026",type:"bar",data:sc["2026"],itemStyle:{color:C26},barMaxWidth:14}
+    ]
+  },true);
+  renderSceneShareTable(sc);
+}
+
+function renderSceneShareTable(sc){
+  const tb=document.querySelector("#table-scene-share tbody");
+  if(!tb||!sc) return;
+  const total25=(sc["2025"]||[]).reduce((a,b)=>a+(Number(b)||0),0);
+  const total26=(sc["2026"]||[]).reduce((a,b)=>a+(Number(b)||0),0);
+  tb.innerHTML=(sc.labels||[]).map((label,i)=>{
+    const v25=Number(sc["2025"]?.[i]||0);
+    const v26=Number(sc["2026"]?.[i]||0);
+    const p25=total25?+(v25/total25*100).toFixed(1):0;
+    const p26=total26?+(v26/total26*100).toFixed(1):0;
+    const diff=+(p26-p25).toFixed(1);
+    return`<tr>
+      <td>${label}</td>
+      <td class="col-25">${p25}%</td>
+      <td class="col-26">${p26}%</td>
+      <td class="col-yoy">${diff>0?"+":""}${diff} pct</td>
+      <td class="col-yoy">${yoyHtml(yoy(v26,v25))}</td>
+    </tr>`;
+  }).join("")||"<tr><td colspan='5'>暂无场景数据</td></tr>";
+}
+
+function setSceneMonthView(mm){
+  sceneMonthMode=mm;
+  document.querySelectorAll("#scene-month-toggle .view-toggle-btn").forEach(btn=>{
+    const active=btn.dataset.mm===mm;
+    btn.classList.toggle("active",active);
+    btn.setAttribute("aria-selected",active?"true":"false");
+  });
+  renderSceneChart(mm);
+}
+
+function initSceneMonthToggle(){
+  document.querySelectorAll("#scene-month-toggle .view-toggle-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>setSceneMonthView(btn.dataset.mm));
+  });
+}
+
+function renderPriceDistributionPair(chartA,chartB,pd){
+  chartA.setOption({
+    tooltip:{trigger:"axis"},
+    legend:{data:["2025","2026"],bottom:0},
+    grid:{left:50,right:20,top:20,bottom:50},
+    xAxis:{type:"category",data:pd.labels,axisLabel:{rotate:20,fontSize:11}},
+    yAxis:{type:"value",name:"占比%",max:100},
+    series:[
+      {name:"2025",type:"bar",data:pd.pct_2025,itemStyle:{color:C25},barMaxWidth:28,
+        label:{show:true,position:"top",formatter:"{c}%",fontSize:10}},
+      {name:"2026",type:"bar",data:pd.pct_2026,itemStyle:{color:C26},barMaxWidth:28,
+        label:{show:true,position:"top",formatter:"{c}%",fontSize:10}}
+    ]
+  },true);
+
+  const delta=pd.labels.map((_,i)=>+(pd.pct_2026[i]-pd.pct_2025[i]).toFixed(1));
+  chartB.setOption({
+    tooltip:{trigger:"axis",formatter:p=>`${p[0].name}<br/>变化：${p[0].value>0?"+":""}${p[0].value} pct`},
+    grid:{left:50,right:20,top:20,bottom:50},
+    xAxis:{type:"category",data:pd.labels,axisLabel:{rotate:20,fontSize:11}},
+    yAxis:{type:"value",name:"百分点"},
+    series:[{type:"bar",data:delta,barMaxWidth:32,
+      itemStyle:{color:p=>p.value>=0?CUP:CDOWN},
+      label:{show:true,position:"top",formatter:p=>(p.value>0?"+":"")+p.value+"%",fontSize:10}}]
+  },true);
+}
+
+function renderOverallCharts(){
+  const o=DATA.overall;
+  if(!chartCollection) chartCollection=echarts.init(document.getElementById("chart-collection"));
+  if(!chartProduction) chartProduction=echarts.init(document.getElementById("chart-production"));
+  if(!chartPublish) chartPublish=echarts.init(document.getElementById("chart-publish"));
+  if(!chartPriceDist) chartPriceDist=echarts.init(document.getElementById("chart-price-dist"));
+  if(!chartPriceDistChange) chartPriceDistChange=echarts.init(document.getElementById("chart-price-dist-change"));
+  if(!chartPriceDistMonth) chartPriceDistMonth=echarts.init(document.getElementById("chart-price-dist-month"));
+  if(!chartPriceDistChangeMonth) chartPriceDistChangeMonth=echarts.init(document.getElementById("chart-price-dist-change-month"));
+
+  const collOpt=volumeComboChartOption(null,seriesToRows(o.collection.monthly));
+  collOpt.yAxis[0].name="征集量";
+  chartCollection.setOption(collOpt,true);
+
+  const prodOpt=volumeComboChartOption(null,seriesToRows(o.production.monthly));
+  prodOpt.yAxis[0].name="生产量";
+  chartProduction.setOption(prodOpt,true);
+
+  const pubOpt=volumeComboChartOption(null,seriesToRows(o.publish.monthly));
+  pubOpt.yAxis[0].name="发布量";
+  chartPublish.setOption(pubOpt,true);
+
+  renderSceneChart(sceneMonthMode);
+
+  const monthPd=o.production.monthly_price_distribution?.["06"]||o.production.price_distribution;
+  renderPriceDistributionPair(chartPriceDistMonth,chartPriceDistChangeMonth,monthPd);
+  renderPriceDistributionPair(chartPriceDist,chartPriceDistChange,o.production.price_distribution);
+}
+
+function renderOverall(){
+  renderOverallSummary();
+  renderOverallStats();
+  renderOverallCharts();
+}
+
+function renderPriceChartGlobal(){
+  const rows=buildPriceRows(DATA.global_monthly_price);
+  if(!chartPriceGlobal) chartPriceGlobal=echarts.init(document.getElementById("chart-price-global"));
+  chartPriceGlobal.setOption(priceComboChartOption(null,rows));
+}
+
+function renderPriceChartProvider(p){
+  const rows=buildPriceRows(p.monthly_price);
+  if(!chartPriceProvider) chartPriceProvider=echarts.init(document.getElementById("chart-price-provider"));
+  chartPriceProvider.setOption(priceComboChartOption(null,rows),true);
+}
+
+function isLocalPageUrl(url){
+  return url.protocol === "file:" || ["localhost","127.0.0.1","0.0.0.0","::1"].includes(url.hostname);
+}
+
+async function copyText(text){
+  if(navigator.clipboard && window.isSecureContext){
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const el=document.createElement("textarea");
+  el.value=text;
+  el.setAttribute("readonly","");
+  el.style.position="fixed";
+  el.style.left="-9999px";
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand("copy");
+  document.body.removeChild(el);
+}
+
+function initShareButton(){
+  const btn=document.getElementById("copy-share-link");
+  const status=document.getElementById("share-status");
+  if(!btn||!status) return;
+  const url=new URL(window.location.href);
+  if(isLocalPageUrl(url)){
+    status.textContent="当前是本地地址；线上分享请先上传 dist 发布包，再复制线上页面地址。";
+  }
+  btn.addEventListener("click",async()=>{
+    const current=window.location.href;
+    try{
+      await copyText(current);
+      const local=isLocalPageUrl(new URL(current));
+      status.textContent=local
+        ? "已复制本地链接；它只在本机可用，发给同事前请先部署线上版本。"
+        : "已复制当前线上页面链接。";
+    }catch(e){
+      status.textContent="复制失败，请手动复制浏览器地址栏链接。";
+    }
+  });
+}
+
+function renderJulySection(){
+  const d=DATA.july;
+  const section=document.getElementById("july-section");
+  if(!section||!d){
+    if(section) section.hidden=true;
+    return;
+  }
+  section.hidden=false;
+  document.getElementById("july-title").textContent="同期次月生产与图书征集";
+  document.getElementById("july-note").textContent=`${d.period||"2025年7月"} · ${d.note||"仅展示已提供数据"}`;
+  const s=d.summary||{};
+  const kpis=[
+    ["生产资料",s.production_count,"份"],
+    ["生产图书",s.production_books,"本"],
+    ["涉及店铺",s.providers,"家"]
+  ];
+  document.getElementById("july-kpi-grid").innerHTML=kpis.map(([label,val,unit])=>`
+    <div class="july-kpi-card">
+      <div class="july-kpi-label">${label}</div>
+      <div class="july-kpi-value">${fmt(val||0)}<span class="unit">${unit}</span></div>
+    </div>`).join("");
+  renderJulyProviderChart();
+  renderJulyProviderTable();
+  renderJulyBookTable();
+  const search=document.getElementById("search-july-book");
+  if(search&&!search.dataset.bound){
+    search.dataset.bound="1";
+    search.addEventListener("input",()=>renderJulyBookTable());
+  }
+  const providerSearch=document.getElementById("search-july-book-provider");
+  if(providerSearch&&!providerSearch.dataset.bound){
+    providerSearch.dataset.bound="1";
+    providerSearch.addEventListener("input",()=>renderJulyBookTable());
+  }
+}
+
+function initSideToc(){
+  const topBtn=document.getElementById("back-to-top");
+  if(topBtn) topBtn.addEventListener("click",()=>window.scrollTo({top:0,behavior:"smooth"}));
+}
+
+function renderJulyProviderChart(){
+  const top=DATA.july?.top_providers;
+  if(!top) return;
+  if(!chartJulyProvider) chartJulyProvider=echarts.init(document.getElementById("chart-july-provider"));
+  chartJulyProvider.setOption({
+    tooltip:{trigger:"axis"},
+    legend:{data:["生产资料","征集图书"],bottom:0},
+    grid:{left:120,right:24,top:18,bottom:42},
+    xAxis:{type:"value",axisLabel:{formatter:axisFmt}},
+    yAxis:{type:"category",data:top.labels,inverse:true,axisLabel:{width:110,overflow:"truncate"}},
+    series:[
+      {name:"生产资料",type:"bar",data:top.production_count,itemStyle:{color:C26},barMaxWidth:14},
+      {name:"征集图书",type:"bar",data:top.collection_books,itemStyle:{color:C25},barMaxWidth:14}
+    ]
+  },true);
+}
+
+function renderJulyProviderTable(){
+  const tb=document.querySelector("#table-july-providers tbody");
+  if(!tb) return;
+  const rows=DATA.july?.provider_rows||[];
+  tb.innerHTML=rows.map(r=>`<tr>
+    <td>${r.provider}</td>
+    <td class="num">${fmt(r.production_count)}</td>
+    <td class="num">${fmt(r.production_books)}</td>
+    <td class="num">${fmt(r.collection_books)}</td>
+    <td class="num">${r.avg_price||0}</td>
+  </tr>`).join("");
+}
+
+function renderJulyBookTable(){
+  const tb=document.querySelector("#table-july-books tbody");
+  if(!tb) return;
+  const textQ=(document.getElementById("search-july-book")?.value||"").trim().toLowerCase();
+  const providerQ=(document.getElementById("search-july-book-provider")?.value||"").trim().toLowerCase();
+  const rows=(DATA.july?.book_details||[]).filter(r=>{
+    const provider=String(r.provider||"").toLowerCase();
+    const text=`${r.provider} ${r.title} ${r.course_name} ${r.grade_names}`.toLowerCase();
+    return (!textQ||text.includes(textQ))&&(!providerQ||provider.includes(providerQ));
+  });
+  tb.innerHTML=rows.map(r=>`<tr>
+    <td>${r.provider}</td>
+    <td>${r.album_id??""}</td>
+    <td style="max-width:460px;white-space:normal">${r.title}</td>
+    <td>${r.course_name||""}</td>
+    <td>${r.grade_names||""}</td>
+    <td>${[r.scenes_one_names,r.scenes_two_names].filter(Boolean).join(" / ")}</td>
+    <td class="num">${fmt(r.document_count||0)}</td>
+  </tr>`).join("")||"<tr><td colspan='7'>暂无匹配数据</td></tr>";
+}
+
+async function load(){
+  const r=await fetch(`data/dashboard.json?v=${Date.now()}`, {cache:"no-store"});
+  if(!r.ok) throw new Error("无法加载 data/dashboard.json");
+  DATA=await r.json();
+  renderHeader();
+  initShareButton();
+  initSideToc();
+  initOverallViewToggle();
+  initSceneMonthToggle();
+  renderOverall();
+  renderJulySection();
+  renderPriceChartGlobal();
+  initProviderPeriodSwitch();
+  renderProviderOverall();
+  renderProviderTable();
+  initProviderOverviewSearch();
+  initProviderSelect();
+}
+
+function renderHeader(){
+  const s=DATA.summary;
+  document.getElementById("period-desc").textContent=s.period+" · "+s.compare_period;
+  document.getElementById("meta-tags").innerHTML=
+    `<span class="tag">生成 ${s.generated_at}</span>`+
+    DATA.data_sources.files.map(f=>`<span class="tag">${f.file}</span>`).join("");
+  document.getElementById("rules").innerHTML=
+    `征集 = ${s.rules.book} · 生产 = ${s.rules.production} · 发布 = ${s.rules.publish} · 品牌 = ${s.rules.brand}`;
+}
+
+function initProviderPeriodSwitch(){
+  const wrap=document.getElementById("provider-period-switch");
+  if(!wrap||wrap.dataset.bound) return;
+  wrap.dataset.bound="1";
+  wrap.querySelectorAll("[data-provider-period]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      providerOverallPeriod=btn.dataset.providerPeriod;
+      wrap.querySelectorAll("[data-provider-period]").forEach(b=>b.classList.toggle("active",b===btn));
+      renderProviderOverall();
+    });
+  });
+}
+
+function renderProviderTable(filter=""){
+  const tb=document.querySelector("#table-providers tbody");
+  const q=filter.trim().toLowerCase();
+  const rows=DATA.providers.filter(p=>!q||p.provider.toLowerCase().includes(q));
+  tb.innerHTML=rows.map(p=>{
+    const a=p.totals["2025"], b=p.totals["2026"];
+    const ry=yoy(b.res_count,a.res_count), rb=yoy(b.book_count,a.book_count), rp=yoy(b.avg_price,a.avg_price);
+    const active=p.provider===activeProvider?"active":"";
+    return`<tr class="${active}" data-prov="${encodeURIComponent(p.provider)}" style="cursor:pointer">
+      <td>${p.provider}</td>
+      <td class="col-25">${fmt(a.res_count)}</td><td class="col-26">${fmt(b.res_count)}</td><td class="col-yoy">${yoyHtml(ry)}</td>
+      <td class="col-25">${fmt(a.book_count)}</td><td class="col-26">${fmt(b.book_count)}</td><td class="col-yoy">${yoyHtml(rb)}</td>
+      <td class="col-25">${a.avg_price}</td><td class="col-26">${b.avg_price}</td><td class="col-yoy">${yoyHtml(rp)}</td></tr>`;
+  }).join("");
+  tb.querySelectorAll("tr").forEach(tr=>tr.onclick=()=>selectProvider(decodeURIComponent(tr.dataset.prov),true));
+}
+
+function renderProviderOverall(){
+  const rows=DATA.providers||[];
+  const period=providerOverallPeriod||"total";
+  const periodLabel=period==="total"?"1-6月累计":`${parseInt(period,10)}月`;
+  const providerVal=(p,year)=>{
+    if(period==="total") return Number(p.totals?.[year]?.res_count)||0;
+    const monthly=buildMonthlyYoY(p.monthly||{months:[],"2025":[],"2026":[]});
+    const row=monthly.find(d=>d.mm===period);
+    return Number(year==="2025"?row?.v25:row?.v26)||0;
+  };
+  const changes=rows.map(p=>{
+    const a=providerVal(p,"2025");
+    const b=providerVal(p,"2026");
+    return {provider:p.provider,v25:a,v26:b,delta:b-a,yoyPct:yoy(b,a)};
+  }).filter(r=>r.v25||r.v26);
+  const up=changes.filter(r=>r.delta>0).sort((a,b)=>b.delta-a.delta).slice(0,8);
+  const down=changes.filter(r=>r.delta<0).sort((a,b)=>a.delta-b.delta).slice(0,8);
+  const table=(list,empty)=>list.length?`<table class="compare-table">
+    <thead><tr><th>店铺</th><th class="col-25">2025</th><th class="col-26">2026</th><th>增减</th><th class="col-yoy">同比</th></tr></thead>
+    <tbody>${list.map(r=>`<tr>
+      <td>${r.provider}</td>
+      <td class="col-25">${fmt(r.v25)}</td>
+      <td class="col-26">${fmt(r.v26)}</td>
+      <td>${r.delta>0?"+":""}${fmt(r.delta)}</td>
+      <td class="col-yoy">${yoyHtml(r.yoyPct)}</td>
+    </tr>`).join("")}</tbody>
+  </table>`:`<div class="provider-empty">${empty}</div>`;
+  document.getElementById("provider-overall-kpis").innerHTML=`
+    <div class="provider-insight-panel">
+      <div class="provider-insight-title up">${periodLabel} · 生产/发布变多店铺 Top</div>
+      <div class="table-wrap compare" style="max-height:340px">${table(up,"暂无增长店铺")}</div>
+    </div>
+    <div class="provider-insight-panel">
+      <div class="provider-insight-title down">${periodLabel} · 生产/发布变少店铺 Top</div>
+      <div class="table-wrap compare" style="max-height:340px">${table(down,"暂无下降店铺")}</div>
+    </div>`;
+}
+
+function renderProviderSummary(p){
+  const a=p.totals["2025"], b=p.totals["2026"];
+  document.getElementById("provider-name").textContent=p.provider;
+  const items=[
+    {title:"发布数据 (res_id)", y25:fmt(a.res_count), y26:fmt(b.res_count), yoyPct:yoy(b.res_count,a.res_count)},
+    {title:"书籍数 (album)", y25:fmt(a.book_count), y26:fmt(b.book_count), yoyPct:yoy(b.book_count,a.book_count)},
+    {title:"均定价 (元)", y25:a.avg_price, y26:b.avg_price, yoyPct:yoy(b.avg_price,a.avg_price)},
+  ];
+  document.getElementById("provider-summary").innerHTML=items.map(it=>{
+    const cls=it.yoyPct>0?"up":it.yoyPct<0?"down":"flat";
+    return`<div class="prov-kpi">
+      <div class="prov-kpi-title">${it.title}</div>
+      <div class="prov-kpi-row"><span class="yr y25">2025</span><span class="val">${it.y25}</span></div>
+      <div class="prov-kpi-row"><span class="yr y26">2026</span><span class="val">${it.y26}</span></div>
+      <div class="prov-kpi-yoy"><span class="compare-label">同比</span>
+        <span class="compare-val ${cls}">${it.yoyPct>0?"+":""}${it.yoyPct}%</span></div>
+    </div>`;
+  }).join("");
+}
+
+function renderMonthlyUploadTable(p){
+  const rows=buildMonthlyYoY(p.monthly);
+  document.querySelector("#table-monthly-upload tbody").innerHTML=rows.map(d=>`
+    <tr>
+      <td>${d.label}</td>
+      <td class="col-25">${fmt(d.v25)}</td>
+      <td class="col-26">${fmt(d.v26)}</td>
+      <td class="col-yoy">${yoyHtml(d.yoyPct)}</td>
+      <td>${d.delta>=0?"+":""}${fmt(d.delta)}</td>
+    </tr>`).join("");
+}
+
+function renderMonthlyPriceTable(p){
+  const rows=buildPriceRows(p.monthly_price);
+  document.querySelector("#table-monthly-price tbody").innerHTML=rows.map(d=>{
+    const diff=d.v25!=null&&d.v26!=null?(d.delta>=0?"+":"")+d.delta:"—";
+    const yoyCell=d.yoyPct==null?"—":yoyHtml(d.yoyPct);
+    return`<tr>
+      <td>${d.label}</td>
+      <td class="col-25">${d.v25??"—"}</td>
+      <td class="col-26">${d.v26??"—"}</td>
+      <td class="col-yoy">${yoyCell}</td>
+      <td>${diff}</td>
+    </tr>`;
+  }).join("");
+}
+
+function filterProviders(q){
+  const s=q.trim().toLowerCase();
+  if(!s) return DATA.providers;
+  return DATA.providers.filter(p=>p.provider.toLowerCase().includes(s));
+}
+
+function renderProviderDropdown(list, query=""){
+  const dd=document.getElementById("provider-dropdown");
+  const hint=query.trim()
+    ?`匹配 ${list.length} / ${DATA.providers.length} 家`
+    :`共 ${DATA.providers.length} 家，输入关键词筛选`;
+  if(!list.length){
+    dd.innerHTML=`<li class="provider-dropdown-hint">${hint}</li><li class="provider-empty">未找到「${query}」</li>`;
+    return;
+  }
+  dd.innerHTML=`<li class="provider-dropdown-hint">${hint}</li>`+list.map(p=>{
+    const active=p.provider===activeProvider?" active":"";
+    return`<li class="provider-option${active}" data-name="${encodeURIComponent(p.provider)}">${p.provider}</li>`;
+  }).join("");
+  dd.querySelectorAll(".provider-option").forEach(el=>{
+    el.onmousedown=e=>{e.preventDefault();selectProvider(decodeURIComponent(el.dataset.name));hideProviderDropdown();};
+  });
+}
+
+function showProviderDropdown(){
+  const input=document.getElementById("select-provider-input");
+  renderProviderDropdown(filterProviders(input.value), input.value);
+  document.getElementById("provider-dropdown").hidden=false;
+}
+
+function hideProviderDropdown(){
+  document.getElementById("provider-dropdown").hidden=true;
+}
+
+function initProviderSelect(){
+  const input=document.getElementById("select-provider-input");
+  const dd=document.getElementById("provider-dropdown");
+  let hi=-1;
+
+  input.addEventListener("focus",()=>{showProviderDropdown();hi=-1;});
+  input.addEventListener("input",()=>{showProviderDropdown();hi=-1;});
+  input.addEventListener("keydown",e=>{
+    const opts=[...dd.querySelectorAll(".provider-option")];
+    if(e.key==="ArrowDown"){e.preventDefault();hi=Math.min(hi+1,opts.length-1);}
+    else if(e.key==="ArrowUp"){e.preventDefault();hi=Math.max(hi-1,0);}
+    else if(e.key==="Enter"){
+      e.preventDefault();
+      const el=opts[hi]||opts[0];
+      if(el){selectProvider(decodeURIComponent(el.dataset.name));hideProviderDropdown();}
+      return;
+    }
+    else if(e.key==="Escape"){hideProviderDropdown();input.blur();return;}
+    else return;
+    opts.forEach((el,i)=>el.classList.toggle("highlight",i===hi));
+    opts[hi]?.scrollIntoView({block:"nearest"});
+  });
+  document.addEventListener("click",e=>{
+    if(!document.getElementById("provider-combobox").contains(e.target)) hideProviderDropdown();
+  });
+  selectProvider(DATA.providers[0]?.provider);
+}
+
+function updateProviderInput(name){
+  document.getElementById("select-provider-input").value=name||"";
+}
+
+function selectProvider(name, scroll=false){
+  activeProvider=name;
+  updateProviderInput(name);
+  renderProviderTable(document.getElementById("search-provider").value);
+  const p=DATA.providers.find(x=>x.provider===name);
+  if(!p) return;
+  renderProviderSummary(p);
+  renderProviderChart(p);
+  renderPriceChartProvider(p);
+  renderMonthlyUploadTable(p);
+  renderMonthlyPriceTable(p);
+  renderBrandTable(p);
+  if(scroll) document.getElementById("provider-detail").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function renderBrandTable(p){
+  const tb=document.querySelector("#table-brands tbody");
+  const sorted=[...p.brands].sort((a,b)=>b["2026"].res_count-a["2026"].res_count);
+  tb.innerHTML=sorted.map(row=>{
+    const a=row["2025"], b=row["2026"];
+    const ry=yoy(b.res_count,a.res_count), rb=yoy(b.book_count,a.book_count), rp=yoy(b.avg_price,a.avg_price);
+    const brand=row.brand==="未标注品牌"?row.brand:"【"+row.brand+"】";
+    return`<tr>
+      <td>${brand}</td>
+      <td class="col-25">${fmt(a.res_count)}</td><td class="col-26">${fmt(b.res_count)}</td><td class="col-yoy">${yoyHtml(ry)}</td>
+      <td class="col-25">${fmt(a.book_count)}</td><td class="col-26">${fmt(b.book_count)}</td><td class="col-yoy">${yoyHtml(rb)}</td>
+      <td class="col-25">${a.avg_price}</td><td class="col-26">${b.avg_price}</td><td class="col-yoy">${yoyHtml(rp)}</td></tr>`;
+  }).join("")||"<tr><td colspan='10'>暂无品牌数据</td></tr>";
+}
+
+function renderProviderChart(p){
+  const rows=buildMonthlyYoY(p.monthly);
+  if(!chartProvider) chartProvider=echarts.init(document.getElementById("chart-provider"));
+  chartProvider.setOption(volumeComboChartOption(null,rows,{compact:true}),true);
+}
+
+function handleProviderSearch(query){
+  renderProviderTable(query);
+  const q=query.trim().toLowerCase();
+  if(!q) return;
+  const rows=DATA.providers.filter(p=>p.provider.toLowerCase().includes(q));
+  const exact=rows.find(p=>p.provider.toLowerCase()===q);
+  if(exact){
+    selectProvider(exact.provider,true);
+    return;
+  }
+  if(rows.length===1) selectProvider(rows[0].provider,true);
+}
+
+function initProviderOverviewSearch(){
+  const input=document.getElementById("search-provider");
+  input.oninput=e=>handleProviderSearch(e.target.value);
+  input.onkeydown=e=>{
+    if(e.key!=="Enter") return;
+    const q=e.target.value.trim().toLowerCase();
+    const rows=DATA.providers.filter(p=>!q||p.provider.toLowerCase().includes(q));
+    if(rows.length) selectProvider(rows[0].provider,true);
+  };
+}
+window.addEventListener("resize",()=>{
+  chartCollection?.resize();chartProduction?.resize();chartPriceGlobal?.resize();
+  chartPriceDist?.resize();chartPriceDistChange?.resize();chartPriceDistMonth?.resize();chartPriceDistChangeMonth?.resize();chartPublish?.resize();chartScene?.resize();
+  chartProvider?.resize();chartPriceProvider?.resize();chartJulyProvider?.resize();
+});
+load().catch(e=>{document.querySelector(".wrap").innerHTML=`<div style="padding:60px;text-align:center"><h2>加载失败</h2><p>${e.message}</p><p style="margin-top:12px">运行 python scripts/process_data.py 后刷新</p></div>`});
+</script>
 </body>
 </html>
+
+
