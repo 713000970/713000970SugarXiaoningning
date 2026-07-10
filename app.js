@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260708-07';
+var RULE_LIBRARY_BUILD = '20260710-01';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -120,7 +120,7 @@ var LEGACY_PLACEHOLDER_RULE_VALUES = {
   naming: ['', '待录入', '按教辅通用规范'],
   split: ['', '待录入', '按教辅通用规范'],
   pricing: ['', '待录入', '通用规则'],
-  publishTime: ['', '待录入', '立即发布', '通用规则'],
+  publishTime: ['', '待录入', '通用规则'],
   specialCase: ['', '待录入', '/'],
   otherInfo: ['', '待录入', '/']
 };
@@ -4248,7 +4248,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   
   var display = document.getElementById('custom-rule-display');
   
-  var html = '<div class="rule-card-edit">';
+  var html = '<div class="rule-card-edit" id="provider-rule-edit-form">';
   html += '  <div class="rule-card-header">';
   html += '    <div class="rule-card-title">编辑: ' + escapeHtmlText((rule.brand || '未命名规则') + ' · ' + ((rule.series || '').trim() || '未设置系列')) + '</div>';
   html += '    <button type="button" class="rule-edit-btn" onclick="cancelProviderRuleEdit()">✖ 取消</button>';
@@ -4293,20 +4293,26 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
 }
 
 async function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, targetSeries) {
-  var saveBtn = document.getElementById('save-rule-btn');
+  var form = document.getElementById('provider-rule-edit-form') || document.getElementById('custom-rule-display') || document;
+  function readEditValue(id) {
+    var el = form.querySelector ? form.querySelector('#' + id) : document.getElementById(id);
+    if (!el) el = document.getElementById(id);
+    return el ? String(el.value || '').trim() : '';
+  }
+  var saveBtn = form.querySelector ? form.querySelector('#save-rule-btn') : document.getElementById('save-rule-btn');
   if (saveBtn) {
     saveBtn.disabled = true;
     saveBtn.textContent = '保存并上传…';
   }
   try {
     console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
-    var newAlbumRaw = document.getElementById('edit-album') ? document.getElementById('edit-album').value.trim() : '';
-    var newNaming = document.getElementById('edit-naming') ? document.getElementById('edit-naming').value.trim() : '';
-    var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
-    var newPricing = document.getElementById('edit-pricing') ? document.getElementById('edit-pricing').value.trim() : '';
-    var newPublishTime = document.getElementById('edit-publishTime') ? document.getElementById('edit-publishTime').value.trim() : '';
-    var newSpecialCase = document.getElementById('edit-specialCase') ? document.getElementById('edit-specialCase').value.trim() : '';
-    var newOtherInfo = document.getElementById('edit-otherInfo') ? document.getElementById('edit-otherInfo').value.trim() : '';
+    var newAlbumRaw = readEditValue('edit-album');
+    var newNaming = readEditValue('edit-naming');
+    var newSplit = readEditValue('edit-split');
+    var newPricing = readEditValue('edit-pricing');
+    var newPublishTime = readEditValue('edit-publishTime');
+    var newSpecialCase = readEditValue('edit-specialCase');
+    var newOtherInfo = readEditValue('edit-otherInfo');
     
     var providers = localStorage.getItem('rule_library_providers');
     var providersData = providers ? JSON.parse(providers) : [];
