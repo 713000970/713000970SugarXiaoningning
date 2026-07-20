@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260720-06';
+var RULE_LIBRARY_BUILD = '20260720-07';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -3880,17 +3880,17 @@ function onProviderSearchInput() {
   }
   
   var providersData = getAllProvidersForSearch();
-  var shopEl = document.getElementById('shop-search-input');
-  var shopVal = shopEl ? String(shopEl.value || '').trim() : '';
   var providerMap = {};
+  var providerShopMap = {};
   providersData.forEach(function(p) {
-    if (shopVal && !rowShopMatchesSearch(p, shopVal)) return;
     var rawName = String((p && p.name) || '').trim();
     if (!rawName || isProviderDeleted(rawName)) return;
     var key = normalizeEntityKey(rawName);
     if (!key) return;
     if (!providerMap[key]) providerMap[key] = [];
     providerMap[key].push(rawName);
+    var shopText = String((p && (p.shop || p.shopname || p.shopName || p.store || p.storeName)) || '').trim();
+    if (shopText && !providerShopMap[key]) providerShopMap[key] = shopText;
   });
   var uniqueProviders = Object.keys(providerMap).map(function(key) {
     return pickPreferredDisplayName(providerMap[key], false);
@@ -3905,8 +3905,10 @@ function onProviderSearchInput() {
     return;
   }
   
-  dropdown.innerHTML = matched.slice(0, 10).map(function(p) { 
-    return '<div class="dropdown-item" data-provider-pick="' + escapeHtmlAttr(p) + '">' + escapeHtmlText(p) + '</div>';
+  dropdown.innerHTML = matched.slice(0, 10).map(function(p) {
+    var key = normalizeEntityKey(p);
+    var shopLabel = providerShopMap[key] ? '<span class="dropdown-subtext"> - ' + escapeHtmlText(providerShopMap[key]) + '</span>' : '';
+    return '<div class="dropdown-item" data-provider-pick="' + escapeHtmlAttr(p) + '">' + escapeHtmlText(p) + shopLabel + '</div>';
   }).join('');
   dropdown.style.display = 'block';
 }
