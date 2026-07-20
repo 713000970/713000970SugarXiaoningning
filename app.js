@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260720-04';
+var RULE_LIBRARY_BUILD = '20260720-05';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -69,6 +69,14 @@ const CHONGWENGE_ORG_ID = '490090';
 const YIBEN_CULTURE_SHOP_NAME = '山东一本图书文化有限公司';
 const YIBEN_CULTURE_ORG_ID = '655943';
 const YIBEN_CULTURE_CACHE_FIX_KEY = 'rule_library_yiben_culture_cache_fix_20260708_07';
+const WANG_CHAOXIA_ORG_ID = '500179';
+const WANG_CHAOXIA_BRAND_NAME = '\u738b\u671d\u971e\u8bd5\u5377\u7cfb\u5217';
+const WANG_CHAOXIA_SERIES = [
+  { id: 2978, name: '\u4e13\u9879\u5c0f\u7ec3', brandId: null, orgId: WANG_CHAOXIA_ORG_ID },
+  { id: 2926, name: '\u671f\u672b\u51b2\u523a\u8bfe\u5185\u9605\u8bfb\u62bc\u9898\u5377', brandId: null, orgId: WANG_CHAOXIA_ORG_ID },
+  { id: 2905, name: '\u671f\u672b\u51b2\u523a\u62a2\u5206\u8ba1\u5212', brandId: null, orgId: WANG_CHAOXIA_ORG_ID },
+  { id: 2904, name: '\u5907\u8003\u51b2A\u8ba1\u5212', brandId: null, orgId: WANG_CHAOXIA_ORG_ID }
+];
 
 function providerHasMeaningfulRule(p) {
   if (!p) return false;
@@ -340,8 +348,13 @@ function mergeRuleCardData(base, incoming) {
 
 function getBbmSeriesListForBrand(brandName) {
   var orgId = getBbmOrgIdForCurrentShop();
+  var name = String(brandName || '').trim();
+  var isWangChaoxia = String(orgId || '').trim() === WANG_CHAOXIA_ORG_ID && normalizeText(name) === normalizeText(WANG_CHAOXIA_BRAND_NAME);
+  if (isWangChaoxia) {
+    return WANG_CHAOXIA_SERIES.map(function(s) { return Object.assign({}, s); });
+  }
   if (!orgId || !window.BbmBrandApi || typeof BbmBrandApi.getBbmSeriesForBrand !== 'function') return [];
-  return BbmBrandApi.getBbmSeriesForBrand(orgId, brandName).map(function(s) {
+  return BbmBrandApi.getBbmSeriesForBrand(orgId, name).map(function(s) {
     return Object.assign({}, s, { orgId: String(orgId || '').trim() });
   });
 }
@@ -3062,6 +3075,9 @@ function loadBrandsByShopAndShowDropdown(shopName) {
     if (orgId) {
       var bbmBrands = BbmBrandApi.getCachedBrands(orgId, true);
       brands = BbmBrandApi.mergeBrandNames(brands, bbmBrands);
+      if (String(orgId || '').trim() === WANG_CHAOXIA_ORG_ID && !brands.some(function(b) { return normalizeText(b) === normalizeText(WANG_CHAOXIA_BRAND_NAME); })) {
+        brands.push(WANG_CHAOXIA_BRAND_NAME);
+      }
     }
   }
   
@@ -3069,7 +3085,8 @@ function loadBrandsByShopAndShowDropdown(shopName) {
   
   if (brandInput) {
     brandInput.placeholder = brands.length ? '点击选择品牌（含书城）...' : '点击选择品牌...';
-    brandInput.value = '';
+    var previousBrand = String(brandInput.value || '').trim();
+    brandInput.value = (previousBrand && brands.some(function(b) { return normalizeText(b) === normalizeText(previousBrand); })) ? previousBrand : '';
     brandInput.setAttribute('data-shop-brands', JSON.stringify(brands));
     brandInput.setAttribute('data-current-shop', shopName);
     brandInput.setAttribute('data-current-provider', providerName);
@@ -3239,6 +3256,13 @@ var _providerSeriesTagContext = { matched: [], selected: '' };
 function renderSeriesTags(matched, selectedSeries, expandedOpt, bbmSeriesNames) {
   var container = document.getElementById('series-tag-container');
   if (!container) return;
+  var orgIdForTags = getBbmOrgIdForCurrentShop();
+  if (
+    String(orgIdForTags || '').trim() === WANG_CHAOXIA_ORG_ID &&
+    normalizeText(currentEditingBrand || (document.getElementById('brand-input') && document.getElementById('brand-input').value) || '') === normalizeText(WANG_CHAOXIA_BRAND_NAME)
+  ) {
+    bbmSeriesNames = (bbmSeriesNames || []).concat(WANG_CHAOXIA_SERIES.map(function(s) { return s.name; }));
+  }
 
   var seriesMap = {};
   var bbmOnlySet = {};
