@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260720-05';
+var RULE_LIBRARY_BUILD = '20260720-06';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -2417,10 +2417,15 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('org-id-input')?.addEventListener('input', function() {
     correctChongwengeInputs();
     correctYibenCultureInputs();
+    resetRuleContextForEntityChange({ clearOrgId: false });
   });
   document.getElementById('provider-search-input')?.addEventListener('input', function() {
     correctChongwengeInputs();
     correctYibenCultureInputs();
+    scheduleRuleContextResetForEntityInput();
+  });
+  document.getElementById('shop-search-input')?.addEventListener('input', function() {
+    scheduleRuleContextResetForEntityInput();
   });
   document.getElementById('shop-search-input')?.addEventListener('blur', function() {
     correctChongwengeInputs();
@@ -2987,12 +2992,12 @@ function selectShop(shopName) {
   var dropdown = document.getElementById('shop-dropdown');
   if (input) input.value = shopName;
   if (dropdown) dropdown.style.display = 'none';
-
   var providerInput = document.getElementById('provider-search-input');
   // 切换店铺时先清空提供者，避免上一家店铺的提供者把当前店铺下的品牌列表收窄成空
   if (providerInput) providerInput.value = '';
 
   var providersData = getAllProvidersForSearch();
+  resetRuleContextForEntityChange({ clearOrgId: true });
   loadBrandsByShopAndShowDropdown(shopName);
 
   // 仅当该店铺语境下只有一个 distinct 提供者名时才自动填入，避免误锁到错误提供者
@@ -3212,6 +3217,52 @@ function clearSeriesTags() {
   container.innerHTML = '';
   currentEditingSeries = '';
   providerSeriesTagsExpanded = false;
+}
+
+var _ruleContextResetTimer = null;
+function resetRuleContextForEntityChange(options) {
+  options = options || {};
+  currentEditingBrand = '';
+  currentEditingShop = '';
+  currentEditingSeries = '';
+  var brandInput = document.getElementById('brand-input');
+  if (brandInput) {
+    brandInput.value = '';
+    brandInput.removeAttribute('data-shop-brands');
+    brandInput.removeAttribute('data-provider-brands');
+    brandInput.setAttribute('data-current-shop', (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value) || '');
+    brandInput.setAttribute('data-current-provider', (document.getElementById('provider-search-input') && document.getElementById('provider-search-input').value) || '');
+  }
+  clearSeriesTags();
+  var display = document.getElementById('custom-rule-display');
+  if (display) {
+    display.style.display = 'none';
+    display.innerHTML = '';
+  }
+  var defaultsPanel = document.getElementById('brand-defaults-panel');
+  if (defaultsPanel) {
+    defaultsPanel.style.display = 'none';
+    defaultsPanel.innerHTML = '';
+  }
+  var addSeriesBtn = document.getElementById('add-series-btn');
+  if (addSeriesBtn) addSeriesBtn.style.display = 'none';
+  var orgInput = document.getElementById('org-id-input');
+  if (orgInput && options.clearOrgId !== false) orgInput.value = '';
+  if (window.BbmBrandApi && typeof BbmBrandApi.loadOrgIdInputForShop === 'function') {
+    BbmBrandApi.loadOrgIdInputForShop(
+      (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value) || '',
+      (document.getElementById('provider-search-input') && document.getElementById('provider-search-input').value) || ''
+    );
+  }
+}
+
+function scheduleRuleContextResetForEntityInput() {
+  clearTimeout(_ruleContextResetTimer);
+  _ruleContextResetTimer = setTimeout(function() {
+    resetRuleContextForEntityChange({ clearOrgId: true });
+    var shopVal = (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value || '').trim();
+    if (shopVal) loadBrandsByShopAndShowDropdown(shopVal);
+  }, 120);
 }
 
 function buildSeriesTagsHtml(seriesMap, options) {
@@ -3898,9 +3949,7 @@ function selectProvider(providerName) {
   var input = document.getElementById('provider-search-input');
   if (input) input.value = providerName;
   currentProvider = providerName;
-  clearSeriesTags();
-  var addSeriesBtn = document.getElementById('add-series-btn');
-  if (addSeriesBtn) addSeriesBtn.style.display = 'none';
+  resetRuleContextForEntityChange({ clearOrgId: true });
   
   var normalizedProvider = normalizeEntityKey(providerName);
   var providersData = getAllProvidersForSearch();
