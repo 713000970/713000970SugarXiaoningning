@@ -174,12 +174,13 @@
   }
 
   /** 机构列表接口有时不带系列，按品牌 ID 补拉 */
-  function ensureBrandSeriesInCache(orgId, brandName) {
+  function ensureBrandSeriesInCache(orgId, brandName, options) {
+    options = options || {};
     var idStr = String(orgId || '').trim();
     var name = String(brandName || '').trim();
     if (!idStr || !name) return Promise.resolve([]);
     var brand = findBbmBrand(idStr, name);
-    if (brand && brand.series && brand.series.length) {
+    if (!options.force && brand && brand.series && brand.series.length) {
       return Promise.resolve(brand.series.map(function(s) { return s.name; }).filter(Boolean));
     }
     if (!brand || !brand.id) return Promise.resolve([]);
@@ -195,14 +196,15 @@
   }
 
   /** 补拉所有「无系列明细」的品牌（后台新加系列时常见） */
-  function enrichBrandsSeriesInCache(orgId) {
+  function enrichBrandsSeriesInCache(orgId, options) {
+    options = options || {};
     var brands = getCachedBrands(orgId, true);
     var need = brands.filter(function(b) {
-      return b && b.id && (!b.series || !b.series.length);
+      return b && b.id && (options.force || !b.series || !b.series.length);
     });
     if (!need.length) return Promise.resolve(brands);
     return Promise.all(need.map(function(b) {
-      return ensureBrandSeriesInCache(orgId, b.name);
+      return ensureBrandSeriesInCache(orgId, b.name, options);
     })).then(function() {
       return getCachedBrands(orgId, true);
     });
@@ -280,7 +282,7 @@
           single = String(single || '').trim();
           if (single) saveCacheEntry(single, brands);
         });
-        return enrichBrandsSeriesInCache(primaryOrg).then(function(enriched) {
+        return enrichBrandsSeriesInCache(primaryOrg, { force: !!options.forceSeries }).then(function(enriched) {
           if (enriched && enriched.length) {
             saveCacheEntry(primaryOrg, enriched);
             brands = enriched;
@@ -400,7 +402,7 @@
     }
     setBbmFetchStatus('正在从书城拉取品牌与系列（跳过缓存）…', false);
 
-    return fetchBbmBrandsByOrgIds(orgId, { force: true })
+    return fetchBbmBrandsByOrgIds(orgId, { force: true, forceSeries: true })
       .then(function(result) {
         var n = (result.brands || []).length;
         var seriesCount = 0;
