@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260720-02';
+var RULE_LIBRARY_BUILD = '20260720-04';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -3493,8 +3493,20 @@ function selectBrand(brandName) {
         showRulesByBrandAndShop(brandName, shopName, '');
       });
   };
-  if (orgIdForBbm && window.BbmBrandApi && typeof BbmBrandApi.ensureBrandSeriesInCache === 'function') {
-    BbmBrandApi.ensureBrandSeriesInCache(orgIdForBbm, brandName, { force: true }).then(afterBrandReady).catch(afterBrandReady);
+  if (orgIdForBbm && window.BbmBrandApi) {
+    var bbmRefresh = Promise.resolve();
+    if (typeof BbmBrandApi.fetchBbmBrandsByOrgIds === 'function') {
+      bbmRefresh = BbmBrandApi.fetchBbmBrandsByOrgIds(orgIdForBbm, { force: true, forceSeries: true });
+    }
+    if (typeof BbmBrandApi.ensureBrandSeriesInCache === 'function') {
+      bbmRefresh = bbmRefresh.then(function() {
+        return BbmBrandApi.ensureBrandSeriesInCache(orgIdForBbm, brandName, { force: true });
+      });
+    }
+    bbmRefresh.then(afterBrandReady).catch(function(err) {
+      console.warn('刷新书城品牌系列失败:', brandName, err);
+      afterBrandReady();
+    });
   } else {
     afterBrandReady();
   }
