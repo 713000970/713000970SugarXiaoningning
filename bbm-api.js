@@ -97,38 +97,154 @@
     if (!body) return [];
     if (Array.isArray(body)) return body;
     if (body.brand && typeof body.brand === 'object' && !Array.isArray(body.brand)) return [body.brand];
+    if (body.data && typeof body.data === 'object' && !Array.isArray(body.data)) {
+      if (Array.isArray(body.data.records)) return body.data.records;
+      if (Array.isArray(body.data.rows)) return body.data.rows;
+      if (Array.isArray(body.data.items)) return body.data.items;
+      if (Array.isArray(body.data.list)) return body.data.list;
+      if (body.data.brand && typeof body.data.brand === 'object' && !Array.isArray(body.data.brand)) return [body.data.brand];
+      if (firstText(body.data, ['name', 'brandName', 'title', 'label'])) return [body.data];
+    }
+    if (body.result && typeof body.result === 'object' && !Array.isArray(body.result)) {
+      if (Array.isArray(body.result.records)) return body.result.records;
+      if (Array.isArray(body.result.rows)) return body.result.rows;
+      if (Array.isArray(body.result.items)) return body.result.items;
+      if (Array.isArray(body.result.list)) return body.result.list;
+      if (body.result.brand && typeof body.result.brand === 'object' && !Array.isArray(body.result.brand)) return [body.result.brand];
+      if (firstText(body.result, ['name', 'brandName', 'title', 'label'])) return [body.result];
+    }
     if (Array.isArray(body.data)) return body.data;
     if (Array.isArray(body.items)) return body.items;
     if (Array.isArray(body.result)) return body.result;
     if (Array.isArray(body.brands)) return body.brands;
+    if (Array.isArray(body.records)) return body.records;
+    if (Array.isArray(body.rows)) return body.rows;
     if (Array.isArray(body.list)) return body.list;
     return [];
   }
 
-  function normalizeSeriesList(brand) {
-    var list = (brand && brand.series) || (brand && brand.brandSeries) || (brand && brand.seriesList) || [];
-    if (!Array.isArray(list)) return [];
-    return list.filter(function(s) {
-      return s && isEntityInUse(s) && String(s.name || s.seriesName || '').trim();
-    }).map(function(s) {
-      return {
-        id: s.id,
-        name: String(s.name || s.seriesName || '').trim(),
-        brandId: s.brandId || (brand && brand.id)
-      };
+  function firstText(obj, keys) {
+    if (typeof obj === 'string') return obj;
+    if (!obj || typeof obj !== 'object') return '';
+    for (var i = 0; i < keys.length; i++) {
+      var val = obj[keys[i]];
+      if (val != null && String(val).trim()) return String(val).trim();
+    }
+    return '';
+  }
+
+  function firstValue(obj, keys) {
+    if (!obj || typeof obj !== 'object') return undefined;
+    for (var i = 0; i < keys.length; i++) {
+      if (obj[keys[i]] != null && String(obj[keys[i]]).trim() !== '') return obj[keys[i]];
+    }
+    return undefined;
+  }
+
+  function isSeriesContainerKey(key) {
+    return /series/i.test(String(key || ''));
+  }
+
+  function getBrandId(brand) {
+    return firstValue(brand, ['id', 'brandId', 'brandID', 'brand_id']);
+  }
+
+  function getSeriesName(item) {
+    return firstText(item, ['name', 'seriesName', 'brandSeriesName', 'title', 'label']);
+  }
+
+  function getSeriesId(item) {
+    return firstValue(item, ['id', 'seriesId', 'brandSeriesId', 'seriesID', 'brand_series_id']);
+  }
+
+  function getSeriesBrandId(item, brand) {
+    return firstValue(item, ['brandId', 'brandID', 'brand_id']) || getBrandId(brand);
+  }
+
+  function looksLikeSeriesItem(item, brand, fromSeriesKey) {
+    var name = getSeriesName(item);
+    if (!name || (item && typeof item === 'object' && !isEntityInUse(item))) return false;
+    if (fromSeriesKey || typeof item === 'string') return true;
+    var expectedBrandId = getBrandId(brand);
+    var itemBrandId = firstValue(item, ['brandId', 'brandID', 'brand_id']);
+    if (itemBrandId) return !expectedBrandId || String(itemBrandId) === String(expectedBrandId);
+    return !!firstValue(item, ['seriesId', 'brandSeriesId', 'brand_series_id']) || !!firstText(item, ['seriesName', 'brandSeriesName']);
+  }
+
+  function normalizeSeriesItem(item, brand) {
+    var name = getSeriesName(item);
+    if (!name) return null;
+    return {
+      id: getSeriesId(item),
+      name: name,
+      brandId: getSeriesBrandId(item, brand),
+      orgId: firstValue(item, ['orgId', 'orgID', 'org_id', 'organizationId']) || (brand && brand.orgId)
+    };
+  }
+
+  function collectSeriesCandidates(value, brand, out, keyHint, depth, seen) {
+    if (!value || depth > 5) return;
+    if (Array.isArray(value)) {
+      var fromSeriesKey = isSeriesContainerKey(keyHint);
+      var candidates = value.filter(function(item) {
+        return looksLikeSeriesItem(item, brand, fromSeriesKey);
+      });
+      if (fromSeriesKey || (candidates.length && candidates.length === value.length)) {
+        candidates.forEach(function(item) {
+          var normalized = normalizeSeriesItem(item, brand);
+          if (normalized) out.push(normalized);
+        });
+        return;
+      }
+      value.forEach(function(item) {
+        collectSeriesCandidates(item, brand, out, keyHint, depth + 1, seen);
+      });
+      return;
+    }
+    if (typeof value !== 'object') return;
+    if (seen.indexOf(value) !== -1) return;
+    seen.push(value);
+    Object.keys(value).forEach(function(key) {
+      var child = value[key];
+      if (child && (Array.isArray(child) || typeof child === 'object')) {
+        collectSeriesCandidates(child, brand, out, key, depth + 1, seen);
+      }
     });
+  }
+
+  function mergeSeriesLists(a, b) {
+    var seenById = {};
+    var seenByName = {};
+    var out = [];
+    (a || []).concat(b || []).forEach(function(s) {
+      if (!s || !String(s.name || '').trim()) return;
+      var id = String(s.id || '').trim();
+      var name = String(s.name || '').trim().toLowerCase();
+      if ((id && seenById[id]) || (name && seenByName[name])) return;
+      if (id) seenById[id] = true;
+      if (name) seenByName[name] = true;
+      out.push(s);
+    });
+    return out;
+  }
+
+  function normalizeSeriesList(brand) {
+    var out = [];
+    collectSeriesCandidates(brand, brand, out, '', 0, []);
+    return mergeSeriesLists(out, []);
   }
 
   function normalizeBrandList(payload) {
     var arr = unwrapBrandPayload(payload);
     if (!Array.isArray(arr)) return [];
     return arr.filter(function(b) {
-      return b && isEntityInUse(b) && String(b.name || b.brandName || '').trim();
+      return b && isEntityInUse(b) && firstText(b, ['name', 'brandName', 'title', 'label']);
     }).map(function(b) {
+      var name = firstText(b, ['name', 'brandName', 'title', 'label']);
       return {
-        id: b.id,
-        name: String(b.name || b.brandName || '').trim(),
-        orgId: b.orgId,
+        id: getBrandId(b),
+        name: name,
+        orgId: firstValue(b, ['orgId', 'orgID', 'org_id', 'organizationId']),
         series: normalizeSeriesList(b)
       };
     });
@@ -174,6 +290,20 @@
   }
 
   /** 机构列表接口有时不带系列，按品牌 ID 补拉 */
+  function logBbmBrandSeries(prefix, orgId, brands) {
+    if (!global.console || typeof console.info !== 'function') return;
+    (brands || []).forEach(function(b) {
+      var names = (b.series || []).map(function(s) { return s && s.name; }).filter(Boolean);
+      console.info('[BBM] ' + prefix, {
+        orgId: String(orgId || ''),
+        brandId: b && b.id,
+        brandName: b && b.name,
+        seriesCount: names.length,
+        seriesNames: names
+      });
+    });
+  }
+
   function ensureBrandSeriesInCache(orgId, brandName, options) {
     options = options || {};
     var idStr = String(orgId || '').trim();
@@ -186,11 +316,25 @@
     if (!brand || !brand.id) return Promise.resolve([]);
     return fetchBrandById(brand.id).then(function(body) {
       var detail = (body && body.brand) ? body.brand : body;
-      var series = normalizeSeriesList(detail);
+      var detailSeries = normalizeSeriesList(detail);
+      var series = mergeSeriesLists(brand.series || [], detailSeries);
+      if (options.force && global.console && typeof console.info === 'function') {
+        console.info('[BBM] brand detail series', {
+          orgId: idStr,
+          brandId: brand.id,
+          brandName: name,
+          before: (brand.series || []).map(function(s) { return s && s.name; }).filter(Boolean),
+          detail: detailSeries.map(function(s) { return s && s.name; }).filter(Boolean),
+          merged: series.map(function(s) { return s && s.name; }).filter(Boolean)
+        });
+      }
       updateBrandSeriesInCache(idStr, name, series);
       return series.map(function(s) { return s.name; }).filter(Boolean);
     }).catch(function(err) {
       console.warn('补拉品牌系列失败:', name, err);
+      if (options.force && typeof setBbmFetchStatus === 'function') {
+        setBbmFetchStatus('品牌系列补拉失败：' + name + '，请看控制台或稍后重试', true);
+      }
       return [];
     });
   }
@@ -278,6 +422,7 @@
       .then(parseBbmResponse)
       .then(function(body) {
         var brands = normalizeBrandList(body);
+        if (options.force) logBbmBrandSeries('org fetch parsed', idStr, brands);
         idStr.split(',').forEach(function(single) {
           single = String(single || '').trim();
           if (single) saveCacheEntry(single, brands);
@@ -287,6 +432,7 @@
             saveCacheEntry(primaryOrg, enriched);
             brands = enriched;
           }
+          if (options.force) logBbmBrandSeries('cache after enrich', primaryOrg, brands);
           return { brands: brands, fromCache: false, orgIds: idStr };
         });
       });
@@ -407,9 +553,22 @@
         var n = (result.brands || []).length;
         var seriesCount = 0;
         (result.brands || []).forEach(function(b) { seriesCount += (b.series || []).length; });
+        var currentBrandName = (document.getElementById('brand-input') && document.getElementById('brand-input').value || '').trim();
+        var currentBrand = currentBrandName ? (result.brands || []).find(function(b) {
+          return String((b && b.name) || '').trim().toLowerCase() === currentBrandName.toLowerCase();
+        }) : null;
+        var currentSeriesNames = currentBrand ? (currentBrand.series || []).map(function(s) {
+          return String((s && s.name) || '').trim();
+        }).filter(Boolean) : [];
         if (n === 0) {
           setBbmFetchStatus('接口成功但未返回品牌，请核对机构 ID 是否为该店铺（非品牌 ID）', true);
           if (typeof showToast === 'function') showToast('未获取到品牌，请核对机构 ID');
+        } else if (currentBrandName && currentBrand) {
+          setBbmFetchStatus('已获取 ' + n + ' 个品牌、' + seriesCount + ' 个系列；当前品牌「' + currentBrandName + '」识别到 ' + currentSeriesNames.length + ' 个系列：' + (currentSeriesNames.join('、') || '无'), false);
+          if (typeof showToast === 'function') showToast('书城品牌系列已更新');
+        } else if (currentBrandName) {
+          setBbmFetchStatus('已获取 ' + n + ' 个品牌、' + seriesCount + ' 个系列；未在机构 ' + orgId + ' 下找到当前品牌「' + currentBrandName + '」', true);
+          if (typeof showToast === 'function') showToast('未找到当前品牌，请核对机构 ID');
         } else {
           setBbmFetchStatus('已获取 ' + n + ' 个品牌、' + seriesCount + ' 个系列（实时）', false);
           if (typeof showToast === 'function') showToast('书城品牌系列已更新');
