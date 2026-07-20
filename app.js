@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260720-07';
+var RULE_LIBRARY_BUILD = '20260720-09';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -3556,34 +3556,29 @@ function selectBrand(brandName) {
   console.log('calling showRulesByBrandAndShop with:', brandName, shopName);
   var providerNameForBbm = (document.getElementById('provider-search-input')?.value || '').trim();
   var orgIdForBbm = getBbmOrgIdForCurrentShop();
-  var afterBrandReady = function() {
-    ensureBbmSeriesRuleCardsForBrand(shopName, providerNameForBbm, brandName, { silent: true, awaitCloud: true })
+  var afterBrandReady = function(forceRefresh) {
+    ensureBbmSeriesRuleCardsForBrand(shopName, providerNameForBbm, brandName, { silent: true, awaitCloud: false })
       .then(function(res) {
         if (res && res.created > 0 && typeof showToast === 'function') {
           showToast('已为书城 ' + res.created + ' 个系列创建规则卡（已填默认）');
         }
-        showRulesByBrandAndShop(brandName, shopName, '');
+        showRulesByBrandAndShop(brandName, shopName, '', !!forceRefresh);
       })
       .catch(function() {
-        showRulesByBrandAndShop(brandName, shopName, '');
+        showRulesByBrandAndShop(brandName, shopName, '', !!forceRefresh);
       });
   };
+  showRulesByBrandAndShop(brandName, shopName, '', true);
+  afterBrandReady(false);
   if (orgIdForBbm && window.BbmBrandApi) {
-    var bbmRefresh = Promise.resolve();
-    if (typeof BbmBrandApi.fetchBbmBrandsByOrgIds === 'function') {
-      bbmRefresh = BbmBrandApi.fetchBbmBrandsByOrgIds(orgIdForBbm, { force: true, forceSeries: true });
+    var hasCachedSeries = getBbmSeriesListForBrand(brandName).length > 0;
+    var bbmRefresh = null;
+    if (!hasCachedSeries && typeof BbmBrandApi.ensureBrandSeriesInCache === 'function') {
+      bbmRefresh = BbmBrandApi.ensureBrandSeriesInCache(orgIdForBbm, brandName, { force: false });
     }
-    if (typeof BbmBrandApi.ensureBrandSeriesInCache === 'function') {
-      bbmRefresh = bbmRefresh.then(function() {
-        return BbmBrandApi.ensureBrandSeriesInCache(orgIdForBbm, brandName, { force: true });
-      });
-    }
-    bbmRefresh.then(afterBrandReady).catch(function(err) {
+    if (!hasCachedSeries && bbmRefresh) bbmRefresh.then(afterBrandReady).catch(function(err) {
       console.warn('刷新书城品牌系列失败:', brandName, err);
-      afterBrandReady();
     });
-  } else {
-    afterBrandReady();
   }
 }
 
