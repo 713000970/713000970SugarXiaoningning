@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260720-09';
+var RULE_LIBRARY_BUILD = '20260720-10';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -2417,7 +2417,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('org-id-input')?.addEventListener('input', function() {
     correctChongwengeInputs();
     correctYibenCultureInputs();
-    resetRuleContextForEntityChange({ clearOrgId: false });
+    resetRuleContextForEntityChange({ clearOrgId: false, skipOrgLookup: true });
   });
   document.getElementById('provider-search-input')?.addEventListener('input', function() {
     correctChongwengeInputs();
@@ -3248,7 +3248,7 @@ function resetRuleContextForEntityChange(options) {
   if (addSeriesBtn) addSeriesBtn.style.display = 'none';
   var orgInput = document.getElementById('org-id-input');
   if (orgInput && options.clearOrgId !== false) orgInput.value = '';
-  if (window.BbmBrandApi && typeof BbmBrandApi.loadOrgIdInputForShop === 'function') {
+  if (!options.skipOrgLookup && window.BbmBrandApi && typeof BbmBrandApi.loadOrgIdInputForShop === 'function') {
     BbmBrandApi.loadOrgIdInputForShop(
       (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value) || '',
       (document.getElementById('provider-search-input') && document.getElementById('provider-search-input').value) || ''
