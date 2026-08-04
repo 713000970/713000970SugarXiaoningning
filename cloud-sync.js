@@ -395,6 +395,78 @@ function buildRemoteProvidersByKey(remoteRows) {
   return byKey;
 }
 
+async function deleteCloudProviderIds(ids) {
+  var list = (ids || []).filter(isPositiveIntId).map(function(id) { return Number(id); });
+  for (var i = 0; i < list.length; i += SYNC_HTTP_CHUNK) {
+    var chunk = list.slice(i, i + SYNC_HTTP_CHUNK);
+    if (!chunk.length) continue;
+    var delRes = await fetchWithTimeout(SUPABASE_URL + '/rest/v1/providers?id=in.(' + chunk.join(',') + ')', {
+      method: 'DELETE',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY
+      }
+    });
+    if (!delRes.ok) {
+      var delErr = await delRes.text();
+      throw new Error(delErr || String(delRes.status));
+    }
+  }
+}
+
+async function compactCloudDuplicateProviders(remoteRows) {
+  var rows = (remoteRows || []).map(toLocalProvider);
+  var groups = new Map();
+  rows.forEach(function(row) {
+    var key = providerIdentityKey(row);
+    if (!key.replace(/\|/g, '')) return;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  });
+
+  var toDelete = [];
+  var toUpdate = [];
+  groups.forEach(function(group) {
+    if (group.length <= 1) return;
+    var keep = group[0];
+    group.forEach(function(row) {
+      if (providerMergeScoreForCloud(row) > providerMergeScoreForCloud(keep)) keep = row;
+    });
+    var merged = keep;
+    group.forEach(function(row) {
+      if (row === keep) return;
+      merged = mergeLocalProviderForCloud(merged, row);
+      if (isPositiveIntId(row.id)) toDelete.push(Number(row.id));
+    });
+    if (isPositiveIntId(keep.id)) merged.id = Number(keep.id);
+    if (providerContentSignature(merged) !== providerContentSignature(keep)) {
+      toUpdate.push(merged);
+    }
+  });
+
+  if (!toDelete.length && !toUpdate.length) {
+    return { ok: true, removed: 0, updated: 0 };
+  }
+
+  emitSyncStatus('syncing', '正在清理云端重复规则 ' + toDelete.length + ' 条…');
+  for (var i = 0; i < toUpdate.length; i += SYNC_HTTP_CHUNK) {
+    var upChunk = toUpdate.slice(i, i + SYNC_HTTP_CHUNK).map(providerRowForDb);
+    await httpPostProvidersJson(
+      '?on_conflict=id',
+      upChunk,
+      'resolution=merge-duplicates,return=minimal'
+    );
+  }
+  await deleteCloudProviderIds(toDelete);
+  var afterCount = await fetchBestEffortCloudCount();
+  return {
+    ok: true,
+    removed: toDelete.length,
+    updated: toUpdate.length,
+    remoteCount: afterCount
+  };
+}
+
 /**
  * 云端行数少于本机时：按业务主键补 INSERT 缺失行、PATCH 本机已录入而云端为空的行。
  * 不 DELETE 全表，避免误删；也不会像 recover 那样盲目 POST 全量造成翻倍。
@@ -862,6 +934,20 @@ async function cloudSync(opts) {
         if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
         return;
       }
+      if (typeof rcQuick === 'number' && rcQuick > localProviders.length) {
+        console.warn('🌥️ 同步预检发现云端多出 ' + (rcQuick - localProviders.length) + ' 条，检查重复行');
+        emitSyncStatus('syncing', '云端多 ' + (rcQuick - localProviders.length) + ' 条，正在检查重复…');
+        var remoteForCompact = await fetchCloudProviders();
+        var compactQuick = await compactCloudDuplicateProviders(remoteForCompact);
+        if (compactQuick && compactQuick.removed > 0) {
+          var rcAfterCompact = await fetchBestEffortCloudCount();
+          if (verifyCloudCountAtLeast(localProviders.length, rcAfterCompact)) {
+            markUploadVerified(localProviders, '已清理云端重复（-' + compactQuick.removed + '）');
+            if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
+            return;
+          }
+        }
+      }
     }
 
     if (fromTimer && localDirty) {
@@ -993,6 +1079,25 @@ async function cloudSync(opts) {
         if (typeof alert === 'function') alert(blockMsg);
         queuePendingSync(localProvidersNow);
         return;
+      }
+
+      /** 云端条数多于本机：只清理云端同业务键重复行，不删除独立有效规则 */
+      if (localProvidersNow.length >= CLOUD_DEFICIENT_MIN_LOCAL && formatted.length > localProvidersNow.length) {
+        console.warn('🌥️ 云端多于本机（' + formatted.length + ' / ' + localProvidersNow.length + '），检查重复行…');
+        emitSyncStatus('syncing', '云端多 ' + (formatted.length - localProvidersNow.length) + ' 条，正在检查重复…');
+        try {
+          var compactPull = await compactCloudDuplicateProviders(remoteData);
+          if (compactPull && compactPull.removed > 0) {
+            var afterCompactPull = await fetchBestEffortCloudCount();
+            if (afterCompactPull === localProvidersNow.length) {
+              markUploadVerified(localProvidersNow, '已清理云端重复（-' + compactPull.removed + '）');
+              if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
+              return;
+            }
+          }
+        } catch (compactErr) {
+          console.error('🌥️ 云端重复清理失败:', compactErr);
+        }
       }
 
       var mergeResult = mergeRemoteProvidersPreservingLocal(localProvidersNow, formatted);
