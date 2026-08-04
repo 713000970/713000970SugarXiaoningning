@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260804-02';
+var RULE_LIBRARY_BUILD = '20260804-03';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -25,6 +25,11 @@ function applyMultiUserUi() {
     var el = document.getElementById(id);
     if (el) el.remove();
   });
+  var manualSyncBtn = document.getElementById('manual-sync-btn');
+  if (manualSyncBtn) {
+    manualSyncBtn.textContent = '检查同步';
+    manualSyncBtn.title = '自动同步异常时手动检查，不需要日常点击';
+  }
   var hint = document.getElementById('multi-user-hint');
   if (hint) hint.hidden = false;
 }
