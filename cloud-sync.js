@@ -984,6 +984,18 @@ async function cloudSync(opts) {
     const remoteData = await fetchCloudProviders();
     console.log('🌥️ 云端数据:', remoteData);
 
+    if (remoteData && remoteData.length > 0) {
+      try {
+        var compactRemoteData = await compactCloudDuplicateProviders(remoteData);
+        if (compactRemoteData && compactRemoteData.removed > 0) {
+          console.warn('🌥️ 云端重复规则已清理 ' + compactRemoteData.removed + ' 条，重新拉取后继续同步');
+          remoteData = await fetchCloudProviders();
+        }
+      } catch (compactRemoteErr) {
+        console.error('🌥️ 云端重复清理失败:', compactRemoteErr);
+      }
+    }
+
     if (!remoteData || remoteData.length === 0) {
       const localData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
       var declaredEmpty = await fetchBestEffortCloudCount();
