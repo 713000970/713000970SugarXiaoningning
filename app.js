@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260814-12';
+var RULE_LIBRARY_BUILD = '20260814-13';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -1973,6 +1973,15 @@ function updateStats() {
   const statProviders = document.getElementById('stat-providers');
   const statBrands = document.getElementById('stat-brands');
   const statShops = document.getElementById('stat-shops');
+
+  if (typeof window !== 'undefined' &&
+      window.__RULE_LIB_CLOUD_STATS_READY &&
+      typeof window.__RULE_LIB_CLOUD_EFFECTIVE_COUNT === 'number') {
+    if (statProviders) statProviders.textContent = String(window.__RULE_LIB_CLOUD_EFFECTIVE_COUNT);
+    if (statBrands) statBrands.textContent = String(window.__RULE_LIB_CLOUD_BRAND_COUNT || 0);
+    if (statShops) statShops.textContent = String(window.__RULE_LIB_CLOUD_SHOP_COUNT || 0);
+    return;
+  }
 
   if (typeof window !== 'undefined' && window.__RULE_LIB_WAIT_CLOUD_STATS) {
     if (statProviders) statProviders.textContent = '同步中';

@@ -947,8 +947,39 @@ function markCloudStatsReady(count, rawCount) {
   window.__RULE_LIB_WAIT_CLOUD_STATS = false;
   window.__RULE_LIB_CLOUD_EFFECTIVE_COUNT = count;
   window.__RULE_LIB_CLOUD_RAW_COUNT = rawCount;
+  try {
+    var list = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+    var brandSet = new Set();
+    var shopSet = new Set();
+    (list || []).forEach(function(p) {
+      var brand = normalizeCloudKeyText(p && p.brand);
+      var shop = providerShopIdentityPart(p || {});
+      if (brand) brandSet.add(brand);
+      if (shop) shopSet.add(shop);
+    });
+    window.__RULE_LIB_CLOUD_BRAND_COUNT = brandSet.size;
+    window.__RULE_LIB_CLOUD_SHOP_COUNT = shopSet.size;
+  } catch (e) { /* ignore */ }
   if (typeof updateStats === 'function') updateStats();
 }
+
+async function pullCloudCanonicalForStats() {
+  var remoteData = await fetchCloudProviders();
+  if (!remoteData || !remoteData.length) return false;
+  var remoteCanonical = normalizeProvidersForCloudSync(remoteData.map(toLocalProvider), { persist: false });
+  var formatted = remoteCanonical.list;
+  localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
+  localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+  persistCloudSnapshot(calcSnapshot(formatted));
+  lastSyncedRawProvidersStr = JSON.stringify(formatted);
+  markCloudStatsReady(formatted.length, remoteCanonical.before);
+  notifyProvidersUpdated('cloud-pull-stats');
+  markSyncSuccess('已从云端同步有效 ' + formatted.length + ' 条' +
+    (remoteCanonical.before !== formatted.length ? '（云端原始 ' + remoteCanonical.before + '）' : ''));
+  return true;
+}
+
+window.pullCloudCanonicalForStats = pullCloudCanonicalForStats;
 
 // 云同步API - 加载时拉取数据
 // opts.fromTimer：定时触发；opts.quickCheck：手动「立即同步」先探测行数/快照；opts.silent：启动同步不打扰顶栏
