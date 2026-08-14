@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260814-13';
+var RULE_LIBRARY_BUILD = '20260814-14';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -1969,6 +1969,14 @@ window.addEventListener('cloud-sync-status', function(evt) {
 // ========================================
 // 统计更新
 // ========================================
+function getCloudStatsCacheForDisplay() {
+  try {
+    var cached = JSON.parse(localStorage.getItem('rule_library_cloud_stats_cache') || 'null');
+    if (cached && typeof cached.effective === 'number') return cached;
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
 function updateStats() {
   const statProviders = document.getElementById('stat-providers');
   const statBrands = document.getElementById('stat-brands');
@@ -1984,9 +1992,16 @@ function updateStats() {
   }
 
   if (typeof window !== 'undefined' && window.__RULE_LIB_WAIT_CLOUD_STATS) {
-    if (statProviders) statProviders.textContent = '同步中';
-    if (statBrands) statBrands.textContent = '同步中';
-    if (statShops) statShops.textContent = '同步中';
+    var cachedCloudStats = getCloudStatsCacheForDisplay();
+    if (cachedCloudStats) {
+      if (statProviders) statProviders.textContent = String(cachedCloudStats.effective);
+      if (statBrands) statBrands.textContent = String(cachedCloudStats.brands || 0);
+      if (statShops) statShops.textContent = String(cachedCloudStats.shops || 0);
+    } else {
+      if (statProviders) statProviders.textContent = '—';
+      if (statBrands) statBrands.textContent = '—';
+      if (statShops) statShops.textContent = '—';
+    }
     return;
   }
 

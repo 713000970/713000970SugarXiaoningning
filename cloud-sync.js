@@ -17,6 +17,7 @@ const PROVIDERS_REST_PATH = '/rest/v1/providers?select=*';
 /** 已知总行数时并行拉取分页 */
 const FETCH_CLOUD_PARALLEL_PAGES = 3;
 const CLOUD_SNAPSHOT_KEY = 'rule_library_cloud_snapshot';
+const CLOUD_STATS_CACHE_KEY = 'rule_library_cloud_stats_cache';
 /** 本地条数超过此值且云端拉取为 0 时，禁止自动整表上传（防止 DELETE 清空云端） */
 const BLOCK_UPLOAD_WHEN_REMOTE_EMPTY_MIN_LOCAL = 50;
 /** 本地条数 ≥ 此值且云端可见行数低于本地 × 比例，视为云端不完整（需补全而非整表 DELETE） */
@@ -941,12 +942,14 @@ function notifyProvidersUpdated(source) {
   }));
 }
 
-function markCloudStatsReady(count, rawCount) {
+function markCloudStatsReady(count, rawCount, statsOpt) {
   if (typeof window === 'undefined') return;
   window.__RULE_LIB_CLOUD_STATS_READY = true;
   window.__RULE_LIB_WAIT_CLOUD_STATS = false;
   window.__RULE_LIB_CLOUD_EFFECTIVE_COUNT = count;
   window.__RULE_LIB_CLOUD_RAW_COUNT = rawCount;
+  var brandCount = statsOpt && typeof statsOpt.brands === 'number' ? statsOpt.brands : null;
+  var shopCount = statsOpt && typeof statsOpt.shops === 'number' ? statsOpt.shops : null;
   try {
     var list = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
     var brandSet = new Set();
@@ -957,13 +960,36 @@ function markCloudStatsReady(count, rawCount) {
       if (brand) brandSet.add(brand);
       if (shop) shopSet.add(shop);
     });
-    window.__RULE_LIB_CLOUD_BRAND_COUNT = brandSet.size;
-    window.__RULE_LIB_CLOUD_SHOP_COUNT = shopSet.size;
+    if (brandCount === null) brandCount = brandSet.size;
+    if (shopCount === null) shopCount = shopSet.size;
   } catch (e) { /* ignore */ }
+  window.__RULE_LIB_CLOUD_BRAND_COUNT = brandCount || 0;
+  window.__RULE_LIB_CLOUD_SHOP_COUNT = shopCount || 0;
+  try {
+    localStorage.setItem(CLOUD_STATS_CACHE_KEY, JSON.stringify({
+      effective: count,
+      raw: rawCount,
+      brands: window.__RULE_LIB_CLOUD_BRAND_COUNT,
+      shops: window.__RULE_LIB_CLOUD_SHOP_COUNT,
+      at: Date.now()
+    }));
+  } catch (e2) { /* ignore */ }
   if (typeof updateStats === 'function') updateStats();
 }
 
 async function pullCloudCanonicalForStats() {
+  var quickCount = await fetchCloudProvidersDeclaredTotal();
+  if (typeof quickCount === 'number' && quickCount > 0) {
+    var cachedStats = null;
+    try {
+      cachedStats = JSON.parse(localStorage.getItem(CLOUD_STATS_CACHE_KEY) || 'null');
+    } catch (e) { /* ignore */ }
+    markCloudStatsReady(quickCount, quickCount, {
+      brands: cachedStats && typeof cachedStats.brands === 'number' ? cachedStats.brands : undefined,
+      shops: cachedStats && typeof cachedStats.shops === 'number' ? cachedStats.shops : undefined
+    });
+  }
+
   var remoteData = await fetchCloudProviders();
   if (!remoteData || !remoteData.length) return false;
   var remoteCanonical = normalizeProvidersForCloudSync(remoteData.map(toLocalProvider), { persist: false });
