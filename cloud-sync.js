@@ -246,7 +246,7 @@ function toCloudProviderDbRow(p) {
 }
 
 function calcSnapshot(data) {
-  var list = (data || []).map(function(item) {
+  var list = toCloudProviderListForUpload(data || []).map(function(item) {
     return toCloudProvider(item || {});
   });
   // 按业务主键排序后再序列化，避免仅顺序不同却误判为「本地/云端不一致」
@@ -256,13 +256,41 @@ function calcSnapshot(data) {
   return JSON.stringify(list);
 }
 
+function normalizeCloudKeyText(value) {
+  var s = String(value || '');
+  try {
+    if (typeof s.normalize === 'function') s = s.normalize('NFKC');
+  } catch (e) {
+    /* ignore */
+  }
+  return s
+    .replace(/\u00a0/g, ' ')
+    .replace(/\u3000/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+function normalizeCloudEntityKey(value) {
+  return normalizeCloudKeyText(value).replace(/[()\uFF08\uFF09\s]/g, '');
+}
+
+function providerShopIdentityPart(p) {
+  var shop = normalizeCloudEntityKey(p && p.shop);
+  var shopname = normalizeCloudEntityKey(p && p.shopname);
+  if (!shop) return shopname;
+  if (!shopname) return shop;
+  if (shop === shopname) return shop;
+  if (shop.indexOf(shopname) !== -1) return shop;
+  if (shopname.indexOf(shop) !== -1) return shopname;
+  return shop;
+}
+
 function providerIdentityKey(p) {
-  var shop = String(p.shop || '').trim().toLowerCase();
-  var shopname = String(p.shopname || '').trim().toLowerCase();
-  var name = String(p.name || '').trim().toLowerCase();
-  var brand = String(p.brand || '').trim().toLowerCase();
-  var series = String(p.series || '').trim().toLowerCase();
-  return [shop, shopname, name, brand, series].join('|');
+  var shop = providerShopIdentityPart(p);
+  var name = normalizeCloudEntityKey(p && p.name);
+  var brand = normalizeCloudKeyText(p && p.brand);
+  var series = normalizeCloudKeyText((p && p.series) || '');
+  return [shop, name, brand, series].join('|');
 }
 
 function providerMergeScoreForCloud(p) {
@@ -667,7 +695,17 @@ function computeProviderSyncDelta(prevFormatted, nextFormatted) {
 
 function captureSyncBaselineFromStorage() {
   try {
-    lastSyncedRawProvidersStr = localStorage.getItem('rule_library_providers');
+    var raw = localStorage.getItem('rule_library_providers');
+    var list = raw ? JSON.parse(raw) : [];
+    var normalized = normalizeProvidersForCloudSync(list, { persist: false });
+    if (normalized.changed && normalized.list.length > 0) {
+      raw = JSON.stringify(normalized.list);
+      localStorage.setItem('rule_library_providers', raw);
+      console.warn('🌥️ 启动时已合并本机重复规则：' + normalized.before + ' → ' + normalized.after);
+      if (typeof notifyProvidersUpdated === 'function') notifyProvidersUpdated('cloud-local-startup-canonicalize');
+      if (typeof updateStats === 'function') updateStats();
+    }
+    lastSyncedRawProvidersStr = raw;
   } catch (e) {
     lastSyncedRawProvidersStr = null;
   }
@@ -1049,8 +1087,9 @@ async function cloudSync(opts) {
         await syncToCloud(localData, { reentrant: true, forcePushUpload: true });
       }
     } else {
-      // 远程有数据，转回驼峰后更新本地
-      const formatted = remoteData.map(toLocalProvider);
+      // 远程有数据，先转回驼峰并按业务键去重，避免云端重复行把各设备首页数字放大
+      var remoteCanonical = normalizeProvidersForCloudSync(remoteData.map(toLocalProvider), { persist: false });
+      const formatted = remoteCanonical.list;
       const remoteSnapshot = calcSnapshot(formatted);
       const localProvidersNow = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
       const localSnapshotNow = calcSnapshot(localProvidersNow);
@@ -1065,8 +1104,8 @@ async function cloudSync(opts) {
         if (remoteSnapshot !== localSnapshotNow || formatted.length !== localProvidersNow.length) {
           notifyProvidersUpdated('cloud-pull-canonical');
         }
-        markSyncSuccess('已从云端同步 ' + formatted.length + ' 条');
-        console.log('🌥️ 多人协作：已按云端覆盖本机 providers，本机 ' + localProvidersNow.length + ' → 云端 ' + formatted.length);
+        markSyncSuccess('已从云端同步 ' + formatted.length + ' 条' + (remoteCanonical.merged ? '（合并重复 ' + remoteCanonical.merged + '）' : ''));
+        console.log('🌥️ 多人协作：已按云端覆盖本机 providers，本机 ' + localProvidersNow.length + ' → 云端有效 ' + formatted.length + '（原始 ' + remoteCanonical.before + '）');
         if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
         return;
       }
@@ -1555,14 +1594,15 @@ window.forcePullProvidersFromCloud = async function() {
       }
       return;
     }
-    var formatted = remoteData.map(toLocalProvider);
+    var remoteCanonical = normalizeProvidersForCloudSync(remoteData.map(toLocalProvider), { persist: false });
+    var formatted = remoteCanonical.list;
     localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
     localStorage.setItem(LOCAL_DIRTY_KEY, '0');
     persistCloudSnapshot(calcSnapshot(formatted));
     notifyProvidersUpdated('cloud-force-pull');
-    markSyncSuccess('已从云端写入本地 ' + cnt + ' 条');
+    markSyncSuccess('已从云端写入本地 ' + formatted.length + ' 条' + (remoteCanonical.merged ? '（合并重复 ' + remoteCanonical.merged + '）' : ''));
     if (typeof updateStats === 'function') updateStats();
-    if (typeof showToast === 'function') showToast('已写入 ' + cnt + ' 条，请核对首页数字');
+    if (typeof showToast === 'function') showToast('已写入有效规则 ' + formatted.length + ' 条' + (cnt !== formatted.length ? '（云端原始 ' + cnt + '）' : ''));
     captureSyncBaselineFromStorage();
   } catch (e) {
     emitSyncStatus('error', String((e && e.message) || e));
