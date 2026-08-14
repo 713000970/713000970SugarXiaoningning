@@ -282,7 +282,7 @@ function providerShopIdentityPart(p) {
   if (shop === shopname) return shop;
   if (shop.indexOf(shopname) !== -1) return shop;
   if (shopname.indexOf(shop) !== -1) return shopname;
-  return shop;
+  return shop + '#' + shopname;
 }
 
 function providerIdentityKey(p) {
