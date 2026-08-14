@@ -644,11 +644,15 @@ function isPositiveIntId(id) {
 function toCloudProviderListForUpload(data) {
   var map = new Map();
   (data || []).forEach(function(item) {
-    var c = toCloudProvider(item || {});
-    var key = providerIdentityKey(c);
+    var local = toLocalProvider(item || {});
+    if (isPositiveIntId(item && item.id)) local.id = Number(item.id);
+    var key = providerIdentityKey(local);
     if (!key.replace(/\|/g, '')) return;
-    var row = Object.assign({}, c);
-    if (isPositiveIntId(item && item.id)) row.id = Number(item.id);
+    if (map.has(key)) {
+      local = mergeLocalProviderForCloud(toLocalProvider(map.get(key)), local);
+    }
+    var row = toCloudProvider(local);
+    if (isPositiveIntId(local && local.id)) row.id = Number(local.id);
     map.set(key, row);
   });
   return Array.from(map.values());
@@ -942,7 +946,7 @@ async function cloudSync(opts) {
         return;
       }
       var cleanData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
-      var cleanNormalize = normalizeProvidersForCloudSync(cleanData);
+      var cleanNormalize = normalizeProvidersForCloudSync(cleanData, { persist: false });
       var rcCooldown = await fetchBestEffortCloudCount();
       if (!verifyCloudCountAtLeast(cleanNormalize.list.length, rcCooldown)) {
         await syncToCloud(cleanNormalize.list, { reentrant: false, forcePushUpload: true });
@@ -964,9 +968,18 @@ async function cloudSync(opts) {
   try {
     console.log('🌥️ 开始同步云端数据...');
     const localProvidersRaw = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
-    const localNormalize = normalizeProvidersForCloudSync(localProvidersRaw);
+    const localDirtyBeforeNormalize = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
+    const localNormalize = normalizeProvidersForCloudSync(localProvidersRaw, { persist: false });
     const localProviders = localNormalize.list;
-    const localDirty = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
+    if (localNormalize.changed && localProviders.length > 0) {
+      localStorage.setItem('rule_library_providers', JSON.stringify(localProviders));
+      localStorage.setItem(LOCAL_DIRTY_KEY, localDirtyBeforeNormalize ? '1' : '0');
+      console.warn('🌥️ 已显示本机有效规则：' + localNormalize.before + ' → ' + localNormalize.after +
+        '（合并重复 ' + localNormalize.merged + '，空键 ' + localNormalize.droppedBlank + '）');
+      notifyProvidersUpdated('cloud-local-canonicalize-readonly');
+      if (typeof updateStats === 'function') updateStats();
+    }
+    const localDirty = localDirtyBeforeNormalize;
     const cloudCanonical = isMultiUserClientSyncMode();
 
     /** 本地有待传：直接上传，不再先拉 2000+ 行（删改卡后最常见） */
@@ -988,23 +1001,13 @@ async function cloudSync(opts) {
         return;
       }
       if (typeof rcQuick === 'number' && rcQuick > localProviders.length) {
-        console.warn('🌥️ 同步预检发现云端多出 ' + (rcQuick - localProviders.length) + ' 条，检查重复行');
-        emitSyncStatus('syncing', '云端多 ' + (rcQuick - localProviders.length) + ' 条，正在检查重复…');
-        var remoteForCompact = await fetchCloudProviders();
-        var compactQuick = await compactCloudDuplicateProviders(remoteForCompact);
-        if (compactQuick && compactQuick.removed > 0) {
-          var rcAfterCompact = await fetchBestEffortCloudCount();
-          if (verifyCloudCountAtLeast(localProviders.length, rcAfterCompact)) {
-            markUploadVerified(localProviders, '已清理云端重复（-' + compactQuick.removed + '）');
-            if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
-            return;
-          }
-        }
+        console.warn('🌥️ 云端原始行数多于本机有效规则（' + rcQuick + ' / ' + localProviders.length + '），继续拉取并按有效规则合并显示');
       }
     }
 
     if (fromTimer && localDirty) {
-      const localProvidersNow = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+      const localProvidersNowRaw = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+      const localProvidersNow = normalizeProvidersForCloudSync(localProvidersNowRaw, { persist: false }).list;
       localStorage.setItem(LOCAL_DIRTY_KEY, '1');
       queuePendingSync(localProvidersNow);
       notifyProvidersUpdated('cloud-timer-skip-pull');
@@ -1036,18 +1039,6 @@ async function cloudSync(opts) {
 
     const remoteData = await fetchCloudProviders();
     console.log('🌥️ 云端数据:', remoteData);
-
-    if (remoteData && remoteData.length > 0) {
-      try {
-        var compactRemoteData = await compactCloudDuplicateProviders(remoteData);
-        if (compactRemoteData && compactRemoteData.removed > 0) {
-          console.warn('🌥️ 云端重复规则已清理 ' + compactRemoteData.removed + ' 条，重新拉取后继续同步');
-          remoteData = await fetchCloudProviders();
-        }
-      } catch (compactRemoteErr) {
-        console.error('🌥️ 云端重复清理失败:', compactRemoteErr);
-      }
-    }
 
     if (!remoteData || remoteData.length === 0) {
       const localData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
@@ -1091,10 +1082,18 @@ async function cloudSync(opts) {
       var remoteCanonical = normalizeProvidersForCloudSync(remoteData.map(toLocalProvider), { persist: false });
       const formatted = remoteCanonical.list;
       const remoteSnapshot = calcSnapshot(formatted);
-      const localProvidersNow = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
-      const localSnapshotNow = calcSnapshot(localProvidersNow);
+      const localProvidersNowRaw = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+      const localProvidersNowCanonical = normalizeProvidersForCloudSync(localProvidersNowRaw, { persist: false });
+      const localProvidersNow = localProvidersNowCanonical.list;
       /** fetch 期间 DOMContentLoaded 可能已 setData，必须在拉取结束后再读 dirty */
       var localDirtyAfterFetch = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
+      if (localProvidersNowCanonical.changed && localProvidersNow.length > 0) {
+        localStorage.setItem('rule_library_providers', JSON.stringify(localProvidersNow));
+        localStorage.setItem(LOCAL_DIRTY_KEY, localDirtyAfterFetch ? '1' : '0');
+        notifyProvidersUpdated('cloud-local-canonicalize-fetch');
+        if (typeof updateStats === 'function') updateStats();
+      }
+      const localSnapshotNow = calcSnapshot(localProvidersNow);
 
       if (cloudCanonical && !localDirtyAfterFetch) {
         localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
@@ -1104,7 +1103,7 @@ async function cloudSync(opts) {
         if (remoteSnapshot !== localSnapshotNow || formatted.length !== localProvidersNow.length) {
           notifyProvidersUpdated('cloud-pull-canonical');
         }
-        markSyncSuccess('已从云端同步 ' + formatted.length + ' 条' + (remoteCanonical.merged ? '（合并重复 ' + remoteCanonical.merged + '）' : ''));
+        markSyncSuccess('已从云端同步有效 ' + formatted.length + ' 条' + (remoteCanonical.before !== formatted.length ? '（云端原始 ' + remoteCanonical.before + '）' : ''));
         console.log('🌥️ 多人协作：已按云端覆盖本机 providers，本机 ' + localProvidersNow.length + ' → 云端有效 ' + formatted.length + '（原始 ' + remoteCanonical.before + '）');
         if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
         return;
@@ -1161,25 +1160,6 @@ async function cloudSync(opts) {
         return;
       }
 
-      /** 云端条数多于本机：只清理云端同业务键重复行，不删除独立有效规则 */
-      if (localProvidersNow.length >= CLOUD_DEFICIENT_MIN_LOCAL && formatted.length > localProvidersNow.length) {
-        console.warn('🌥️ 云端多于本机（' + formatted.length + ' / ' + localProvidersNow.length + '），检查重复行…');
-        emitSyncStatus('syncing', '云端多 ' + (formatted.length - localProvidersNow.length) + ' 条，正在检查重复…');
-        try {
-          var compactPull = await compactCloudDuplicateProviders(remoteData);
-          if (compactPull && compactPull.removed > 0) {
-            var afterCompactPull = await fetchBestEffortCloudCount();
-            if (afterCompactPull === localProvidersNow.length) {
-              markUploadVerified(localProvidersNow, '已清理云端重复（-' + compactPull.removed + '）');
-              if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
-              return;
-            }
-          }
-        } catch (compactErr) {
-          console.error('🌥️ 云端重复清理失败:', compactErr);
-        }
-      }
-
       var mergeResult = mergeRemoteProvidersPreservingLocal(localProvidersNow, formatted);
       localStorage.setItem('rule_library_providers', JSON.stringify(mergeResult.list));
       if (mergeResult.changed) {
@@ -1206,8 +1186,8 @@ async function cloudSync(opts) {
         if (remoteSnapshot !== localSnapshotNow) {
           notifyProvidersUpdated('cloud-pull');
         }
-        markSyncSuccess('已同步');
-        console.log('🌥️ 已从云端同步数据，本地更新');
+        markSyncSuccess('已同步有效 ' + mergeResult.list.length + ' 条' + (remoteCanonical.before !== formatted.length ? '（云端原始 ' + remoteCanonical.before + '）' : ''));
+        console.log('🌥️ 已从云端同步有效数据，本地更新为 ' + mergeResult.list.length + ' 条');
       }
     }
 
