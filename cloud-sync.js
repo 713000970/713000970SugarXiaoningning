@@ -43,6 +43,13 @@ let dirtyRetryTimer = null;
 /** 刚完成补传后短暂跳过定时全量拉取，避免 2377↔2379 死循环 */
 let cloudPullCooldownUntil = 0;
 
+function isMultiUserClientSyncMode() {
+  var cfg = (typeof window !== 'undefined') ? window.RULE_LIBRARY_CONFIG : null;
+  if (!cfg || !cfg.multiUser) return false;
+  if (typeof window.isSyncAdminMode === 'function' && window.isSyncAdminMode()) return false;
+  return true;
+}
+
 function emitSyncStatus(status, message, extra) {
   window.dispatchEvent(new CustomEvent('cloud-sync-status', {
     detail: Object.assign({
@@ -882,6 +889,7 @@ async function cloudSync(opts) {
   opts = opts || {};
   var fromTimer = !!opts.fromTimer;
   var quickCheck = !!opts.quickCheck;
+  var cloudCanonicalMode = isMultiUserClientSyncMode();
 
   if (isCloudSyncing) return;
   if (opts.fromTimer && Date.now() < cloudPullCooldownUntil) {
@@ -891,6 +899,10 @@ async function cloudSync(opts) {
         await syncToCloud(dirtyData, { reentrant: false, uploadOnly: true });
       }
     } else {
+      if (cloudCanonicalMode) {
+        markSyncSuccess('等待下轮云端同步');
+        return;
+      }
       var cleanData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
       var cleanNormalize = normalizeProvidersForCloudSync(cleanData);
       var rcCooldown = await fetchBestEffortCloudCount();
@@ -915,6 +927,7 @@ async function cloudSync(opts) {
     const localNormalize = normalizeProvidersForCloudSync(localProvidersRaw);
     const localProviders = localNormalize.list;
     const localDirty = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
+    const cloudCanonical = isMultiUserClientSyncMode();
 
     /** 本地有待传：直接上传，不再先拉 2000+ 行（删改卡后最常见） */
     if (localDirty && !opts.forcePull) {
@@ -924,7 +937,7 @@ async function cloudSync(opts) {
       return;
     }
 
-    if (!opts.forcePull && localProviders.length > 0) {
+    if (!cloudCanonical && !opts.forcePull && localProviders.length > 0) {
       var rcQuick = await fetchBestEffortCloudCount();
       if (typeof rcQuick === 'number' && rcQuick < localProviders.length) {
         console.warn('🌥️ 同步预检发现云端不足（' + rcQuick + ' / ' + localProviders.length + '），开始补传');
@@ -960,7 +973,7 @@ async function cloudSync(opts) {
     }
 
     /** 打开页面 / 定时 / 手动同步：本地干净且快照一致时，仅探测行数即可 */
-    var tryFastSkip = !localDirty && !opts.forcePull;
+    var tryFastSkip = !cloudCanonical && !localDirty && !opts.forcePull;
     if (tryFastSkip && canSkipFullCloudPull(localProviders)) {
       var rcSnap = await fetchCloudProvidersDeclaredTotal();
       var localLenSnap = localProviders.length;
@@ -1041,6 +1054,20 @@ async function cloudSync(opts) {
       const localSnapshotNow = calcSnapshot(localProvidersNow);
       /** fetch 期间 DOMContentLoaded 可能已 setData，必须在拉取结束后再读 dirty */
       var localDirtyAfterFetch = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
+
+      if (cloudCanonical && !localDirtyAfterFetch) {
+        localStorage.setItem('rule_library_providers', JSON.stringify(formatted));
+        localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+        persistCloudSnapshot(remoteSnapshot);
+        lastSyncedRawProvidersStr = JSON.stringify(formatted);
+        if (remoteSnapshot !== localSnapshotNow || formatted.length !== localProvidersNow.length) {
+          notifyProvidersUpdated('cloud-pull-canonical');
+        }
+        markSyncSuccess('已从云端同步 ' + formatted.length + ' 条');
+        console.log('🌥️ 多人协作：已按云端覆盖本机 providers，本机 ' + localProvidersNow.length + ' → 云端 ' + formatted.length);
+        if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
+        return;
+      }
 
       // lastCloudSnapshot 仅在内存中，刷新后会清空；须结合 localDirty，否则会每次打开都误判「并发」并全量回传
       var localEdited =
@@ -1166,7 +1193,8 @@ async function cloudSync(opts) {
 }
 
 /** 仅推送相对上次基线的新增/修改，不 DELETE 云端行（RLS 异常或本地 dirty 时用） */
-async function syncProvidersPushLocalChangesOnly(data) {
+async function syncProvidersPushLocalChangesOnly(data, opts) {
+  opts = opts || {};
   var normalizedLocal = normalizeProvidersForCloudSync(data);
   data = normalizedLocal.list;
   var formatted = toCloudProviderListForUpload(data);
@@ -1180,6 +1208,10 @@ async function syncProvidersPushLocalChangesOnly(data) {
   delta.deletes = [];
   var opCount = delta.upserts.length + delta.insertsNoId.length;
   if (opCount <= 0) {
+    if (opts.skipCountVerify) {
+      markUploadVerified(data, '已同步');
+      return true;
+    }
     var rcZero = await fetchBestEffortCloudCount();
     if (!verifyCloudCountAtLeast(formatted.length, rcZero)) {
       var gapZero = await syncProvidersGapFillToCloud(data);
@@ -1191,6 +1223,10 @@ async function syncProvidersPushLocalChangesOnly(data) {
   await syncProvidersIncrementalApply(delta);
   var stored = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
   var storedFmt = toCloudProviderListForUpload(stored);
+  if (opts.skipCountVerify) {
+    markUploadVerified(stored, '已上传 ' + opCount + ' 项变更');
+    return true;
+  }
   var rcPush = await fetchBestEffortCloudCount();
   if (!verifyCloudCountAtLeast(storedFmt.length, rcPush)) {
     var gapPush = await syncProvidersGapFillToCloud(stored);
@@ -1214,6 +1250,10 @@ async function syncProvidersFullTableReplace(data, options) {
   const nextSnapshot = calcSnapshot(formatted);
 
   var remoteCount = await fetchBestEffortCloudCount();
+  if (isMultiUserClientSyncMode()) {
+    console.warn('🌥️ 多人协作普通设备已禁止整表替换，改为仅补写/更新本机变更');
+    return await syncProvidersPushLocalChangesOnly(data);
+  }
   if ((remoteCount === null && formatted.length > BLOCK_UPLOAD_WHEN_REMOTE_EMPTY_MIN_LOCAL) ||
       (options.forcePushUpload && (remoteCount === null || remoteCount === 0))) {
     console.warn('🌥️ 云端不可读或为空，跳过整表 DELETE，仅推送本地变更');
@@ -1332,6 +1372,12 @@ async function syncToCloudImpl(data, options) {
     var normalizedLocal = normalizeProvidersForCloudSync(data);
     data = normalizedLocal.list;
     const formatted = toCloudProviderListForUpload(data);
+
+    if (isMultiUserClientSyncMode() && !options.allowFullReplace) {
+      var pushOnly = await syncProvidersPushLocalChangesOnly(data, { skipCountVerify: true });
+      if (pushOnly) return;
+      throw new Error('multi_user_push_only_failed');
+    }
 
     if (options.uploadOnly) {
       var gapOnly = await syncProvidersGapFillToCloud(data);
