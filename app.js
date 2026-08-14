@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260814-02';
+var RULE_LIBRARY_BUILD = '20260814-03';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -25,11 +25,6 @@ function applyMultiUserUi() {
     var el = document.getElementById(id);
     if (el) el.remove();
   });
-  var manualSyncBtn = document.getElementById('manual-sync-btn');
-  if (manualSyncBtn) {
-    manualSyncBtn.textContent = '检查同步';
-    manualSyncBtn.title = '自动同步异常时手动检查，不需要日常点击';
-  }
   var hint = document.getElementById('multi-user-hint');
   if (hint) hint.hidden = false;
 }
@@ -66,22 +61,6 @@ const APP_LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 const DELETED_BRANDS_KEY = 'rule_library_deleted_brands';
 const DELETED_SHOPS_KEY = 'rule_library_deleted_shops';
 const DELETED_PROVIDERS_KEY = 'rule_library_deleted_providers';
-const DELETED_RULE_CARDS_KEY = 'rule_library_deleted_rule_cards';
-const STANDARD_RULE_FILL_DONE_KEY = 'rule_library_standard_fill_v1';
-const CHONGWENGE_PROVIDER_NAME = '北京时代圣哲教育科技有限公司';
-const CHONGWENGE_SHOP_NAME = '崇文阁';
-const CHONGWENGE_ORG_ID = '490090';
-const YIBEN_CULTURE_SHOP_NAME = '山东一本图书文化有限公司';
-const YIBEN_CULTURE_ORG_ID = '655943';
-const YIBEN_CULTURE_CACHE_FIX_KEY = 'rule_library_yiben_culture_cache_fix_20260708_07';
-const WANG_CHAOXIA_ORG_ID = '500179';
-const WANG_CHAOXIA_BRAND_NAME = '\u738b\u671d\u971e\u8bd5\u5377\u7cfb\u5217';
-const WANG_CHAOXIA_SERIES = [
-  { id: 2978, name: '\u4e13\u9879\u5c0f\u7ec3', brandId: null, orgId: WANG_CHAOXIA_ORG_ID },
-  { id: 2926, name: '\u671f\u672b\u51b2\u523a\u8bfe\u5185\u9605\u8bfb\u62bc\u9898\u5377', brandId: null, orgId: WANG_CHAOXIA_ORG_ID },
-  { id: 2905, name: '\u671f\u672b\u51b2\u523a\u62a2\u5206\u8ba1\u5212', brandId: null, orgId: WANG_CHAOXIA_ORG_ID },
-  { id: 2904, name: '\u5907\u8003\u51b2A\u8ba1\u5212', brandId: null, orgId: WANG_CHAOXIA_ORG_ID }
-];
 
 function providerHasMeaningfulRule(p) {
   if (!p) return false;
@@ -130,12 +109,12 @@ var PLATFORM_RULE_DEFAULTS = {
 
 /** 视为「尚未录入规则」的占位值（含旧版默认），用于批量填充 */
 var LEGACY_PLACEHOLDER_RULE_VALUES = {
-  naming: ['', '待录入', '按教辅通用规范'],
-  split: ['', '待录入', '按教辅通用规范'],
-  pricing: ['', '待录入', '通用规则'],
-  publishTime: ['', '待录入', '通用规则'],
-  specialCase: ['', '待录入', '/'],
-  otherInfo: ['', '待录入', '/']
+  naming: ['', '按教辅通用规范'],
+  split: ['', '按教辅通用规范'],
+  pricing: ['', '通用规则'],
+  publishTime: ['', '立即发布', '通用规则'],
+  specialCase: ['', '/'],
+  otherInfo: ['', '/']
 };
 
 function isPlaceholderRuleField(field, value) {
@@ -158,12 +137,6 @@ function isUnfilledRuleCard(p) {
 /** 命名尚未录入（空或旧占位） */
 function isNamingUnfilled(p) {
   return isPlaceholderRuleField('naming', p && p.naming);
-}
-
-function isPlatformDefaultRuleField(field, value) {
-  var def = PLATFORM_RULE_DEFAULTS[field];
-  if (def === undefined) return false;
-  return normalizeText(value) === normalizeText(def);
 }
 
 function getStandardRuleFillPayload() {
@@ -200,12 +173,9 @@ function saveBrandDefaultsMap(map) {
 function hasStoredBrandDefaults(stored) {
   if (!stored) return false;
   if (stored.saved === true) return true;
-  return !!(
-    String(stored.naming || '').trim() ||
-    String(stored.split || '').trim() ||
-    String(stored.pricing || '').trim() ||
-    String(stored.publishTime || '').trim()
-  );
+  return ['naming', 'split', 'pricing', 'publishTime'].some(function(field) {
+    return String(stored[field] || '').trim();
+  });
 }
 
 function getStoredBrandDefaults(shop, provider, brand) {
@@ -217,19 +187,17 @@ function getStoredBrandDefaults(shop, provider, brand) {
 function inferBrandDefaultsFromProviders(shop, provider, brand) {
   var providers = getData(STORAGE_KEYS.PROVIDERS);
   var found = null;
-  var fields = ['naming', 'split', 'pricing', 'publishTime'];
   providers.forEach(function(p) {
     if (found) return;
     if (!isSameContextProvider(p, shop, provider)) return;
     if (!brandMatchesUi(p && p.brand, brand)) return;
-    if (isUnfilledRuleCard(p)) return;
-    var inferred = {};
-    fields.forEach(function(field) {
-      if (!isPlaceholderRuleField(field, p && p[field])) {
-        inferred[field] = String(p[field] || '').trim();
-      }
-    });
-    if (Object.keys(inferred).length > 0) found = inferred;
+    if (!providerHasMeaningfulRule(p)) return;
+    found = {
+      naming: String(p.naming || '').trim(),
+      split: String(p.split || '').trim(),
+      pricing: String(p.pricing || '').trim(),
+      publishTime: String(p.publishTime || '').trim()
+    };
   });
   return found;
 }
@@ -251,7 +219,7 @@ function setBrandDefaults(shop, provider, brand, fields) {
   var key = brandDefaultsContextKey(shop, provider, brand);
   if (!key.replace(/\|/g, '')) return;
   var map = getBrandDefaultsMap();
-  map[key] = {
+  var saved = {
     naming: String((fields && fields.naming) || '').trim(),
     split: String((fields && fields.split) || '').trim(),
     pricing: String((fields && fields.pricing) || '').trim(),
@@ -259,84 +227,83 @@ function setBrandDefaults(shop, provider, brand, fields) {
     saved: true,
     updatedAt: Date.now()
   };
+  map[key] = saved;
   saveBrandDefaultsMap(map);
-  return map[key];
+  return saved;
 }
 
 function normalizeRuleFieldCompareValue(value) {
-  return normalizeText(value)
-    .replace(/[。．.]+$/g, '')
-    .replace(/\s+/g, '');
+  return normalizeText(String(value || '').replace(/\s+/g, ' '));
 }
 
 function isSameRuleFieldValue(a, b) {
-  var left = normalizeRuleFieldCompareValue(a);
-  var right = normalizeRuleFieldCompareValue(b);
-  return !!left && !!right && left === right;
+  return normalizeRuleFieldCompareValue(a) === normalizeRuleFieldCompareValue(b);
+}
+
+function isPlatformDefaultRuleField(field, value) {
+  if (!PLATFORM_RULE_DEFAULTS || PLATFORM_RULE_DEFAULTS[field] === undefined) return false;
+  return isSameRuleFieldValue(value, PLATFORM_RULE_DEFAULTS[field]);
 }
 
 function isLegacyDefaultBackedRuleField(field, value) {
-  var v = normalizeRuleFieldCompareValue(value);
-  if (!v) return true;
-  var legacy = {
-    publishTime: [
-      '全部上传，不定时。',
-      '全部上传，不定时',
-      '全部上传，不定时.'
-    ]
-  };
-  return (legacy[field] || []).some(function(item) {
-    return normalizeRuleFieldCompareValue(item) === v;
+  if (field !== 'publishTime') return false;
+  var legacyPublishValues = [
+    '\u5168\u90e8\u4e0a\u4f20\uff0c\u4e0d\u5b9a\u65f6',
+    '\u5168\u90e8\u4e0a\u4f20\uff0c\u4e0d\u5b9a\u65f6\u3002',
+    '\u5168\u90e8\u4e0a\u4f20,\u4e0d\u5b9a\u65f6',
+    '\u5168\u90e8\u4e0a\u4f20,\u4e0d\u5b9a\u65f6\u3002'
+  ];
+  return legacyPublishValues.some(function(legacy) {
+    return isSameRuleFieldValue(value, legacy);
   });
 }
 
 function shouldApplyBrandDefaultToRuleField(field, currentValue, previousValue, nextValue) {
-  if (!String(nextValue || '').trim()) return false;
   if (isSameRuleFieldValue(currentValue, nextValue)) return false;
+  if (!String(currentValue || '').trim()) return true;
   if (isPlaceholderRuleField(field, currentValue)) return true;
   if (isPlatformDefaultRuleField(field, currentValue)) return true;
   if (isLegacyDefaultBackedRuleField(field, currentValue)) return true;
-  if (previousValue && isSameRuleFieldValue(currentValue, previousValue)) return true;
+  if (previousValue !== undefined && isSameRuleFieldValue(currentValue, previousValue)) return true;
   return false;
 }
 
 async function applyBrandDefaultsToDefaultBackedSeriesCards(shopName, providerName, brandName, fields, previousDefaults) {
+  fields = fields || getBrandDefaults(shopName, providerName, brandName);
+  previousDefaults = previousDefaults || {};
   var providers = getData(STORAGE_KEYS.PROVIDERS);
-  var changedRows = 0;
-  var changedFields = 0;
+  var updateFields = ['naming', 'split', 'pricing', 'publishTime'];
+  var updated = 0;
+
   providers.forEach(function(p, i) {
-    if (!p || isRuleCardDeleted(p, shopName)) return;
     if (!isSameContextProvider(p, shopName, providerName)) return;
     if (!brandMatchesUi(p && p.brand, brandName)) return;
-    var next = Object.assign({}, p);
-    var rowChanged = false;
-    ['naming', 'split', 'pricing', 'publishTime'].forEach(function(field) {
-      var nextValue = fields && fields[field];
-      var previousValue = previousDefaults && previousDefaults[field];
-      if (!shouldApplyBrandDefaultToRuleField(field, next[field], previousValue, nextValue)) return;
-      next[field] = String(nextValue || '').trim();
-      rowChanged = true;
-      changedFields += 1;
+    if (!String((p && p.series) || '').trim()) return;
+
+    var nextProvider = null;
+    updateFields.forEach(function(field) {
+      var nextValue = String(fields[field] || '').trim();
+      if (!shouldApplyBrandDefaultToRuleField(field, p && p[field], previousDefaults[field], nextValue)) return;
+      if (!nextProvider) nextProvider = Object.assign({}, p);
+      nextProvider[field] = nextValue;
     });
-    if (!rowChanged) return;
-    providers[i] = next;
-    changedRows += 1;
+
+    if (nextProvider) {
+      providers[i] = nextProvider;
+      updated += 1;
+    }
   });
 
-  if (!changedRows) {
-    return { updated: 0, fields: 0, syncResult: null };
-  }
-  var syncResult;
+  if (!updated) return { updated: 0 };
   if (typeof persistProviders === 'function') {
-    syncResult = await persistProviders(providers, { awaitCloud: true });
+    await persistProviders(providers, { awaitCloud: true });
   } else {
     setData(STORAGE_KEYS.PROVIDERS, providers);
-    syncResult = { ok: true, localOnly: true };
   }
-  return { updated: changedRows, fields: changedFields, syncResult: syncResult };
+  return { updated: updated };
 }
 
-function buildNewProviderRuleCard(shop, provider, brand, series, bbmSeriesId, bbmOrgId) {
+function buildNewProviderRuleCard(shop, provider, brand, series, bbmSeriesId) {
   var defs = getBrandDefaults(shop, provider, brand);
   var card = {
     shop: String(shop || '').trim(),
@@ -353,102 +320,13 @@ function buildNewProviderRuleCard(shop, provider, brand, series, bbmSeriesId, bb
     otherInfo: defs.otherInfo || PLATFORM_RULE_DEFAULTS.otherInfo || ''
   };
   if (bbmSeriesId != null && bbmSeriesId !== '') card.bbmSeriesId = bbmSeriesId;
-  if (bbmOrgId != null && bbmOrgId !== '') card.bbmOrgId = String(bbmOrgId || '').trim();
   return card;
-}
-
-function applyDefaultRulesToExistingCard(p, shop, provider, brand) {
-  if (!p) return { changed: false, data: p };
-  var defs = getBrandDefaults(shop, provider, brand || p.brand);
-  var next = Object.assign({}, p);
-  var changed = false;
-  if (shop && String(next.shop || '').trim() !== String(shop || '').trim()) {
-    next.shop = String(shop || '').trim();
-    changed = true;
-  }
-  if (shop && String(next.shopname || '').trim() !== String(shop || '').trim()) {
-    next.shopname = String(shop || '').trim();
-    changed = true;
-  }
-  if (provider && String(next.name || '').trim() !== String(provider || '').trim()) {
-    next.name = String(provider || '').trim();
-    changed = true;
-  }
-  if (brand && String(next.brand || '').trim() !== String(brand || '').trim()) {
-    next.brand = String(brand || '').trim();
-    changed = true;
-  }
-  ['naming', 'split', 'pricing', 'publishTime', 'specialCase', 'otherInfo'].forEach(function(field) {
-    var value = defs[field] || PLATFORM_RULE_DEFAULTS[field] || '';
-    if (!value) return;
-    if (!isPlaceholderRuleField(field, next[field])) return;
-    if (String(next[field] || '').trim() === String(value || '').trim()) return;
-    next[field] = value;
-    changed = true;
-  });
-  if (!String(next.album || '').trim()) {
-    next.album = buildDefaultAlbumRule(null, next.name || provider);
-    changed = true;
-  }
-  return { changed: changed, data: next };
-}
-
-function shouldUseIncomingRuleField(field, currentValue, incomingValue) {
-  var incoming = String(incomingValue || '').trim();
-  if (!incoming) return false;
-  if (isPlaceholderRuleField(field, currentValue)) return true;
-  if (isPlatformDefaultRuleField(field, currentValue) && !isPlatformDefaultRuleField(field, incoming)) return true;
-  return false;
-}
-
-function mergeRuleCardData(base, incoming) {
-  var next = Object.assign({}, base || {});
-  var changed = false;
-  if (!next.id && incoming && incoming.id) {
-    next.id = incoming.id;
-    changed = true;
-  }
-  ['shop', 'shopname', 'name', 'brand', 'series'].forEach(function(field) {
-    if (!String(next[field] || '').trim() && String((incoming && incoming[field]) || '').trim()) {
-      next[field] = incoming[field];
-      changed = true;
-    }
-  });
-  ['album', 'naming', 'split', 'pricing', 'publishTime', 'specialCase', 'otherInfo'].forEach(function(field) {
-    if (field === 'album') {
-      if (!String(next.album || '').trim() && String((incoming && incoming.album) || '').trim()) {
-        next.album = incoming.album;
-        changed = true;
-      }
-      return;
-    }
-    if (shouldUseIncomingRuleField(field, next[field], incoming && incoming[field])) {
-      next[field] = incoming[field];
-      changed = true;
-    }
-  });
-  if (!next.bbmSeriesId && incoming && incoming.bbmSeriesId) {
-    next.bbmSeriesId = incoming.bbmSeriesId;
-    changed = true;
-  }
-  if (!next.bbmOrgId && incoming && incoming.bbmOrgId) {
-    next.bbmOrgId = incoming.bbmOrgId;
-    changed = true;
-  }
-  return { changed: changed, data: next };
 }
 
 function getBbmSeriesListForBrand(brandName) {
   var orgId = getBbmOrgIdForCurrentShop();
-  var name = String(brandName || '').trim();
-  var isWangChaoxia = String(orgId || '').trim() === WANG_CHAOXIA_ORG_ID && normalizeText(name) === normalizeText(WANG_CHAOXIA_BRAND_NAME);
-  if (isWangChaoxia) {
-    return WANG_CHAOXIA_SERIES.map(function(s) { return Object.assign({}, s); });
-  }
   if (!orgId || !window.BbmBrandApi || typeof BbmBrandApi.getBbmSeriesForBrand !== 'function') return [];
-  return BbmBrandApi.getBbmSeriesForBrand(orgId, name).map(function(s) {
-    return Object.assign({}, s, { orgId: String(orgId || '').trim() });
-  });
+  return BbmBrandApi.getBbmSeriesForBrand(orgId, brandName);
 }
 
 function providerSeriesIdentityKey(p) {
@@ -459,320 +337,6 @@ function providerSeriesIdentityKey(p) {
     normalizeText(p && p.brand),
     normalizeText((p && p.series) || '')
   ].join('|');
-}
-
-function buildBbmSeriesLookup(seriesList) {
-  var byId = {};
-  var byName = {};
-  (seriesList || []).forEach(function(s) {
-    if (!s) return;
-    var id = String(s.id || '').trim();
-    var name = normalizeText(s.name || '');
-    if (id) byId[id] = s;
-    if (name) byName[name] = s;
-  });
-  return { byId: byId, byName: byName };
-}
-
-function isDefaultOrPlaceholderRuleField(field, value) {
-  if (field === 'split' && normalizeText(value) === normalizeText('通用规则')) return true;
-  return isPlaceholderRuleField(field, value) || isPlatformDefaultRuleField(field, value);
-}
-
-function isAutoGeneratedBbmRuleCard(p) {
-  if (!p || !String(p.bbmSeriesId || '').trim()) return false;
-  return ['naming', 'split', 'pricing', 'publishTime', 'specialCase', 'otherInfo'].every(function(field) {
-    return isDefaultOrPlaceholderRuleField(field, p && p[field]);
-  });
-}
-
-function isStaleBbmSeriesForCurrentOrg(p, seriesList, orgId) {
-  if (!p || (!String(p.bbmSeriesId || '').trim() && !String(p.bbmOrgId || '').trim())) return false;
-  if (!seriesList || !seriesList.length) return false;
-  var lookup = buildBbmSeriesLookup(seriesList);
-  var id = String(p.bbmSeriesId || '').trim();
-  if (id && lookup.byId[id]) return false;
-  var name = normalizeText((p && p.series) || '');
-  if (name && lookup.byName[name]) return false;
-  if (p.bbmOrgId && orgId && String(p.bbmOrgId) === String(orgId)) return false;
-  return true;
-}
-
-function isRuleAllowedForStrictBbmOrgContext(p, seriesList, orgId) {
-  if (!p) return false;
-  if (!String((p && p.series) || '').trim()) return true;
-  if (orgId && String(p.bbmOrgId || '') === String(orgId)) return true;
-  if (!seriesList || !seriesList.length) return false;
-  var lookup = buildBbmSeriesLookup(seriesList);
-  var id = String(p.bbmSeriesId || '').trim();
-  if (id && lookup.byId[id]) return true;
-  var name = normalizeText((p && p.series) || '');
-  return !!(name && lookup.byName[name]);
-}
-
-function pruneStaleBbmSeriesRuleCardsForContext(providers, shopName, providerName, brandName, seriesList, orgId) {
-  var list = Array.isArray(providers) ? providers.slice() : [];
-  if (!seriesList || !seriesList.length) {
-    return { providers: list, changed: false, removed: 0, relinked: 0, hidden: 0 };
-  }
-  var lookup = buildBbmSeriesLookup(seriesList);
-  var changed = false;
-  var removed = 0;
-  var relinked = 0;
-  var hidden = 0;
-  var removeIdx = {};
-  list.forEach(function(p, i) {
-    if (!p || isRuleCardDeleted(p, shopName)) return;
-    if (!isSameContextProvider(p, shopName, providerName)) return;
-    if (!brandMatchesUi(p && p.brand, brandName)) return;
-    if (!String((p && p.series) || '').trim()) return;
-    if (!String(p.bbmSeriesId || '').trim() && !String(p.bbmOrgId || '').trim()) return;
-
-    var id = String(p.bbmSeriesId || '').trim();
-    var name = normalizeText(p.series || '');
-    if (id && lookup.byId[id]) {
-      if (orgId && String(p.bbmOrgId || '') !== String(orgId)) {
-        list[i] = Object.assign({}, p, { bbmOrgId: String(orgId) });
-        changed = true;
-        relinked += 1;
-      }
-      return;
-    }
-    if (name && lookup.byName[name]) {
-      var current = lookup.byName[name];
-      list[i] = Object.assign({}, p, {
-        bbmSeriesId: current.id,
-        bbmOrgId: String(orgId || current.orgId || '')
-      });
-      changed = true;
-      relinked += 1;
-      return;
-    }
-
-    hidden += 1;
-    if (isAutoGeneratedBbmRuleCard(p)) {
-      removeIdx[i] = true;
-      removed += 1;
-    }
-  });
-
-  if (removed > 0) {
-    list = list.filter(function(_, i) { return !removeIdx[i]; });
-    changed = true;
-  }
-  return { providers: list, changed: changed, removed: removed, relinked: relinked, hidden: hidden };
-}
-
-function contextSeriesIdentityKey(p, shopName, providerName) {
-  return [
-    normalizeEntityKey(shopName || (p && (p.shop || p.shopname))),
-    normalizeEntityKey(providerName || (p && p.name)),
-    normalizeText(p && p.brand),
-    normalizeText((p && p.series) || '')
-  ].join('|');
-}
-
-function repairSeriesRulesForContext(providers, shopName, providerName, brandName) {
-  var list = Array.isArray(providers) ? providers.slice() : [];
-  shopName = String(shopName || '').trim();
-  providerName = String(providerName || '').trim();
-  brandName = String(brandName || '').trim();
-  if (!shopName || !providerName || !brandName) {
-    return { providers: list, changed: false, filled: 0, deduped: 0 };
-  }
-
-  var changed = false;
-  var filled = 0;
-  var groups = {};
-  list.forEach(function(p, i) {
-    if (!p || isRuleCardDeleted(p, shopName)) return;
-    if (!isSameContextProvider(p, shopName, providerName)) return;
-    if (!brandMatchesUi(p && p.brand, brandName)) return;
-    if (!String((p && p.series) || '').trim()) return;
-
-    var fill = applyDefaultRulesToExistingCard(p, shopName, providerName, brandName);
-    if (fill.changed) {
-      list[i] = fill.data;
-      p = list[i];
-      changed = true;
-      filled += 1;
-    }
-
-    var key = contextSeriesIdentityKey(p, shopName, providerName);
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(i);
-  });
-
-  var removeIdx = {};
-  var deduped = 0;
-  Object.keys(groups).forEach(function(key) {
-    var indices = groups[key];
-    if (indices.length <= 1) return;
-    var keep = indices[0];
-    indices.slice(1).forEach(function(i) {
-      var merged = mergeRuleCardData(list[keep], list[i]);
-      if (merged.changed) {
-        list[keep] = merged.data;
-        changed = true;
-      }
-      removeIdx[i] = true;
-    });
-    deduped += indices.length - 1;
-  });
-
-  if (deduped > 0) {
-    list = list.filter(function(_, i) { return !removeIdx[i]; });
-    changed = true;
-  }
-
-  return { providers: list, changed: changed, filled: filled, deduped: deduped };
-}
-
-function dedupeMatchedRuleItemsForDisplay(items, shopName, providerName) {
-  var map = {};
-  var result = [];
-  (items || []).forEach(function(item) {
-    var p = item && item.data ? item.data : {};
-    if (!String((p && p.series) || '').trim()) {
-      result.push(item);
-      return;
-    }
-    var key = contextSeriesIdentityKey(p, shopName, providerName);
-    if (!map[key]) {
-      map[key] = { item: item, resultIndex: result.length };
-      result.push(item);
-      return;
-    }
-    var existing = map[key].item;
-    var merged = mergeRuleCardData(existing.data, p);
-    if (merged.changed) {
-      existing.data = merged.data;
-      result[map[key].resultIndex] = existing;
-    }
-  });
-  return result;
-}
-
-function providerDuplicateIdentityKey(p) {
-  var shopKey = normalizeEntityKey((p && p.shopname) || (p && p.shop) || (p && p.name));
-  var providerKey = normalizeEntityKey(p && p.name);
-  var brandKey = normalizeText(p && p.brand);
-  var seriesKey = normalizeText((p && p.series) || '');
-  if (!shopKey && !providerKey && !brandKey && !seriesKey) return '';
-  return [shopKey, providerKey, brandKey, seriesKey].join('|');
-}
-
-function providerSuspectIdentityKey(p) {
-  var providerKey = normalizeEntityKey(p && p.name);
-  var brandKey = normalizeText(p && p.brand);
-  var seriesKey = normalizeText((p && p.series) || '');
-  if (!providerKey && !brandKey && !seriesKey) return '';
-  return [providerKey, brandKey, seriesKey].join('|');
-}
-
-function providerRuleCompletenessScore(p) {
-  if (!p) return 0;
-  var score = 0;
-  if (String(p.id || '').trim()) score += 1;
-  if (String(p.bbmSeriesId || '').trim()) score += 2;
-  if (String(p.shop || '').trim()) score += 1;
-  if (String(p.shopname || '').trim()) score += 1;
-  if (String(p.album || '').trim()) score += 1;
-  ['naming', 'split', 'pricing', 'publishTime', 'specialCase', 'otherInfo'].forEach(function(field) {
-    if (!isPlaceholderRuleField(field, p && p[field])) score += 3;
-    else if (String((p && p[field]) || '').trim()) score += 1;
-  });
-  return score;
-}
-
-function compactDuplicateProviderRules(providers) {
-  var list = Array.isArray(providers) ? providers.slice() : getData(STORAGE_KEYS.PROVIDERS);
-  var groups = {};
-  list.forEach(function(p, i) {
-    var key = providerDuplicateIdentityKey(p);
-    if (!key) return;
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(i);
-  });
-
-  var removeIdx = {};
-  var duplicateGroups = 0;
-  var removed = 0;
-  var changed = false;
-
-  Object.keys(groups).forEach(function(key) {
-    var indices = groups[key];
-    if (indices.length <= 1) return;
-    duplicateGroups += 1;
-    var keep = indices[0];
-    indices.forEach(function(i) {
-      if (providerRuleCompletenessScore(list[i]) > providerRuleCompletenessScore(list[keep])) keep = i;
-    });
-    indices.forEach(function(i) {
-      if (i === keep) return;
-      var merged = mergeRuleCardData(list[keep], list[i]);
-      if (merged.changed) {
-        list[keep] = merged.data;
-        changed = true;
-      }
-      removeIdx[i] = true;
-      removed += 1;
-    });
-  });
-
-  if (removed > 0) {
-    list = list.filter(function(_, i) { return !removeIdx[i]; });
-    changed = true;
-  }
-
-  return {
-    list: list,
-    changed: changed,
-    duplicateGroups: duplicateGroups,
-    removed: removed,
-    before: Array.isArray(providers) ? providers.length : getData(STORAGE_KEYS.PROVIDERS).length,
-    after: list.length
-  };
-}
-
-function auditProviderDuplicateStats(providers) {
-  var list = Array.isArray(providers) ? providers : getData(STORAGE_KEYS.PROVIDERS);
-  var groups = {};
-  var suspectGroups = {};
-  var seriesRows = 0;
-  var blankSeriesRows = 0;
-  (list || []).forEach(function(p) {
-    var key = providerDuplicateIdentityKey(p);
-    if (key) groups[key] = (groups[key] || 0) + 1;
-    var suspectKey = providerSuspectIdentityKey(p);
-    if (suspectKey) suspectGroups[suspectKey] = (suspectGroups[suspectKey] || 0) + 1;
-    if (String((p && p.series) || '').trim()) seriesRows += 1;
-    else blankSeriesRows += 1;
-  });
-  var duplicateGroups = 0;
-  var duplicateRows = 0;
-  var suspectDuplicateGroups = 0;
-  var suspectDuplicateRows = 0;
-  Object.keys(groups).forEach(function(key) {
-    if (groups[key] <= 1) return;
-    duplicateGroups += 1;
-    duplicateRows += groups[key] - 1;
-  });
-  Object.keys(suspectGroups).forEach(function(key) {
-    if (suspectGroups[key] <= 1) return;
-    suspectDuplicateGroups += 1;
-    suspectDuplicateRows += suspectGroups[key] - 1;
-  });
-  return {
-    total: (list || []).length,
-    duplicateGroups: duplicateGroups,
-    duplicateRows: duplicateRows,
-    unique: (list || []).length - duplicateRows,
-    suspectDuplicateGroups: suspectDuplicateGroups,
-    suspectDuplicateRows: suspectDuplicateRows,
-    seriesRows: seriesRows,
-    blankSeriesRows: blankSeriesRows
-  };
 }
 
 /** 书城系列改名后：按 bbmSeriesId / 1:1 孤儿匹配重命名本地卡，并合并重复系列卡 */
@@ -787,58 +351,35 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
   var seriesList = getBbmSeriesListForBrand(brandName);
   var providers = Array.isArray(providersOpt) ? providersOpt.slice() : getData(STORAGE_KEYS.PROVIDERS);
   if (!seriesList.length) return { renamed: 0, deduped: 0, changed: false, providers: providers };
-  var orgId = (seriesList[0] && seriesList[0].orgId) || getBbmOrgIdForCurrentShop();
-  var lookup = buildBbmSeriesLookup(seriesList);
   var bbmNameSet = {};
   seriesList.forEach(function(s) { bbmNameSet[normalizeText(s.name)] = true; });
   var renamed = 0;
-  var relinked = 0;
 
   providers.forEach(function(p, i) {
-    if (isRuleCardDeleted(p, shopName)) return;
     if (!isSameContextProvider(p, shopName, providerName)) return;
     if (!brandMatchesUi(p && p.brand, brandName)) return;
     if (!p.bbmSeriesId) return;
-    var bbm = lookup.byId[String(p.bbmSeriesId)];
-    if (!bbm) {
-      var sameName = lookup.byName[normalizeText(p.series || '')];
-      if (sameName) {
-        providers[i] = Object.assign({}, p, {
-          bbmSeriesId: sameName.id,
-          bbmOrgId: String(orgId || sameName.orgId || '')
-        });
-        relinked += 1;
-      }
-      return;
-    }
-    if (orgId && String(p.bbmOrgId || '') !== String(orgId)) {
-      providers[i] = Object.assign({}, p, { bbmOrgId: String(orgId) });
-      p = providers[i];
-      relinked += 1;
-    }
+    var bbm = seriesList.find(function(s) { return String(s.id) === String(p.bbmSeriesId); });
+    if (!bbm) return;
     if (normalizeText(p.series) !== normalizeText(bbm.name)) {
-      var renamedRule = Object.assign({}, p, { series: bbm.name });
-      if (isRuleCardDeleted(renamedRule, shopName)) return;
-      providers[i] = renamedRule;
+      providers[i] = Object.assign({}, p, { series: bbm.name });
       renamed += 1;
     }
   });
 
   providers.forEach(function(p, i) {
-    if (isRuleCardDeleted(p, shopName)) return;
     if (!isSameContextProvider(p, shopName, providerName)) return;
     if (!brandMatchesUi(p && p.brand, brandName)) return;
     if (p.bbmSeriesId) return;
     var sn = normalizeText(p.series);
     if (!sn) return;
     var bbm = seriesList.find(function(s) { return normalizeText(s.name) === sn; });
-    if (bbm) providers[i] = Object.assign({}, p, { bbmSeriesId: bbm.id, bbmOrgId: String(orgId || bbm.orgId || '') });
+    if (bbm) providers[i] = Object.assign({}, p, { bbmSeriesId: bbm.id });
   });
 
   function matchedBbmIdSet() {
     var set = {};
     providers.forEach(function(p) {
-      if (isRuleCardDeleted(p, shopName)) return;
       if (!isSameContextProvider(p, shopName, providerName)) return;
       if (!brandMatchesUi(p && p.brand, brandName)) return;
       if (!String(p.series || '').trim()) return;
@@ -856,7 +397,6 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
 
   var orphanLocals = [];
   providers.forEach(function(p) {
-    if (isRuleCardDeleted(p, shopName)) return;
     if (!isSameContextProvider(p, shopName, providerName)) return;
     if (!brandMatchesUi(p && p.brand, brandName)) return;
     if (!String(p.series || '').trim()) return;
@@ -871,14 +411,11 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
     var orphanKey = normalizeText(orphanLocals[0].series);
     var target = unmatchedBbm[0];
     providers.forEach(function(p, i) {
-      if (isRuleCardDeleted(p, shopName)) return;
       if (!isSameContextProvider(p, shopName, providerName)) return;
       if (!brandMatchesUi(p && p.brand, brandName)) return;
       if (p.bbmSeriesId) return;
       if (normalizeText(p.series) !== orphanKey) return;
-      var renamedOrphan = Object.assign({}, p, { series: target.name, bbmSeriesId: target.id, bbmOrgId: String(orgId || target.orgId || '') });
-      if (isRuleCardDeleted(renamedOrphan, shopName)) return;
-      providers[i] = renamedOrphan;
+      providers[i] = Object.assign({}, p, { series: target.name, bbmSeriesId: target.id });
       renamed += 1;
     });
   }
@@ -886,11 +423,10 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
   var deduped = 0;
   var groups = {};
   providers.forEach(function(p, i) {
-    if (isRuleCardDeleted(p, shopName)) return;
     if (!isSameContextProvider(p, shopName, providerName)) return;
     if (!brandMatchesUi(p && p.brand, brandName)) return;
     if (!String(p.series || '').trim()) return;
-    var key = contextSeriesIdentityKey(p, shopName, providerName);
+    var key = providerSeriesIdentityKey(p);
     if (!groups[key]) groups[key] = [];
     groups[key].push(i);
   });
@@ -904,11 +440,7 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
       if (providerHasMeaningfulRule(providers[i]) && !providerHasMeaningfulRule(providers[best])) best = i;
     });
     indices.forEach(function(i) {
-      if (i !== best) {
-        var merged = mergeRuleCardData(providers[best], providers[i]);
-        if (merged.changed) providers[best] = merged.data;
-        removeIdx[i] = true;
-      }
+      if (i !== best) removeIdx[i] = true;
     });
     deduped += indices.length - 1;
   });
@@ -917,7 +449,7 @@ function syncBbmSeriesNamesForBrand(shopName, providerName, brandName, providers
     providers = providers.filter(function(_, i) { return !removeIdx[i]; });
   }
 
-  return { renamed: renamed, deduped: deduped, relinked: relinked, changed: renamed > 0 || deduped > 0 || relinked > 0, providers: providers };
+  return { renamed: renamed, deduped: deduped, changed: renamed > 0 || deduped > 0, providers: providers };
 }
 
 function isSeriesRuleBlank(p) {
@@ -926,10 +458,7 @@ function isSeriesRuleBlank(p) {
 
 function seriesRuleExists(providers, shop, provider, brand, seriesName, bbmSeriesId) {
   var normSeries = normalizeText(seriesName);
-  var probe = buildRuleCardDeletionProbe(shop, provider, brand, seriesName);
-  if (isRuleCardDeleted(probe, shop)) return true;
   return providers.some(function(p) {
-    if (isRuleCardDeleted(p, shop)) return false;
     if (!isSameContextProvider(p, shop, provider)) return false;
     if (!brandMatchesUi(p && p.brand, brand)) return false;
     if (bbmSeriesId != null && bbmSeriesId !== '' && String(p.bbmSeriesId) === String(bbmSeriesId)) return true;
@@ -958,31 +487,15 @@ async function ensureBbmSeriesRuleCardsForBrand(shopName, providerName, brandNam
     var created = 0;
     var renamed = syncResult.renamed || 0;
     var deduped = syncResult.deduped || 0;
-    var relinked = syncResult.relinked || 0;
-    var staleRemoved = 0;
-    var filled = 0;
-    var orgId = (seriesList[0] && seriesList[0].orgId) || getBbmOrgIdForCurrentShop();
-
-    var pruneResult = pruneStaleBbmSeriesRuleCardsForContext(providers, shopName, providerName, brandName, seriesList, orgId);
-    providers = pruneResult.providers;
-    staleRemoved = pruneResult.removed || 0;
-    relinked += pruneResult.relinked || 0;
 
     seriesList.forEach(function(item) {
       var seriesName = item.name;
       if (seriesRuleExists(providers, shopName, providerName, brandName, seriesName, item.id)) return;
-      var candidate = buildNewProviderRuleCard(shopName, providerName, brandName, seriesName, item.id, orgId || item.orgId);
-      if (isRuleCardDeleted(candidate, shopName)) return;
-      providers.push(candidate);
+      providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, seriesName, item.id));
       created += 1;
     });
 
-    var repairResult = repairSeriesRulesForContext(providers, shopName, providerName, brandName);
-    providers = repairResult.providers;
-    filled = repairResult.filled || 0;
-    deduped += repairResult.deduped || 0;
-
-    if (created > 0 || syncResult.changed || repairResult.changed || pruneResult.changed) {
+    if (created > 0 || syncResult.changed) {
       if (typeof persistProviders === 'function') {
         await persistProviders(providers, { awaitCloud: !!options.awaitCloud });
       } else {
@@ -991,18 +504,14 @@ async function ensureBbmSeriesRuleCardsForBrand(shopName, providerName, brandNam
       if (!options.silent && typeof showToast === 'function') {
         if (renamed > 0) {
           showToast('已同步书城系列改名 ' + renamed + ' 条' + (deduped ? '，合并重复 ' + deduped + ' 条' : ''));
-        } else if (staleRemoved > 0) {
-          showToast('已清理旧机构书城系列 ' + staleRemoved + ' 条');
         } else if (created > 0) {
           showToast('已为书城 ' + created + ' 个系列创建规则卡（已填默认）');
-        } else if (filled > 0) {
-          showToast('已补齐已有系列默认规则 ' + filled + ' 条' + (deduped ? '，合并重复 ' + deduped + ' 条' : ''));
         } else if (deduped > 0) {
           showToast('已合并重复系列规则卡 ' + deduped + ' 条');
         }
       }
     }
-    return { created: created, renamed: renamed, deduped: deduped, relinked: relinked, staleRemoved: staleRemoved, filled: filled };
+    return { created: created, renamed: renamed, deduped: deduped };
   } finally {
     _ensureBbmSeriesInflight = false;
   }
@@ -1046,19 +555,6 @@ function renderBrandDefaultsPanel(shopName, providerName, brandName) {
   if (elSplit) elSplit.value = defs.split || '';
   if (elPricing) elPricing.value = defs.pricing || '';
   if (elPub) elPub.value = defs.publishTime || '';
-  panel.setAttribute('data-brand-defaults-dirty', '0');
-
-  var commitFields = function() {
-    return commitBrandDefaultsFromPanel({ silent: true });
-  };
-  [elNaming, elSplit, elPricing, elPub].forEach(function(el) {
-    if (!el) return;
-    el.addEventListener('input', function() {
-      panel.setAttribute('data-brand-defaults-dirty', '1');
-    });
-    el.addEventListener('change', commitFields);
-    el.addEventListener('blur', commitFields);
-  });
 }
 
 function readBrandDefaultsPanelFields() {
@@ -1070,24 +566,6 @@ function readBrandDefaultsPanelFields() {
   };
 }
 
-function commitBrandDefaultsFromPanel(options) {
-  options = options || {};
-  var panel = document.getElementById('brand-defaults-panel');
-  if (!panel || panel.style.display === 'none') return null;
-  if (!options.force && panel.getAttribute('data-brand-defaults-dirty') !== '1') return null;
-  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
-  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
-  var brandName = (document.getElementById('brand-input')?.value || '').trim();
-  if (!shopName || !providerName || !brandName) return null;
-  var fields = readBrandDefaultsPanelFields();
-  var saved = setBrandDefaults(shopName, providerName, brandName, fields);
-  panel.setAttribute('data-brand-defaults-dirty', '0');
-  if (!options.silent) {
-    renderBrandDefaultsPanel(shopName, providerName, brandName);
-  }
-  return saved;
-}
-
 async function saveBrandDefaultsFromPanel() {
   var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
@@ -1096,22 +574,20 @@ async function saveBrandDefaultsFromPanel() {
     showToast('请先选择店铺、提供者、品牌');
     return;
   }
-  var previousDefaults = getBrandDefaults(shopName, providerName, brandName);
   var fields = readBrandDefaultsPanelFields();
+  var previousDefaults = getBrandDefaults(shopName, providerName, brandName);
   setBrandDefaults(shopName, providerName, brandName, fields);
-  var applyResult = await applyBrandDefaultsToDefaultBackedSeriesCards(shopName, providerName, brandName, fields, previousDefaults);
+  var applied = await applyBrandDefaultsToDefaultBackedSeriesCards(shopName, providerName, brandName, fields, previousDefaults);
   renderBrandDefaultsPanel(shopName, providerName, brandName);
   showRulesByBrandAndShop(brandName, shopName, currentEditingSeries || '', true);
-  if (applyResult && applyResult.updated > 0) {
-    var syncHint = applyResult.syncResult && applyResult.syncResult.ok ? '，已同步云端' : '，后台继续同步';
-    showToast('已保存品牌默认，并更新 ' + applyResult.updated + ' 张系列卡' + syncHint);
+  if (applied && applied.updated > 0) {
+    showToast('已保存品牌「' + brandName + '」默认，并更新 ' + applied.updated + ' 张系列卡');
     return;
   }
   showToast('已保存品牌「' + brandName + '」默认规则');
 }
 
 async function applyBrandDefaultsToBlankSeries() {
-  commitBrandDefaultsFromPanel({ silent: true });
   var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
   var brandName = (document.getElementById('brand-input')?.value || '').trim();
@@ -1154,6 +630,7 @@ async function applyBrandDefaultsToBlankSeries() {
 
 window.saveBrandDefaultsFromPanel = saveBrandDefaultsFromPanel;
 window.applyBrandDefaultsToBlankSeries = applyBrandDefaultsToBlankSeries;
+window.applyBrandDefaultsToDefaultBackedSeriesCards = applyBrandDefaultsToDefaultBackedSeriesCards;
 
 window.onBbmBrandsFetched = function() {
   var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
@@ -1281,16 +758,11 @@ function migrateUnfilledRuleCards(providers) {
   return { list: list, changed: changed };
 }
 
-async function runStandardRuleFillMigration(options) {
-  options = options || {};
-  if (!options.force && localStorage.getItem(STANDARD_RULE_FILL_DONE_KEY) === '1') {
-    return { list: getData(STORAGE_KEYS.PROVIDERS), changed: 0, skipped: true };
-  }
+async function runStandardRuleFillMigration() {
   var result = migrateUnfilledRuleCards();
   var namingResult = migrateMissingNamingRuleCards(result.list);
   var finalList = namingResult.list;
   var totalChanged = result.changed + namingResult.changed;
-  localStorage.setItem(STANDARD_RULE_FILL_DONE_KEY, '1');
   if (!totalChanged) return { list: finalList, changed: 0 };
   console.log('[规则库] 标准规则填充：全量 ' + result.changed + ' 条，补命名 ' + namingResult.changed + ' 条');
   if (typeof persistProviders === 'function') {
@@ -1347,46 +819,6 @@ window.migrateUnfilledRuleCards = migrateUnfilledRuleCards;
 window.migrateMissingNamingRuleCards = migrateMissingNamingRuleCards;
 window.runStandardRuleFillMigration = runStandardRuleFillMigration;
 window.runMissingNamingRuleFillMigration = runMissingNamingRuleFillMigration;
-
-function migrateChongwengeShopName(providers) {
-  var list = Array.isArray(providers) ? providers.slice() : getData(STORAGE_KEYS.PROVIDERS);
-  var changed = 0;
-  list.forEach(function(p, i) {
-    if (!p) return;
-    var providerMatch = isEntityMatched(p.name, CHONGWENGE_PROVIDER_NAME);
-    var oldShopMatch =
-      isEntityMatched(p.shop, CHONGWENGE_PROVIDER_NAME) ||
-      isEntityMatched(p.shopname, CHONGWENGE_PROVIDER_NAME);
-    var alreadyShop =
-      isEntityMatched(p.shop, CHONGWENGE_SHOP_NAME) &&
-      isEntityMatched(p.shopname, CHONGWENGE_SHOP_NAME);
-    if (!providerMatch && !oldShopMatch) return;
-    if (alreadyShop) return;
-    list[i] = Object.assign({}, p, {
-      shop: CHONGWENGE_SHOP_NAME,
-      shopname: CHONGWENGE_SHOP_NAME
-    });
-    changed += 1;
-  });
-  return { list: list, changed: changed };
-}
-
-async function runChongwengeShopNameMigration() {
-  var result = migrateChongwengeShopName();
-  if (!result.changed) return result;
-  console.log('[规则库] 已修正崇文阁店铺名称：' + result.changed + ' 条');
-  if (typeof persistProviders === 'function') {
-    await persistProviders(result.list, { awaitCloud: true });
-  } else {
-    setData(STORAGE_KEYS.PROVIDERS, result.list);
-  }
-  if (typeof updateStats === 'function') updateStats();
-  return result;
-}
-
-window.migrateChongwengeShopName = migrateChongwengeShopName;
-window.runChongwengeShopNameMigration = runChongwengeShopNameMigration;
-window.correctChongwengeInputs = correctChongwengeInputs;
 
 // 默认数据
 const defaultData = {
@@ -1598,108 +1030,6 @@ function normalizeEntityKey(value) {
   return normalizeText(value).replace(/[()（）\s]/g, '');
 }
 
-var _deletedRuleCardSetCacheRaw = null;
-var _deletedRuleCardSetCache = null;
-
-function getDeletedRuleCardSet() {
-  var raw = localStorage.getItem(DELETED_RULE_CARDS_KEY) || '[]';
-  if (_deletedRuleCardSetCache && _deletedRuleCardSetCacheRaw === raw) {
-    return _deletedRuleCardSetCache;
-  }
-  var arr;
-  try {
-    arr = JSON.parse(raw);
-  } catch (e) {
-    arr = [];
-  }
-  _deletedRuleCardSetCacheRaw = raw;
-  _deletedRuleCardSetCache = new Set((arr || []).map(function(key) { return String(key || ''); }).filter(Boolean));
-  return _deletedRuleCardSetCache;
-}
-
-function saveDeletedRuleCardSet(setObj) {
-  var raw = JSON.stringify(Array.from(setObj || []));
-  localStorage.setItem(DELETED_RULE_CARDS_KEY, raw);
-  _deletedRuleCardSetCacheRaw = raw;
-  _deletedRuleCardSetCache = new Set(Array.from(setObj || []));
-}
-
-function resolveRuleCardDeletionShop(p, contextShop) {
-  var ctx = String(contextShop || '').trim();
-  if (ctx) return ctx;
-  return String((p && (p.shop || p.shopname)) || '').trim();
-}
-
-function buildRuleCardDeletionKeyFromParts(shop, provider, brand, series) {
-  var shopKey = normalizeEntityKey(shop);
-  var providerKey = normalizeEntityKey(provider);
-  var brandKey = normalizeText(brand);
-  var seriesKey = normalizeText(series || '');
-  if (!shopKey && !providerKey && !brandKey && !seriesKey) return '';
-  return [shopKey, providerKey, brandKey, seriesKey].join('|');
-}
-
-function ruleCardDeletionKeys(p, contextShop) {
-  if (!p) return [];
-  var shops = [
-    contextShop,
-    p && p.shop,
-    p && p.shopname
-  ].map(function(value) {
-    return String(value || '').trim();
-  }).filter(Boolean);
-  if (!shops.length) shops = [''];
-
-  var seen = {};
-  var keys = [];
-  shops.forEach(function(shop) {
-    var key = buildRuleCardDeletionKeyFromParts(shop, p && p.name, p && p.brand, (p && p.series) || '');
-    if (!key || seen[key]) return;
-    seen[key] = true;
-    keys.push(key);
-  });
-  return keys;
-}
-
-function ruleCardDeletionKey(p, contextShop) {
-  var keys = ruleCardDeletionKeys(p, contextShop);
-  return keys[0] || '';
-}
-
-function buildRuleCardDeletionProbe(shop, provider, brand, series) {
-  shop = String(shop || '').trim();
-  return {
-    shop: shop,
-    shopname: shop,
-    name: String(provider || '').trim(),
-    brand: String(brand || '').trim(),
-    series: String(series || '').trim()
-  };
-}
-
-function markRuleCardDeleted(rule, contextShop) {
-  var keys = ruleCardDeletionKeys(rule, contextShop);
-  if (!keys.length) return;
-  var setObj = getDeletedRuleCardSet();
-  keys.forEach(function(key) { setObj.add(key); });
-  saveDeletedRuleCardSet(setObj);
-}
-
-function unmarkRuleCardDeleted(rule, contextShop) {
-  var keys = ruleCardDeletionKeys(rule, contextShop);
-  if (!keys.length) return;
-  var setObj = getDeletedRuleCardSet();
-  keys.forEach(function(key) { setObj.delete(key); });
-  saveDeletedRuleCardSet(setObj);
-}
-
-function isRuleCardDeleted(rule, contextShop) {
-  var keys = ruleCardDeletionKeys(rule, contextShop);
-  if (!keys.length) return false;
-  var setObj = getDeletedRuleCardSet();
-  return keys.some(function(key) { return setObj.has(key); });
-}
-
 /** 公司/店铺名对齐：常见「文化」与「文化传媒」混用；「洛阳市」与「洛阳」工商/点评差异 */
 function alignCompanyMatchKey(value) {
   var k = normalizeEntityKey(value);
@@ -1728,88 +1058,6 @@ function isEntitySameExact(source, target) {
   if (!sourceKey || !targetKey) return false;
   return sourceKey === targetKey;
 }
-
-function isChongwengeProviderName(value) {
-  return isEntityMatched(value, CHONGWENGE_PROVIDER_NAME);
-}
-
-function shouldUseChongwengeShop(shopName, providerName, orgId) {
-  return isChongwengeProviderName(shopName) ||
-    isChongwengeProviderName(providerName) ||
-    String(orgId || '').trim() === CHONGWENGE_ORG_ID;
-}
-
-function isYibenCultureShopName(value) {
-  return normalizeEntityKey(value) === normalizeEntityKey(YIBEN_CULTURE_SHOP_NAME);
-}
-
-function shouldUseYibenCultureShop(shopName, providerName, orgId) {
-  return isYibenCultureShopName(shopName) ||
-    isYibenCultureShopName(providerName) ||
-    String(orgId || '').trim() === YIBEN_CULTURE_ORG_ID;
-}
-
-function clearYibenCultureBbmCacheOnce() {
-  if (localStorage.getItem(YIBEN_CULTURE_CACHE_FIX_KEY) === '1') return;
-  if (window.BbmBrandApi && typeof BbmBrandApi.clearCacheEntry === 'function') {
-    BbmBrandApi.clearCacheEntry(YIBEN_CULTURE_ORG_ID);
-  }
-  localStorage.setItem(YIBEN_CULTURE_CACHE_FIX_KEY, '1');
-}
-
-function correctYibenCultureInputs(options) {
-  options = options || {};
-  var shopInput = document.getElementById('shop-search-input');
-  var providerInput = document.getElementById('provider-search-input');
-  var orgInput = document.getElementById('org-id-input');
-  var shopVal = shopInput ? String(shopInput.value || '').trim() : '';
-  var providerVal = providerInput ? String(providerInput.value || '').trim() : '';
-  var orgVal = orgInput ? String(orgInput.value || '').trim() : '';
-  if (!shouldUseYibenCultureShop(shopVal, providerVal, orgVal)) return false;
-  if (shopInput && shopInput.value !== YIBEN_CULTURE_SHOP_NAME) {
-    shopInput.value = YIBEN_CULTURE_SHOP_NAME;
-  }
-  if (providerInput && !providerVal) {
-    providerInput.value = YIBEN_CULTURE_SHOP_NAME;
-  }
-  if (orgInput && orgInput.value !== YIBEN_CULTURE_ORG_ID) {
-    orgInput.value = YIBEN_CULTURE_ORG_ID;
-  }
-  if (window.BbmBrandApi && typeof BbmBrandApi.saveShopOrgId === 'function') {
-    BbmBrandApi.saveShopOrgId(YIBEN_CULTURE_SHOP_NAME, YIBEN_CULTURE_ORG_ID);
-  }
-  clearYibenCultureBbmCacheOnce();
-  if (!options.skipReload) {
-    loadBrandsByShopAndShowDropdown(YIBEN_CULTURE_SHOP_NAME);
-  }
-  return true;
-}
-
-function correctChongwengeInputs(options) {
-  options = options || {};
-  var shopInput = document.getElementById('shop-search-input');
-  var providerInput = document.getElementById('provider-search-input');
-  var orgInput = document.getElementById('org-id-input');
-  var shopVal = shopInput ? String(shopInput.value || '').trim() : '';
-  var providerVal = providerInput ? String(providerInput.value || '').trim() : '';
-  var orgVal = orgInput ? String(orgInput.value || '').trim() : '';
-  if (!shouldUseChongwengeShop(shopVal, providerVal, orgVal)) return false;
-  if (shopInput && shopInput.value !== CHONGWENGE_SHOP_NAME) {
-    shopInput.value = CHONGWENGE_SHOP_NAME;
-  }
-  if (providerInput && !providerVal) {
-    providerInput.value = CHONGWENGE_PROVIDER_NAME;
-  }
-  if (orgInput && !orgVal) {
-    orgInput.value = CHONGWENGE_ORG_ID;
-  }
-  if (!options.skipReload) {
-    loadBrandsByShopAndShowDropdown(CHONGWENGE_SHOP_NAME);
-  }
-  return true;
-}
-
-window.correctYibenCultureInputs = correctYibenCultureInputs;
 
 /**
  * 与「规则卡片」展示条件一致：店铺框可为空；非空时用 rowShopMatchesSearch（含 name 兜底）。
@@ -1918,8 +1166,6 @@ function getAllProvidersForSearch() {
   var result = [];
   merged.forEach(function(p) {
     if (!p) return;
-    if (deletedBrandSet.has(normalizeText(p && p.brand))) return;
-    if (isRuleCardDeleted(p)) return;
     var key = [
       normalizeText(p.shop),
       normalizeText(p.shopname),
@@ -1960,71 +1206,6 @@ function isSameContextProvider(p, shopName, providerName) {
   var shopMatched = !targetShop || rowShopMatchesSearch(p, shopName);
   var providerMatched = !targetProvider || isEntityMatched(p && p.name, targetProvider);
   return shopMatched && providerMatched;
-}
-
-function looksLikeCompanyShopName(name) {
-  return /公司|有限|集团|传媒|图书|文化|出版|策划|责任/.test(String(name || ''));
-}
-
-function pickPreferredShopForProvider(shopNames, providerName) {
-  var names = (shopNames || []).map(function(s) { return String(s || '').trim(); }).filter(Boolean);
-  if (!names.length) return '';
-  var prov = String(providerName || '').trim();
-  var companies = names.filter(function(s) {
-    return s !== prov && looksLikeCompanyShopName(s);
-  });
-  if (companies.length) {
-    companies.sort(function(a, b) { return b.length - a.length; });
-    return companies[0];
-  }
-  var notProvider = names.filter(function(s) { return s !== prov; });
-  if (notProvider.length) return notProvider[0];
-  return names[0];
-}
-
-/** 同提供者下其它规则卡里的公司全称（旧数据 shop 误填提供者时兜底） */
-function inferCompanyShopForProvider(providerName) {
-  var prov = String(providerName || '').trim();
-  if (!prov) return '';
-  var list = getData(STORAGE_KEYS.PROVIDERS);
-  var i;
-  for (i = 0; i < list.length; i++) {
-    var row = list[i];
-    if (!isEntityMatched(row && row.name, prov)) continue;
-    var s = String(row.shop || '').trim();
-    var sn = String(row.shopname || '').trim();
-    if (s && s !== prov && looksLikeCompanyShopName(s)) return s;
-    if (sn && sn !== prov && looksLikeCompanyShopName(sn)) return sn;
-  }
-  return '';
-}
-
-/** 导出/展示用店铺名：旧数据常把提供者填进 shop；筛选框填提供者简称时不应覆盖公司全称 */
-function resolveRuleShopName(p, contextShop) {
-  if (!p) return String(contextShop || '').trim() || '-';
-  var shop = String(p.shop || '').trim();
-  var shopname = String(p.shopname || '').trim();
-  var provider = String(p.name || '').trim();
-  var ctx = String(contextShop || '').trim();
-
-  if (shop && shop !== provider && looksLikeCompanyShopName(shop)) return shop;
-  if (shopname && shopname !== provider && looksLikeCompanyShopName(shopname)) return shopname;
-
-  if (shop && shop !== provider) return shop;
-  if (shopname && shopname !== provider) return shopname;
-
-  var peerShop = inferCompanyShopForProvider(provider);
-  if (peerShop) return peerShop;
-
-  if (ctx && ctx !== provider && looksLikeCompanyShopName(ctx) && rowShopMatchesSearch(p, ctx)) {
-    return ctx;
-  }
-
-  if (shop && shop !== provider) return shop;
-  if (shopname) return shopname;
-  if (ctx && rowShopMatchesSearch(p, ctx) && ctx !== provider) return ctx;
-  if (shop) return shop;
-  return ctx || '-';
 }
 
 function setData(key, data, options) {
@@ -2157,15 +1338,13 @@ function downloadExportBlob(filename, blob) {
   setTimeout(function() { URL.revokeObjectURL(a.href); }, 2000);
 }
 
-function formatRuleExportTextBlock(p, index, contextShop) {
+function formatRuleExportTextBlock(p, index) {
   var album = resolveAlbumRule(p);
-  var shopLabel = resolveRuleShopName(p, contextShop);
-  var providerLabel = String(p.name || '').trim() || '-';
   var lines = [
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-    '【' + index + '】' + [shopLabel, providerLabel, p.brand, p.series].filter(Boolean).join(' · '),
-    '店铺：' + shopLabel,
-    '提供者：' + providerLabel,
+    '【' + index + '】' + [p.shop || p.shopname, p.name, p.brand, p.series].filter(Boolean).join(' · '),
+    '店铺：' + (p.shop || p.shopname || '-'),
+    '提供者：' + (p.name || '-'),
     '品牌：' + (p.brand || '-'),
     '系列：' + (p.series || '-'),
     '命名：' + (p.naming || '-'),
@@ -2179,19 +1358,17 @@ function formatRuleExportTextBlock(p, index, contextShop) {
   return lines.join('\n');
 }
 
-function buildRulesExportWordHtml(list, scopeLabel, contextShop) {
+function buildRulesExportWordHtml(list, scopeLabel) {
   var now = new Date();
   var cards = list.map(function(p, i) {
-    var shopLabel = resolveRuleShopName(p, contextShop);
-    var providerLabel = String(p.name || '').trim() || '-';
-    var title = escapeHtmlText([shopLabel, providerLabel, p.brand, p.series].filter(Boolean).join(' · '));
+    var title = escapeHtmlText([p.shop || p.shopname, p.name, p.brand, p.series].filter(Boolean).join(' · '));
     var album = escapeHtmlText(resolveAlbumRule(p)).replace(/\n/g, '<br/>');
     return (
       '<div class="rule-card">' +
         '<h2>【' + (i + 1) + '】' + title + '</h2>' +
         '<table class="rule-table">' +
-          '<tr><td class="lbl">店铺</td><td>' + escapeHtmlText(shopLabel) + '</td></tr>' +
-          '<tr><td class="lbl">提供者</td><td>' + escapeHtmlText(providerLabel) + '</td></tr>' +
+          '<tr><td class="lbl">店铺</td><td>' + escapeHtmlText(p.shop || p.shopname || '-') + '</td></tr>' +
+          '<tr><td class="lbl">提供者</td><td>' + escapeHtmlText(p.name || '-') + '</td></tr>' +
           '<tr><td class="lbl">品牌</td><td>' + escapeHtmlText(p.brand || '-') + '</td></tr>' +
           '<tr><td class="lbl">系列</td><td>' + escapeHtmlText(p.series || '-') + '</td></tr>' +
           '<tr><td class="lbl">命名</td><td>' + escapeHtmlText(p.naming || '-') + '</td></tr>' +
@@ -2244,60 +1421,27 @@ function resolveRuleForExport(index) {
   return list[index] || null;
 }
 
-function buildRuleCardExportButtons(globalIndex, contextShop) {
+function buildRuleCardExportButtons(globalIndex) {
   if (typeof globalIndex !== 'number' || globalIndex < 0) return '';
-  var shopAttr = contextShop
-    ? ' data-export-shop="' + escapeHtmlAttr(encodeURIComponent(String(contextShop))) + '"'
-    : '';
-  return '<button type="button" class="rule-export-btn" data-export-txt="1" data-index="' + globalIndex + '"' + shopAttr + ' title="导出本条为 TXT">📄 TXT</button>' +
-    '<button type="button" class="rule-export-btn rule-export-btn-word" data-export-word="1" data-index="' + globalIndex + '"' + shopAttr + ' title="导出本条为 Word">📘 Word</button>';
+  return '<button type="button" class="rule-export-btn" data-export-txt="1" data-index="' + globalIndex + '" title="导出本条为 TXT">📄 TXT</button>' +
+    '<button type="button" class="rule-export-btn rule-export-btn-word" data-export-word="1" data-index="' + globalIndex + '" title="导出本条为 Word">📘 Word</button>';
 }
 
-function readExportContextShop(btn, ruleRow) {
-  var provider = ruleRow ? String(ruleRow.name || '').trim() : '';
-  var peer = inferCompanyShopForProvider(provider);
-  if (peer) return peer;
-  if (!btn) {
-    var shopInput = document.getElementById('shop-search-input');
-    var provInput = document.getElementById('provider-search-input');
-    var shopVal = shopInput ? String(shopInput.value || '').trim() : '';
-    var provVal = provInput ? String(provInput.value || '').trim() : '';
-    if (shopVal && shopVal !== provVal && looksLikeCompanyShopName(shopVal)) return shopVal;
-    return '';
-  }
-  var enc = btn.getAttribute('data-export-shop');
-  if (!enc) {
-    var shopInput2 = document.getElementById('shop-search-input');
-    var shopVal2 = shopInput2 ? String(shopInput2.value || '').trim() : '';
-    if (shopVal2 && shopVal2 !== provider && looksLikeCompanyShopName(shopVal2)) return shopVal2;
-    return '';
-  }
-  try {
-    var decoded = decodeURIComponent(enc);
-    if (decoded && decoded !== provider && looksLikeCompanyShopName(decoded)) return decoded;
-    if (ruleRow) return resolveRuleShopName(ruleRow, '');
-    return decoded;
-  } catch (e) {
-    return enc;
-  }
-}
-
-function exportRuleCardByIndex(globalIndex, format, contextShop) {
+function exportRuleCardByIndex(globalIndex, format) {
   var p = resolveRuleForExport(globalIndex);
   if (!p) {
     showToast('未找到该规则');
     return;
   }
-  var shopLabel = resolveRuleShopName(p, contextShop);
   var scopeLabel = [p.brand, p.series].filter(Boolean).join(' · ') || '单条规则';
   if (format === 'txt') {
-    var txtBody = formatRuleExportTextBlock(p, 1, contextShop) + '\n';
+    var txtBody = formatRuleExportTextBlock(p, 1) + '\n';
     var blob = new Blob(['\uFEFF' + txtBody], { type: 'text/plain;charset=utf-8' });
     downloadExportBlob(makeSingleRuleExportFilename('txt', p), blob);
     showToast('已导出 TXT');
     return;
   }
-  var html = buildRulesExportWordHtml([p], scopeLabel, contextShop);
+  var html = buildRulesExportWordHtml([p], scopeLabel);
   var wordBlob = new Blob(['\uFEFF' + html], { type: 'application/msword;charset=utf-8' });
   downloadExportBlob(makeSingleRuleExportFilename('doc', p), wordBlob);
   showToast('已导出 Word');
@@ -2319,15 +1463,13 @@ function handleRuleCardExportClick(e) {
   var txtBtn = e.target.closest('[data-export-txt]');
   if (txtBtn) {
     e.preventDefault();
-    var rowTxt = resolveRuleForExport(parseInt(txtBtn.getAttribute('data-index'), 10));
-    exportRuleCardByIndex(parseInt(txtBtn.getAttribute('data-index'), 10), 'txt', readExportContextShop(txtBtn, rowTxt));
+    exportRuleCardByIndex(parseInt(txtBtn.getAttribute('data-index'), 10), 'txt');
     return true;
   }
   var wordBtn = e.target.closest('[data-export-word]');
   if (wordBtn) {
     e.preventDefault();
-    var rowWord = resolveRuleForExport(parseInt(wordBtn.getAttribute('data-index'), 10));
-    exportRuleCardByIndex(parseInt(wordBtn.getAttribute('data-index'), 10), 'word', readExportContextShop(wordBtn, rowWord));
+    exportRuleCardByIndex(parseInt(wordBtn.getAttribute('data-index'), 10), 'word');
     return true;
   }
   return false;
@@ -2490,40 +1632,10 @@ function cleanupBlankPlaceholderProviders() {
   }
 }
 
-async function runProviderDuplicateCleanupMigration(options) {
-  options = options || {};
-  var providers = getData(STORAGE_KEYS.PROVIDERS);
-  var beforeAudit = auditProviderDuplicateStats(providers);
-  console.log('[规则库] 当前运行数据审计（清理前）：' + JSON.stringify(beforeAudit));
-  var result = compactDuplicateProviderRules(providers);
-  if (!result.changed) {
-    console.log('[规则库] 重复规则卡检查：总数 ' + result.before + '，安全重复 ' + beforeAudit.duplicateRows + ' 条，疑似同系列重复 ' + beforeAudit.suspectDuplicateRows + ' 条');
-    return result;
-  }
-  var afterAudit = auditProviderDuplicateStats(result.list);
-  console.log('[规则库] 已合并重复规则卡：' + result.removed + ' 条，' + result.before + ' → ' + result.after + '；清理后：' + JSON.stringify(afterAudit));
-  if (typeof persistProviders === 'function') {
-    await persistProviders(result.list, { awaitCloud: !!options.awaitCloud });
-  } else {
-    setData(STORAGE_KEYS.PROVIDERS, result.list);
-  }
-  if (typeof updateStats === 'function') updateStats();
-  if (typeof loadProviders === 'function') loadProviders();
-  if (!options.silent && typeof showToast === 'function') {
-    showToast('已合并重复规则卡 ' + result.removed + ' 条');
-  }
-  return result;
-}
-
-window.auditProviderDuplicateStats = auditProviderDuplicateStats;
-window.compactDuplicateProviderRules = compactDuplicateProviderRules;
-window.runProviderDuplicateCleanupMigration = runProviderDuplicateCleanupMigration;
-
 document.addEventListener('DOMContentLoaded', () => {
   initData();
   if (typeof cloudSync !== 'function') {
     cleanupBlankPlaceholderProviders();
-    runProviderDuplicateCleanupMigration({ silent: true });
   }
   if (typeof initCollapsibles === 'function') initCollapsibles();
   loadProviderSelect();
@@ -2545,26 +1657,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('ai-query')?.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') aiQuery();
   });
-
-  document.getElementById('org-id-input')?.addEventListener('input', function() {
-    correctChongwengeInputs();
-    correctYibenCultureInputs();
-    resetRuleContextForEntityChange({ clearOrgId: false, skipOrgLookup: true });
-  });
-  document.getElementById('provider-search-input')?.addEventListener('input', function() {
-    correctChongwengeInputs();
-    correctYibenCultureInputs();
-    scheduleRuleContextResetForEntityInput();
-  });
-  document.getElementById('shop-search-input')?.addEventListener('input', function() {
-    scheduleRuleContextResetForEntityInput();
-  });
-  document.getElementById('shop-search-input')?.addEventListener('blur', function() {
-    correctChongwengeInputs();
-    correctYibenCultureInputs();
-  });
-  correctChongwengeInputs();
-  correctYibenCultureInputs({ skipReload: true });
   
   // 点击其他地方关闭下拉框
   document.addEventListener('click', (e) => {
@@ -3117,19 +2209,16 @@ function searchShopByInput() {
 }
 
 function selectShop(shopName) {
-  if (shouldUseChongwengeShop(shopName, '', '')) {
-    shopName = CHONGWENGE_SHOP_NAME;
-  }
   var input = document.getElementById('shop-search-input');
   var dropdown = document.getElementById('shop-dropdown');
   if (input) input.value = shopName;
   if (dropdown) dropdown.style.display = 'none';
+
   var providerInput = document.getElementById('provider-search-input');
   // 切换店铺时先清空提供者，避免上一家店铺的提供者把当前店铺下的品牌列表收窄成空
   if (providerInput) providerInput.value = '';
 
   var providersData = getAllProvidersForSearch();
-  resetRuleContextForEntityChange({ clearOrgId: true });
   loadBrandsByShopAndShowDropdown(shopName);
 
   // 仅当该店铺语境下只有一个 distinct 提供者名时才自动填入，避免误锁到错误提供者
@@ -3163,14 +2252,6 @@ function getBbmOrgIdForCurrentShop() {
   var provider = (document.getElementById('provider-search-input') && document.getElementById('provider-search-input').value || '').trim();
   var orgInput = document.getElementById('org-id-input');
   var typed = orgInput ? String(orgInput.value || '').trim() : '';
-  if (shouldUseChongwengeShop(shop, provider, typed)) {
-    correctChongwengeInputs({ skipReload: true });
-    return CHONGWENGE_ORG_ID;
-  }
-  if (shouldUseYibenCultureShop(shop, provider, typed)) {
-    correctYibenCultureInputs({ skipReload: true });
-    return YIBEN_CULTURE_ORG_ID;
-  }
   if (typed) return typed;
   if (window.BbmBrandApi && shop) {
     var saved = BbmBrandApi.getOrgIdForShop(shop);
@@ -3195,7 +2276,6 @@ function loadBrandsByShopAndShowDropdown(shopName) {
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
   var hasShop = String(shopName || '').trim();
   var matched = providersData.filter(function(p) {
-    if (isRuleCardDeleted(p, shopName)) return false;
     if (!hasShop && !providerName) return false;
     if (hasShop && !rowShopMatchesSearch(p, shopName)) return false;
     if (providerName && !isEntityMatched(p && p.name, providerName)) return false;
@@ -3212,9 +2292,6 @@ function loadBrandsByShopAndShowDropdown(shopName) {
     if (orgId) {
       var bbmBrands = BbmBrandApi.getCachedBrands(orgId, true);
       brands = BbmBrandApi.mergeBrandNames(brands, bbmBrands);
-      if (String(orgId || '').trim() === WANG_CHAOXIA_ORG_ID && !brands.some(function(b) { return normalizeText(b) === normalizeText(WANG_CHAOXIA_BRAND_NAME); })) {
-        brands.push(WANG_CHAOXIA_BRAND_NAME);
-      }
     }
   }
   
@@ -3222,8 +2299,7 @@ function loadBrandsByShopAndShowDropdown(shopName) {
   
   if (brandInput) {
     brandInput.placeholder = brands.length ? '点击选择品牌（含书城）...' : '点击选择品牌...';
-    var previousBrand = String(brandInput.value || '').trim();
-    brandInput.value = (previousBrand && brands.some(function(b) { return normalizeText(b) === normalizeText(previousBrand); })) ? previousBrand : '';
+    brandInput.value = '';
     brandInput.setAttribute('data-shop-brands', JSON.stringify(brands));
     brandInput.setAttribute('data-current-shop', shopName);
     brandInput.setAttribute('data-current-provider', providerName);
@@ -3351,52 +2427,6 @@ function clearSeriesTags() {
   providerSeriesTagsExpanded = false;
 }
 
-var _ruleContextResetTimer = null;
-function resetRuleContextForEntityChange(options) {
-  options = options || {};
-  currentEditingBrand = '';
-  currentEditingShop = '';
-  currentEditingSeries = '';
-  var brandInput = document.getElementById('brand-input');
-  if (brandInput) {
-    brandInput.value = '';
-    brandInput.removeAttribute('data-shop-brands');
-    brandInput.removeAttribute('data-provider-brands');
-    brandInput.setAttribute('data-current-shop', (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value) || '');
-    brandInput.setAttribute('data-current-provider', (document.getElementById('provider-search-input') && document.getElementById('provider-search-input').value) || '');
-  }
-  clearSeriesTags();
-  var display = document.getElementById('custom-rule-display');
-  if (display) {
-    display.style.display = 'none';
-    display.innerHTML = '';
-  }
-  var defaultsPanel = document.getElementById('brand-defaults-panel');
-  if (defaultsPanel) {
-    defaultsPanel.style.display = 'none';
-    defaultsPanel.innerHTML = '';
-  }
-  var addSeriesBtn = document.getElementById('add-series-btn');
-  if (addSeriesBtn) addSeriesBtn.style.display = 'none';
-  var orgInput = document.getElementById('org-id-input');
-  if (orgInput && options.clearOrgId !== false) orgInput.value = '';
-  if (!options.skipOrgLookup && window.BbmBrandApi && typeof BbmBrandApi.loadOrgIdInputForShop === 'function') {
-    BbmBrandApi.loadOrgIdInputForShop(
-      (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value) || '',
-      (document.getElementById('provider-search-input') && document.getElementById('provider-search-input').value) || ''
-    );
-  }
-}
-
-function scheduleRuleContextResetForEntityInput() {
-  clearTimeout(_ruleContextResetTimer);
-  _ruleContextResetTimer = setTimeout(function() {
-    resetRuleContextForEntityChange({ clearOrgId: true });
-    var shopVal = (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value || '').trim();
-    if (shopVal) loadBrandsByShopAndShowDropdown(shopVal);
-  }, 120);
-}
-
 function buildSeriesTagsHtml(seriesMap, options) {
   options = options || {};
   var filterAttr = options.filterAttr || 'data-series-filter';
@@ -3439,13 +2469,6 @@ var _providerSeriesTagContext = { matched: [], selected: '' };
 function renderSeriesTags(matched, selectedSeries, expandedOpt, bbmSeriesNames) {
   var container = document.getElementById('series-tag-container');
   if (!container) return;
-  var orgIdForTags = getBbmOrgIdForCurrentShop();
-  if (
-    String(orgIdForTags || '').trim() === WANG_CHAOXIA_ORG_ID &&
-    normalizeText(currentEditingBrand || (document.getElementById('brand-input') && document.getElementById('brand-input').value) || '') === normalizeText(WANG_CHAOXIA_BRAND_NAME)
-  ) {
-    bbmSeriesNames = (bbmSeriesNames || []).concat(WANG_CHAOXIA_SERIES.map(function(s) { return s.name; }));
-  }
 
   var seriesMap = {};
   var bbmOnlySet = {};
@@ -3560,12 +2583,12 @@ function aiRenderProviderResults(fullList) {
     var providerName = rule.name || '未命名提供者';
     var brandName = rule.brand || '未设置品牌';
     var seriesName = (rule.series || '').trim() || '未设置系列';
-    var shopName = resolveRuleShopName(rule, '');
+    var shopName = rule.shop || rule.shopname || '未设置店铺';
     var providersData = getData(STORAGE_KEYS.PROVIDERS);
     var globalIndex = providersData.findIndex(function(p) {
       return ruleRowMatchesEditIdentity(p, shopName, providerName, brandName, seriesName);
     });
-    var exportBtns = buildRuleCardExportButtons(globalIndex, shopName);
+    var exportBtns = buildRuleCardExportButtons(globalIndex);
     return '<div class="ai-result-card">' +
       '<div class="ai-result-header">' +
         '<span class="ai-result-icon">📌</span>' +
@@ -3595,7 +2618,6 @@ function aiRenderProviderResults(fullList) {
 
 function selectSeriesFilter(seriesEncoded) {
   var seriesName = seriesEncoded ? decodeURIComponent(seriesEncoded) : '';
-  commitBrandDefaultsFromPanel({ silent: true });
   currentEditingSeries = seriesName;
   showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, seriesName);
 }
@@ -3616,19 +2638,13 @@ async function autoEnsureSeriesRuleAndRefresh(shopName, providerName, brandName,
     var providers = getData(STORAGE_KEYS.PROVIDERS);
     var normSeries = normalizeText(seriesName);
     var exists = providers.some(function(p) {
-      if (isRuleCardDeleted(p, shopName)) return false;
       return isSameContextProvider(p, shopName, providerName) &&
         brandMatchesUi(p && p.brand, brandName) &&
         normalizeText(String((p && p.series) || '').trim()) === normSeries;
     });
 
     if (!exists) {
-      var newRule = buildNewProviderRuleCard(shopName, providerName, brandName, seriesName);
-      if (isRuleCardDeleted(newRule, shopName)) {
-        showRulesByBrandAndShop(brandName, shopName, seriesName, true);
-        return;
-      }
-      providers.push(newRule);
+      providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, seriesName));
       if (typeof persistProviders === 'function') {
         await persistProviders(providers, { awaitCloud: true });
       } else {
@@ -3667,7 +2683,6 @@ function tryAutoEnsureSeriesRuleCard(shopName, providerName, brandName, seriesFi
 
 function selectBrand(brandName) {
   console.log('selectBrand called:', brandName);
-  commitBrandDefaultsFromPanel({ silent: true });
   var input = document.getElementById('brand-input');
   var dropdown = document.getElementById('brand-dropdown');
   if (input) input.value = brandName;
@@ -3690,29 +2705,22 @@ function selectBrand(brandName) {
   console.log('calling showRulesByBrandAndShop with:', brandName, shopName);
   var providerNameForBbm = (document.getElementById('provider-search-input')?.value || '').trim();
   var orgIdForBbm = getBbmOrgIdForCurrentShop();
-  var afterBrandReady = function(forceRefresh) {
-    ensureBbmSeriesRuleCardsForBrand(shopName, providerNameForBbm, brandName, { silent: true, awaitCloud: false })
+  var afterBrandReady = function() {
+    ensureBbmSeriesRuleCardsForBrand(shopName, providerNameForBbm, brandName, { silent: true, awaitCloud: true })
       .then(function(res) {
         if (res && res.created > 0 && typeof showToast === 'function') {
           showToast('已为书城 ' + res.created + ' 个系列创建规则卡（已填默认）');
         }
-        showRulesByBrandAndShop(brandName, shopName, '', !!forceRefresh);
+        showRulesByBrandAndShop(brandName, shopName, '');
       })
       .catch(function() {
-        showRulesByBrandAndShop(brandName, shopName, '', !!forceRefresh);
+        showRulesByBrandAndShop(brandName, shopName, '');
       });
   };
-  showRulesByBrandAndShop(brandName, shopName, '', true);
-  afterBrandReady(false);
-  if (orgIdForBbm && window.BbmBrandApi) {
-    var hasCachedSeries = getBbmSeriesListForBrand(brandName).length > 0;
-    var bbmRefresh = null;
-    if (!hasCachedSeries && typeof BbmBrandApi.ensureBrandSeriesInCache === 'function') {
-      bbmRefresh = BbmBrandApi.ensureBrandSeriesInCache(orgIdForBbm, brandName, { force: false });
-    }
-    if (!hasCachedSeries && bbmRefresh) bbmRefresh.then(afterBrandReady).catch(function(err) {
-      console.warn('刷新书城品牌系列失败:', brandName, err);
-    });
+  if (orgIdForBbm && window.BbmBrandApi && typeof BbmBrandApi.ensureBrandSeriesInCache === 'function') {
+    BbmBrandApi.ensureBrandSeriesInCache(orgIdForBbm, brandName).then(afterBrandReady).catch(afterBrandReady);
+  } else {
+    afterBrandReady();
   }
 }
 
@@ -3740,34 +2748,13 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
   var targetSeries = normalizeText(seriesFilter || '');
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
   var relaxedHintHtml = '';
-  var currentBbmOrgId = getBbmOrgIdForCurrentShop();
-  var currentBbmSeriesList = getBbmSeriesListForBrand(brandName);
-  var strictBbmOrgScope = shouldUseYibenCultureShop(targetShopTrim, providerName, currentBbmOrgId);
-
-  if (targetShopTrim && providerName && brandName) {
-    if (currentBbmSeriesList.length) {
-      var pruneResult = pruneStaleBbmSeriesRuleCardsForContext(providersData, targetShopTrim, providerName, brandName, currentBbmSeriesList, currentBbmOrgId);
-      if (pruneResult.changed) {
-        providersData = pruneResult.providers;
-        setData(STORAGE_KEYS.PROVIDERS, providersData);
-      }
-    }
-    var repairResult = repairSeriesRulesForContext(providersData, targetShopTrim, providerName, brandName);
-    if (repairResult.changed) {
-      providersData = repairResult.providers;
-      setData(STORAGE_KEYS.PROVIDERS, providersData);
-    }
-  }
   
   // 过滤：品牌 + 店铺语境 + 提供者（与 loadBrandsByShopAndShowDropdown 一致，避免「有品牌名、规则卡片为 0」）
   var matched = [];
   providersData.forEach(function(p, i) {
-    if (isRuleCardDeleted(p, shopName)) return;
     var brandMatched = brandMatchesUi(p && p.brand, brandName);
     var shopMatched = !targetShopTrim || rowShopMatchesSearch(p, shopName);
     var providerMatched = !providerName || isEntityMatched(p && p.name, providerName);
-    if (strictBbmOrgScope && !isRuleAllowedForStrictBbmOrgContext(p, currentBbmSeriesList, currentBbmOrgId)) return;
-    if (currentBbmSeriesList.length && isStaleBbmSeriesForCurrentOrg(p, currentBbmSeriesList, currentBbmOrgId)) return;
     if (brandMatched && shopMatched && providerMatched) {
       matched.push({ data: p, index: i });
     }
@@ -3777,11 +2764,8 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
   if (matched.length === 0 && providerName && targetShopTrim) {
     var retry = [];
     providersData.forEach(function(p, i) {
-      if (isRuleCardDeleted(p, shopName)) return;
       if (!brandMatchesUi(p && p.brand, brandName)) return;
       if (!rowShopMatchesSearch(p, shopName)) return;
-      if (strictBbmOrgScope && !isRuleAllowedForStrictBbmOrgContext(p, currentBbmSeriesList, currentBbmOrgId)) return;
-      if (currentBbmSeriesList.length && isStaleBbmSeriesForCurrentOrg(p, currentBbmSeriesList, currentBbmOrgId)) return;
       retry.push({ data: p, index: i });
     });
     if (retry.length > 0) {
@@ -3793,17 +2777,10 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
   // 仅在“未选择店铺”时才允许按品牌兜底，避免跨店铺串数据
   if (matched.length === 0 && !targetShopTrim) {
     providersData.forEach(function(p, i) {
-      if (isRuleCardDeleted(p, shopName)) return;
-      if (strictBbmOrgScope && !isRuleAllowedForStrictBbmOrgContext(p, currentBbmSeriesList, currentBbmOrgId)) return;
-      if (currentBbmSeriesList.length && isStaleBbmSeriesForCurrentOrg(p, currentBbmSeriesList, currentBbmOrgId)) return;
       if (brandMatchesUi(p && p.brand, brandName)) {
         matched.push({ data: p, index: i });
       }
     });
-  }
-
-  if (matched.length > 1) {
-    matched = dedupeMatchedRuleItemsForDisplay(matched, targetShopTrim, providerName);
   }
   
   var display = document.getElementById('custom-rule-display');
@@ -3819,7 +2796,6 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       var brandHit = 0;
       var bothHit = 0;
       providersData.forEach(function(p) {
-        if (isRuleCardDeleted(p, shopName)) return;
         var s = rowShopMatchesSearch(p, shopName);
         var b = brandMatchesUi(p && p.brand, brandName);
         if (s) shopHit += 1;
@@ -3839,7 +2815,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
           ? ' 若店铺为 0，请核对库里「店铺/店铺别名/提供者」是否含「洛阳」「朝霞」等关键字。'
           : '') +
         '</div>' +
-        buildRoughMatchSamplesHtml(providersData.filter(function(p) { return !isRuleCardDeleted(p, shopName); }), ['朝霞', '王朝霞', '洛阳朝霞']);
+        buildRoughMatchSamplesHtml(providersData, ['朝霞', '王朝霞', '洛阳朝霞']);
     } else {
       display.style.display = 'none';
     }
@@ -3890,23 +2866,16 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
     });
   }
 
-  var bbmSeriesNames = (currentBbmSeriesList.length
-    ? currentBbmSeriesList.map(function(s) { return s.name; }).filter(Boolean)
-    : getBbmSeriesNamesForBrand(brandName)
-  ).filter(function(seriesName) {
-    return !isRuleCardDeleted(buildRuleCardDeletionProbe(shopName, providerName, brandName, seriesName), shopName);
-  });
+  var bbmSeriesNames = getBbmSeriesNamesForBrand(brandName);
   renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '', undefined, bbmSeriesNames);
   if (matched.length === 0) {
     if (tryAutoEnsureSeriesRuleCard(shopName, providerName, brandName, seriesFilter, forceRefresh)) {
       return;
     }
     display.style.display = 'block';
-    var emptyHint = strictBbmOrgScope && !bbmSeriesNames.length
-      ? '该新机构暂未读取到书城系列，请点击「从书城获取品牌系列」实时拉取。'
-      : (bbmSeriesNames.length
-        ? '正在同步书城系列规则卡…若仍为空请点选上方系列标签。'
-        : '该品牌下未找到所选系列，请点 +新增系列添加。');
+    var emptyHint = bbmSeriesNames.length
+      ? '正在同步书城系列规则卡…若仍为空请点选上方系列标签。'
+      : '该品牌下未找到所选系列，请点 +新增系列添加。';
     display.innerHTML = '<div class="match-hint"><span class="match-icon">ℹ️</span><span class="match-text">' + emptyHint + '</span></div>';
     return;
   }
@@ -3929,13 +2898,13 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       var p = item.data;
       var globalIndex = item.index;
       var ruleName = (p.brand || p.name || '未命名规则') + ' · ' + ((p.series || '').trim() || '未设置系列');
-      var shopForEdit = String(shopName || '').trim() || String(p.shop || p.shopname || '').trim();
+      var shopForEdit = String(shopName || '').trim() || (p.shop || '');
       var shopEncoded = encodeURIComponent(shopForEdit);
       var providerEncoded = encodeURIComponent(p.name || '');
       var brandEncoded = encodeURIComponent(p.brand || '');
       var seriesEncoded = encodeURIComponent((p.series || '').trim());
       var actionButtons = '<button type="button" class="rule-edit-btn" data-edit-rule="1" data-index="' + globalIndex + '" data-shop="' + escapeHtmlAttr(shopEncoded) + '" data-provider="' + escapeHtmlAttr(providerEncoded) + '" data-brand="' + escapeHtmlAttr(brandEncoded) + '" data-series="' + escapeHtmlAttr(seriesEncoded) + '">✏️ 修改</button>' +
-                       buildRuleCardExportButtons(globalIndex, shopForEdit) +
+                       buildRuleCardExportButtons(globalIndex) +
                        '<button type="button" class="rule-delete-btn" data-delete-rule="1" data-index="' + globalIndex + '">🗑️ 删除</button>';
       html += '<div class="rule-card">';
       html += '  <div class="rule-card-header">';
@@ -4009,17 +2978,17 @@ function onProviderSearchInput() {
   }
   
   var providersData = getAllProvidersForSearch();
+  var shopEl = document.getElementById('shop-search-input');
+  var shopVal = shopEl ? String(shopEl.value || '').trim() : '';
   var providerMap = {};
-  var providerShopMap = {};
   providersData.forEach(function(p) {
+    if (shopVal && !rowShopMatchesSearch(p, shopVal)) return;
     var rawName = String((p && p.name) || '').trim();
     if (!rawName || isProviderDeleted(rawName)) return;
     var key = normalizeEntityKey(rawName);
     if (!key) return;
     if (!providerMap[key]) providerMap[key] = [];
     providerMap[key].push(rawName);
-    var shopText = String((p && (p.shop || p.shopname || p.shopName || p.store || p.storeName)) || '').trim();
-    if (shopText && !providerShopMap[key]) providerShopMap[key] = shopText;
   });
   var uniqueProviders = Object.keys(providerMap).map(function(key) {
     return pickPreferredDisplayName(providerMap[key], false);
@@ -4034,10 +3003,8 @@ function onProviderSearchInput() {
     return;
   }
   
-  dropdown.innerHTML = matched.slice(0, 10).map(function(p) {
-    var key = normalizeEntityKey(p);
-    var shopLabel = providerShopMap[key] ? '<span class="dropdown-subtext"> - ' + escapeHtmlText(providerShopMap[key]) + '</span>' : '';
-    return '<div class="dropdown-item" data-provider-pick="' + escapeHtmlAttr(p) + '">' + escapeHtmlText(p) + shopLabel + '</div>';
+  dropdown.innerHTML = matched.slice(0, 10).map(function(p) { 
+    return '<div class="dropdown-item" data-provider-pick="' + escapeHtmlAttr(p) + '">' + escapeHtmlText(p) + '</div>';
   }).join('');
   dropdown.style.display = 'block';
 }
@@ -4073,14 +3040,15 @@ function openAddProviderDirect(name) {
 }
 
 function selectProvider(providerName) {
-  var forceChongwenge = shouldUseChongwengeShop('', providerName, '');
   var dropdown = document.getElementById('provider-dropdown');
   if (dropdown) dropdown.style.display = 'none';
   
   var input = document.getElementById('provider-search-input');
   if (input) input.value = providerName;
   currentProvider = providerName;
-  resetRuleContextForEntityChange({ clearOrgId: true });
+  clearSeriesTags();
+  var addSeriesBtn = document.getElementById('add-series-btn');
+  if (addSeriesBtn) addSeriesBtn.style.display = 'none';
   
   var normalizedProvider = normalizeEntityKey(providerName);
   var providersData = getAllProvidersForSearch();
@@ -4135,21 +3103,10 @@ function selectProvider(providerName) {
       preferredShop = uniqueShops.find(function(s) { return isEntityMatched(s, currentShopValue); }) || '';
     }
     if (!preferredShop) {
-      preferredShop = pickPreferredShopForProvider(uniqueShops, providerName);
-    }
-    if (forceChongwenge) {
-      preferredShop = CHONGWENGE_SHOP_NAME;
+      preferredShop = uniqueShops[0] || '';
     }
     if (shopInput) {
       if (preferredShop) {
-        // 已有公司全称时不降级为提供者简称（如龙门书局）
-        if (
-          currentShopValue &&
-          looksLikeCompanyShopName(currentShopValue) &&
-          matched.some(function(p) { return rowShopMatchesSearch(p, currentShopValue); })
-        ) {
-          preferredShop = currentShopValue;
-        }
         shopInput.value = preferredShop;
       } else {
         shopInput.value = '';
@@ -4207,10 +3164,8 @@ function onBrandChange() {
   var providerName = providerInput ? providerInput.value : '';
   
   // 从预置数据和本地存储中匹配
-  var localProviders = getData(STORAGE_KEYS.PROVIDERS).filter(function(p) { return !isRuleCardDeleted(p); });
-  var allProviders = getPresetProvidersSafe()
-    .filter(function(p) { return !isRuleCardDeleted(p); })
-    .concat(localProviders);
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
+  var allProviders = [...getPresetProvidersSafe(), ...localProviders];
   
   var matched;
   if (providerName && providerName.trim() !== '') {
@@ -4240,7 +3195,6 @@ function displayBrandRule(brandName) {
   if (!brandName) return;
   
   var matched = getPresetProvidersSafe().filter(function(p) {
-    if (isRuleCardDeleted(p)) return false;
     if (providerName) {
       return p.brand === brandName && p.name === providerName;
     }
@@ -4288,10 +3242,8 @@ function onSeriesChange() {
   }
   
   // 检查 presetData 和 localStorage
-  var localProviders = getData(STORAGE_KEYS.PROVIDERS).filter(function(p) { return !isRuleCardDeleted(p); });
-  var allProviders = getPresetProvidersSafe()
-    .filter(function(p) { return !isRuleCardDeleted(p); })
-    .concat(localProviders);
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
+  var allProviders = [...getPresetProvidersSafe(), ...localProviders];
   
   // 获取匹配的规则数据：宽松匹配（包含关系）
   var matched = allProviders.filter(function(p) {
@@ -4410,10 +3362,9 @@ function saveEditRule() {
     newProvidersList[matchedIndex].pricing = newPricing;
     newProvidersList[matchedIndex].publishTime = newPublishTime;
     newProvidersList[matchedIndex].specialCase = newSpecialCase;
-    unmarkRuleCardDeleted(newProvidersList[matchedIndex]);
   } else {
     // 新增项
-    var newEditedRule = {
+    newProvidersList.push({
       name: providerName,
       brand: brandName,
       series: seriesName,
@@ -4423,9 +3374,7 @@ function saveEditRule() {
       pricing: newPricing,
       publishTime: newPublishTime,
       specialCase: newSpecialCase
-    };
-    unmarkRuleCardDeleted(newEditedRule);
-    newProvidersList.push(newEditedRule);
+    });
   }
   
   setData(STORAGE_KEYS.PROVIDERS, newProvidersList);
@@ -4464,7 +3413,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   
   var display = document.getElementById('custom-rule-display');
   
-  var html = '<div class="rule-card-edit" id="provider-rule-edit-form">';
+  var html = '<div class="rule-card-edit">';
   html += '  <div class="rule-card-header">';
   html += '    <div class="rule-card-title">编辑: ' + escapeHtmlText((rule.brand || '未命名规则') + ' · ' + ((rule.series || '').trim() || '未设置系列')) + '</div>';
   html += '    <button type="button" class="rule-edit-btn" onclick="cancelProviderRuleEdit()">✖ 取消</button>';
@@ -4509,26 +3458,20 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
 }
 
 async function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBrand, targetSeries) {
-  var form = document.getElementById('provider-rule-edit-form') || document.getElementById('custom-rule-display') || document;
-  function readEditValue(id) {
-    var el = form.querySelector ? form.querySelector('#' + id) : document.getElementById(id);
-    if (!el) el = document.getElementById(id);
-    return el ? String(el.value || '').trim() : '';
-  }
-  var saveBtn = form.querySelector ? form.querySelector('#save-rule-btn') : document.getElementById('save-rule-btn');
+  var saveBtn = document.getElementById('save-rule-btn');
   if (saveBtn) {
     saveBtn.disabled = true;
     saveBtn.textContent = '保存并上传…';
   }
   try {
     console.log('💾 saveRuleByIndex 被调用，globalIndex:', globalIndex);
-    var newAlbumRaw = readEditValue('edit-album');
-    var newNaming = readEditValue('edit-naming');
-    var newSplit = readEditValue('edit-split');
-    var newPricing = readEditValue('edit-pricing');
-    var newPublishTime = readEditValue('edit-publishTime');
-    var newSpecialCase = readEditValue('edit-specialCase');
-    var newOtherInfo = readEditValue('edit-otherInfo');
+    var newAlbumRaw = document.getElementById('edit-album') ? document.getElementById('edit-album').value.trim() : '';
+    var newNaming = document.getElementById('edit-naming') ? document.getElementById('edit-naming').value.trim() : '';
+    var newSplit = document.getElementById('edit-split') ? document.getElementById('edit-split').value.trim() : '';
+    var newPricing = document.getElementById('edit-pricing') ? document.getElementById('edit-pricing').value.trim() : '';
+    var newPublishTime = document.getElementById('edit-publishTime') ? document.getElementById('edit-publishTime').value.trim() : '';
+    var newSpecialCase = document.getElementById('edit-specialCase') ? document.getElementById('edit-specialCase').value.trim() : '';
+    var newOtherInfo = document.getElementById('edit-otherInfo') ? document.getElementById('edit-otherInfo').value.trim() : '';
     
     var providers = localStorage.getItem('rule_library_providers');
     var providersData = providers ? JSON.parse(providers) : [];
@@ -4583,19 +3526,12 @@ function deleteRuleByIndex(globalIndex) {
   
   var providers = localStorage.getItem('rule_library_providers');
   var providersData = providers ? JSON.parse(providers) : [];
-  var deletedRule = providersData[globalIndex];
-  if (!deletedRule) {
+  if (!providersData[globalIndex]) {
     showToast('未找到该规则');
     return;
   }
   
-  markRuleCardDeleted(deletedRule, currentEditingShop);
-  var deletedKey = ruleCardDeletionKey(deletedRule, currentEditingShop);
-  providersData = providersData.filter(function(p, i) {
-    if (i === globalIndex) return false;
-    if (isRuleCardDeleted(p, currentEditingShop)) return false;
-    return ruleCardDeletionKey(p, currentEditingShop) !== deletedKey;
-  });
+  providersData.splice(globalIndex, 1);
   setData(STORAGE_KEYS.PROVIDERS, providersData);
   showToast('删除成功');
   showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, currentEditingSeries, true);
@@ -5106,7 +4042,7 @@ async function saveProvider() {
   
   const providers = getData(STORAGE_KEYS.PROVIDERS);
   var shopnameVal = document.getElementById('new-provider-shopname')?.value.trim() || shop || '';
-  var newProviderRule = {
+  providers.push({
     shop: shop || '',
     shopname: shopnameVal,
     name,
@@ -5119,9 +4055,7 @@ async function saveProvider() {
     publishTime: publishTime || '',
     specialCase: specialCase || '',
     otherInfo: otherInfo || ''
-  };
-  unmarkRuleCardDeleted(newProviderRule, shop);
-  providers.push(newProviderRule);
+  });
   var syncResult = await persistProviders(providers, { awaitCloud: true });
   toastAfterProviderSync(syncResult);
   closeModal('modal-provider');
@@ -5171,18 +4105,13 @@ async function saveBrand(nameInput) {
   // 自动建立品牌与店铺/提供者的关联，确保可被搜索链路命中
   var providers = getData(STORAGE_KEYS.PROVIDERS);
   var hasLinkedRecord = providers.some(function(p) {
-    if (isRuleCardDeleted(p, shopName)) return false;
     return isSameContextProvider(p, shopName, providerName) &&
       normalizeText(p.brand) === normalizeText(name);
   });
   if (!hasLinkedRecord) {
-    var newBrandRule = buildNewProviderRuleCard(shopName, providerName, name, '');
-    unmarkRuleCardDeleted(newBrandRule, shopName);
-    providers.push(newBrandRule);
+    providers.push(buildNewProviderRuleCard(shopName, providerName, name, ''));
     var syncResult = await persistProviders(providers, { awaitCloud: true });
     toastAfterProviderSync(syncResult);
-  } else {
-    unmarkRuleCardDeleted(buildRuleCardDeletionProbe(shopName, providerName, name, ''), shopName);
   }
 
   // 新增后立即刷新当前店铺品牌缓存，避免搜索仍使用旧列表
@@ -5321,13 +4250,9 @@ async function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, pr
   });
 
   if (!linked) {
-    var newSeriesRule = buildNewProviderRuleCard(shopName, providerName, brandName, name);
-    unmarkRuleCardDeleted(newSeriesRule, shopName);
-    providers.push(newSeriesRule);
+    providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, name));
     var syncResult = await persistProviders(providers, { awaitCloud: true });
     toastAfterProviderSync(syncResult);
-  } else {
-    unmarkRuleCardDeleted(buildRuleCardDeletionProbe(shopName, providerName, brandName, name), shopName);
   }
 
   var seriesSelect = document.getElementById('series-select');
@@ -5396,7 +4321,7 @@ function updateProvider() {
   
   const providers = getData(STORAGE_KEYS.PROVIDERS);
   var prev = providers[editingProviderIndex] || {};
-  var updatedRule = {
+  providers[editingProviderIndex] = {
     id: prev.id,
     shop: shop || '',
     shopname: shopname || '',
@@ -5411,8 +4336,6 @@ function updateProvider() {
     specialCase: specialCase || '',
     otherInfo: otherInfo || ''
   };
-  unmarkRuleCardDeleted(updatedRule, shop);
-  providers[editingProviderIndex] = updatedRule;
   setData(STORAGE_KEYS.PROVIDERS, providers);
   
   closeModal('modal-provider');
@@ -5468,9 +4391,7 @@ function aiQuery() {
   const isStrictMultiTermQuery = queryTerms.length >= 2;
   
   // 首先搜索提供者/品牌/系列数据 - 只搜索 localStorage 中的用户保存数据
-  var localProviders = getData(STORAGE_KEYS.PROVIDERS).filter(function(p) {
-    return !isRuleCardDeleted(p);
-  });
+  var localProviders = getData(STORAGE_KEYS.PROVIDERS);
   var deletedBrandSet = getDeletedBrandSet();
   var matchedProviders = [];
 

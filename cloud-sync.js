@@ -880,7 +880,7 @@ function notifyProvidersUpdated(source) {
 }
 
 // 云同步API - 加载时拉取数据
-// opts.fromTimer：定时触发；opts.quickCheck：手动「立即同步」先探测行数/快照
+// opts.fromTimer：定时触发；opts.quickCheck：手动「立即同步」先探测行数/快照；opts.silent：启动同步不打扰顶栏
 // opts.forcePull：强制全表拉取（「以云端为准」）
 async function cloudSync(opts) {
   if (opts && opts.forcePull && isMultiUserSyncBlocked()) {
@@ -889,6 +889,7 @@ async function cloudSync(opts) {
   opts = opts || {};
   var fromTimer = !!opts.fromTimer;
   var quickCheck = !!opts.quickCheck;
+  var silentStatus = !!opts.silent || fromTimer;
   var cloudCanonicalMode = isMultiUserClientSyncMode();
 
   if (isCloudSyncing) return;
@@ -900,7 +901,6 @@ async function cloudSync(opts) {
       }
     } else {
       if (cloudCanonicalMode) {
-        markSyncSuccess('等待下轮云端同步');
         return;
       }
       var cleanData = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
@@ -920,7 +920,9 @@ async function cloudSync(opts) {
     window.__RULE_LIB_SUPPRESS_PROVIDER_SYNC = true;
   }
   clearRetryTimers();
-  emitSyncStatus('syncing', '同步中...');
+  if (!silentStatus) {
+    emitSyncStatus('syncing', '同步中...');
+  }
   try {
     console.log('🌥️ 开始同步云端数据...');
     const localProvidersRaw = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
