@@ -334,14 +334,33 @@ function mergeLocalProviderForCloud(base, incoming) {
   return keep;
 }
 
+function isEmptyRulePlaceholderProvider(p) {
+  if (!p) return true;
+  if (String((p && p.series) || '').trim()) return false;
+  return !(
+    String((p && p.album) || '').trim() ||
+    String((p && p.naming) || '').trim() ||
+    String((p && p.split) || '').trim() ||
+    String((p && p.pricing) || '').trim() ||
+    String((p && p.publishTime) || (p && p.publishtime) || '').trim() ||
+    String((p && p.specialCase) || (p && p.specialcase) || '').trim() ||
+    String((p && p.otherInfo) || (p && p.otherinfo) || '').trim()
+  );
+}
+
 function canonicalizeProvidersForCloudSync(data) {
   var input = Array.isArray(data) ? data : [];
   var list = [];
   var byKey = new Map();
   var merged = 0;
   var droppedBlank = 0;
+  var droppedPlaceholder = 0;
 
   input.forEach(function(item) {
+    if (isEmptyRulePlaceholderProvider(item || {})) {
+      droppedPlaceholder += 1;
+      return;
+    }
     var key = providerIdentityKey(toCloudProvider(item || {}));
     if (!key.replace(/\|/g, '')) {
       droppedBlank += 1;
@@ -359,9 +378,10 @@ function canonicalizeProvidersForCloudSync(data) {
 
   return {
     list: list,
-    changed: merged > 0 || droppedBlank > 0 || list.length !== input.length,
+    changed: merged > 0 || droppedBlank > 0 || droppedPlaceholder > 0 || list.length !== input.length,
     merged: merged,
     droppedBlank: droppedBlank,
+    droppedPlaceholder: droppedPlaceholder,
     before: input.length,
     after: list.length
   };
@@ -376,7 +396,7 @@ function normalizeProvidersForCloudSync(data, opts) {
       localStorage.setItem(LOCAL_DIRTY_KEY, '1');
     } catch (e) { /* ignore */ }
     console.warn('🌥️ 本地规则卡已合并重复/空键：' + result.before + ' → ' + result.after +
-      '（重复 ' + result.merged + '，空键 ' + result.droppedBlank + '）');
+      '（重复 ' + result.merged + '，空键 ' + result.droppedBlank + '，占位 ' + result.droppedPlaceholder + '）');
     if (typeof notifyProvidersUpdated === 'function') notifyProvidersUpdated('cloud-local-canonicalize');
     if (typeof updateStats === 'function') updateStats();
   }
