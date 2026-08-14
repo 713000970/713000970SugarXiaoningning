@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260805-01';
+var RULE_LIBRARY_BUILD = '20260814-01';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -197,6 +197,17 @@ function saveBrandDefaultsMap(map) {
   localStorage.setItem(STORAGE_KEYS.BRAND_DEFAULTS, JSON.stringify(map || {}));
 }
 
+function hasStoredBrandDefaults(stored) {
+  if (!stored) return false;
+  if (stored.saved === true) return true;
+  return !!(
+    String(stored.naming || '').trim() ||
+    String(stored.split || '').trim() ||
+    String(stored.pricing || '').trim() ||
+    String(stored.publishTime || '').trim()
+  );
+}
+
 function getStoredBrandDefaults(shop, provider, brand) {
   var key = brandDefaultsContextKey(shop, provider, brand);
   var map = getBrandDefaultsMap();
@@ -226,7 +237,7 @@ function inferBrandDefaultsFromProviders(shop, provider, brand) {
 /** 品牌默认：显式配置 > 同品牌已有规则 > 平台默认 */
 function getBrandDefaults(shop, provider, brand) {
   var stored = getStoredBrandDefaults(shop, provider, brand);
-  if (stored && (stored.naming || stored.split || stored.pricing || stored.publishTime)) {
+  if (hasStoredBrandDefaults(stored)) {
     return Object.assign({}, PLATFORM_RULE_DEFAULTS, stored);
   }
   var inferred = inferBrandDefaultsFromProviders(shop, provider, brand);
@@ -244,9 +255,85 @@ function setBrandDefaults(shop, provider, brand, fields) {
     naming: String((fields && fields.naming) || '').trim(),
     split: String((fields && fields.split) || '').trim(),
     pricing: String((fields && fields.pricing) || '').trim(),
-    publishTime: String((fields && fields.publishTime) || '').trim()
+    publishTime: String((fields && fields.publishTime) || '').trim(),
+    saved: true,
+    updatedAt: Date.now()
   };
   saveBrandDefaultsMap(map);
+  return map[key];
+}
+
+function normalizeRuleFieldCompareValue(value) {
+  return normalizeText(value)
+    .replace(/[。．.]+$/g, '')
+    .replace(/\s+/g, '');
+}
+
+function isSameRuleFieldValue(a, b) {
+  var left = normalizeRuleFieldCompareValue(a);
+  var right = normalizeRuleFieldCompareValue(b);
+  return !!left && !!right && left === right;
+}
+
+function isLegacyDefaultBackedRuleField(field, value) {
+  var v = normalizeRuleFieldCompareValue(value);
+  if (!v) return true;
+  var legacy = {
+    publishTime: [
+      '全部上传，不定时。',
+      '全部上传，不定时',
+      '全部上传，不定时.'
+    ]
+  };
+  return (legacy[field] || []).some(function(item) {
+    return normalizeRuleFieldCompareValue(item) === v;
+  });
+}
+
+function shouldApplyBrandDefaultToRuleField(field, currentValue, previousValue, nextValue) {
+  if (!String(nextValue || '').trim()) return false;
+  if (isSameRuleFieldValue(currentValue, nextValue)) return false;
+  if (isPlaceholderRuleField(field, currentValue)) return true;
+  if (isPlatformDefaultRuleField(field, currentValue)) return true;
+  if (isLegacyDefaultBackedRuleField(field, currentValue)) return true;
+  if (previousValue && isSameRuleFieldValue(currentValue, previousValue)) return true;
+  return false;
+}
+
+async function applyBrandDefaultsToDefaultBackedSeriesCards(shopName, providerName, brandName, fields, previousDefaults) {
+  var providers = getData(STORAGE_KEYS.PROVIDERS);
+  var changedRows = 0;
+  var changedFields = 0;
+  providers.forEach(function(p, i) {
+    if (!p || isRuleCardDeleted(p, shopName)) return;
+    if (!isSameContextProvider(p, shopName, providerName)) return;
+    if (!brandMatchesUi(p && p.brand, brandName)) return;
+    var next = Object.assign({}, p);
+    var rowChanged = false;
+    ['naming', 'split', 'pricing', 'publishTime'].forEach(function(field) {
+      var nextValue = fields && fields[field];
+      var previousValue = previousDefaults && previousDefaults[field];
+      if (!shouldApplyBrandDefaultToRuleField(field, next[field], previousValue, nextValue)) return;
+      next[field] = String(nextValue || '').trim();
+      rowChanged = true;
+      changedFields += 1;
+    });
+    if (!rowChanged) return;
+    providers[i] = next;
+    changedRows += 1;
+  });
+
+  if (!changedRows) {
+    return { updated: 0, fields: 0, syncResult: null };
+  }
+  var syncResult;
+  if (typeof persistProviders === 'function') {
+    syncResult = await persistProviders(providers, { awaitCloud: true });
+  } else {
+    setData(STORAGE_KEYS.PROVIDERS, providers);
+    syncResult = { ok: true, localOnly: true };
+  }
+  return { updated: changedRows, fields: changedFields, syncResult: syncResult };
 }
 
 function buildNewProviderRuleCard(shop, provider, brand, series, bbmSeriesId, bbmOrgId) {
@@ -933,7 +1020,7 @@ function renderBrandDefaultsPanel(shopName, providerName, brandName) {
   }
   var defs = getBrandDefaults(shopName, providerName, brandName);
   var stored = getStoredBrandDefaults(shopName, providerName, brandName);
-  var sourceHint = stored ? '已保存的品牌默认' : (inferBrandDefaultsFromProviders(shopName, providerName, brandName) ? '继承自本品牌已有规则' : '平台默认（新建系列时自动填充）');
+  var sourceHint = hasStoredBrandDefaults(stored) ? '已保存的品牌默认' : (inferBrandDefaultsFromProviders(shopName, providerName, brandName) ? '继承自本品牌已有规则' : '平台默认（新建系列时自动填充）');
   panel.style.display = 'block';
   panel.innerHTML =
     '<div class="brand-defaults-header">' +
@@ -959,6 +1046,19 @@ function renderBrandDefaultsPanel(shopName, providerName, brandName) {
   if (elSplit) elSplit.value = defs.split || '';
   if (elPricing) elPricing.value = defs.pricing || '';
   if (elPub) elPub.value = defs.publishTime || '';
+  panel.setAttribute('data-brand-defaults-dirty', '0');
+
+  var commitFields = function() {
+    return commitBrandDefaultsFromPanel({ silent: true });
+  };
+  [elNaming, elSplit, elPricing, elPub].forEach(function(el) {
+    if (!el) return;
+    el.addEventListener('input', function() {
+      panel.setAttribute('data-brand-defaults-dirty', '1');
+    });
+    el.addEventListener('change', commitFields);
+    el.addEventListener('blur', commitFields);
+  });
 }
 
 function readBrandDefaultsPanelFields() {
@@ -970,6 +1070,24 @@ function readBrandDefaultsPanelFields() {
   };
 }
 
+function commitBrandDefaultsFromPanel(options) {
+  options = options || {};
+  var panel = document.getElementById('brand-defaults-panel');
+  if (!panel || panel.style.display === 'none') return null;
+  if (!options.force && panel.getAttribute('data-brand-defaults-dirty') !== '1') return null;
+  var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
+  var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
+  var brandName = (document.getElementById('brand-input')?.value || '').trim();
+  if (!shopName || !providerName || !brandName) return null;
+  var fields = readBrandDefaultsPanelFields();
+  var saved = setBrandDefaults(shopName, providerName, brandName, fields);
+  panel.setAttribute('data-brand-defaults-dirty', '0');
+  if (!options.silent) {
+    renderBrandDefaultsPanel(shopName, providerName, brandName);
+  }
+  return saved;
+}
+
 async function saveBrandDefaultsFromPanel() {
   var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
@@ -978,13 +1096,22 @@ async function saveBrandDefaultsFromPanel() {
     showToast('请先选择店铺、提供者、品牌');
     return;
   }
+  var previousDefaults = getBrandDefaults(shopName, providerName, brandName);
   var fields = readBrandDefaultsPanelFields();
   setBrandDefaults(shopName, providerName, brandName, fields);
+  var applyResult = await applyBrandDefaultsToDefaultBackedSeriesCards(shopName, providerName, brandName, fields, previousDefaults);
   renderBrandDefaultsPanel(shopName, providerName, brandName);
+  showRulesByBrandAndShop(brandName, shopName, currentEditingSeries || '', true);
+  if (applyResult && applyResult.updated > 0) {
+    var syncHint = applyResult.syncResult && applyResult.syncResult.ok ? '，已同步云端' : '，后台继续同步';
+    showToast('已保存品牌默认，并更新 ' + applyResult.updated + ' 张系列卡' + syncHint);
+    return;
+  }
   showToast('已保存品牌「' + brandName + '」默认规则');
 }
 
 async function applyBrandDefaultsToBlankSeries() {
+  commitBrandDefaultsFromPanel({ silent: true });
   var shopName = (document.getElementById('shop-search-input')?.value || '').trim();
   var providerName = (document.getElementById('provider-search-input')?.value || '').trim();
   var brandName = (document.getElementById('brand-input')?.value || '').trim();
@@ -3468,6 +3595,7 @@ function aiRenderProviderResults(fullList) {
 
 function selectSeriesFilter(seriesEncoded) {
   var seriesName = seriesEncoded ? decodeURIComponent(seriesEncoded) : '';
+  commitBrandDefaultsFromPanel({ silent: true });
   currentEditingSeries = seriesName;
   showRulesByBrandAndShop(currentEditingBrand, currentEditingShop, seriesName);
 }
@@ -3539,6 +3667,7 @@ function tryAutoEnsureSeriesRuleCard(shopName, providerName, brandName, seriesFi
 
 function selectBrand(brandName) {
   console.log('selectBrand called:', brandName);
+  commitBrandDefaultsFromPanel({ silent: true });
   var input = document.getElementById('brand-input');
   var dropdown = document.getElementById('brand-dropdown');
   if (input) input.value = brandName;
