@@ -944,6 +944,23 @@ function notifyProvidersUpdated(source) {
 // 云同步API - 加载时拉取数据
 // opts.fromTimer：定时触发；opts.quickCheck：手动「立即同步」先探测行数/快照；opts.silent：启动同步不打扰顶栏
 // opts.forcePull：强制全表拉取（「以云端为准」）
+async function applyCloudCanonicalProvidersToLocal(statusPrefix) {
+  const latestRemote = await fetchCloudProviders();
+  if (!latestRemote || !latestRemote.length) return false;
+  var latestCanonical = normalizeProvidersForCloudSync(latestRemote.map(toLocalProvider), { persist: false });
+  var latestFormatted = latestCanonical.list;
+  var latestSnapshot = calcSnapshot(latestFormatted);
+  localStorage.setItem('rule_library_providers', JSON.stringify(latestFormatted));
+  localStorage.setItem(LOCAL_DIRTY_KEY, '0');
+  persistCloudSnapshot(latestSnapshot);
+  lastCloudSnapshot = latestSnapshot;
+  lastSyncedRawProvidersStr = JSON.stringify(latestFormatted);
+  notifyProvidersUpdated('cloud-pull-canonical-after-upload');
+  markSyncSuccess((statusPrefix || '已从云端同步有效 ') + latestFormatted.length + ' 条' +
+    (latestCanonical.before !== latestFormatted.length ? '（云端原始 ' + latestCanonical.before + '）' : ''));
+  return true;
+}
+
 async function cloudSync(opts) {
   if (opts && opts.forcePull && isMultiUserSyncBlocked()) {
     opts = Object.assign({}, opts, { forcePull: false });
@@ -1005,7 +1022,10 @@ async function cloudSync(opts) {
     /** 本地有待传：直接上传，不再先拉 2000+ 行（删改卡后最常见） */
     if (localDirty && !opts.forcePull) {
       emitSyncStatus('syncing', '正在上传本地变更…');
-      await syncToCloud(localProviders, { reentrant: true });
+      var dirtyUpload = await syncToCloud(localProviders, { reentrant: true });
+      if (cloudCanonicalMode && dirtyUpload && dirtyUpload.ok) {
+        await applyCloudCanonicalProvidersToLocal('已上传并从云端同步有效 ');
+      }
       if (typeof onCloudSyncReady === 'function') onCloudSyncReady();
       return;
     }
@@ -1244,6 +1264,11 @@ async function syncProvidersPushLocalChangesOnly(data, opts) {
     try {
       baselineFmt = toCloudProviderListForUpload(JSON.parse(lastSyncedRawProvidersStr));
     } catch (e) { /* ignore */ }
+  }
+  if (!baselineFmt.length && formatted.length >= CLOUD_DEFICIENT_MIN_LOCAL) {
+    console.warn('🌥️ 无同步基线，改用业务键补写/更新，避免把本机全量作为新行插入云端');
+    var gapNoBaseline = await syncProvidersGapFillToCloud(data);
+    return !!(gapNoBaseline && gapNoBaseline.ok);
   }
   var delta = computeProviderSyncDelta(baselineFmt, formatted);
   delta.deletes = [];
