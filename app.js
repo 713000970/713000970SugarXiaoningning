@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260814-10';
+var RULE_LIBRARY_BUILD = '20260814-12';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -1970,6 +1970,17 @@ window.addEventListener('cloud-sync-status', function(evt) {
 // 统计更新
 // ========================================
 function updateStats() {
+  const statProviders = document.getElementById('stat-providers');
+  const statBrands = document.getElementById('stat-brands');
+  const statShops = document.getElementById('stat-shops');
+
+  if (typeof window !== 'undefined' && window.__RULE_LIB_WAIT_CLOUD_STATS) {
+    if (statProviders) statProviders.textContent = '同步中';
+    if (statBrands) statBrands.textContent = '同步中';
+    if (statShops) statShops.textContent = '同步中';
+    return;
+  }
+
   const providers = getData(STORAGE_KEYS.PROVIDERS);
   const brands = getData(STORAGE_KEYS.BRANDS);
   var shopKeySet = new Set();
@@ -1985,10 +1996,6 @@ function updateStats() {
     }
   });
   const shopCount = shopKeySet.size;
-
-  const statProviders = document.getElementById('stat-providers');
-  const statBrands = document.getElementById('stat-brands');
-  const statShops = document.getElementById('stat-shops');
 
   if (statProviders) statProviders.textContent = String(providers.length);
   if (statBrands) statBrands.textContent = String(brands.length);

@@ -941,6 +941,15 @@ function notifyProvidersUpdated(source) {
   }));
 }
 
+function markCloudStatsReady(count, rawCount) {
+  if (typeof window === 'undefined') return;
+  window.__RULE_LIB_CLOUD_STATS_READY = true;
+  window.__RULE_LIB_WAIT_CLOUD_STATS = false;
+  window.__RULE_LIB_CLOUD_EFFECTIVE_COUNT = count;
+  window.__RULE_LIB_CLOUD_RAW_COUNT = rawCount;
+  if (typeof updateStats === 'function') updateStats();
+}
+
 // 云同步API - 加载时拉取数据
 // opts.fromTimer：定时触发；opts.quickCheck：手动「立即同步」先探测行数/快照；opts.silent：启动同步不打扰顶栏
 // opts.forcePull：强制全表拉取（「以云端为准」）
@@ -955,6 +964,7 @@ async function applyCloudCanonicalProvidersToLocal(statusPrefix) {
   persistCloudSnapshot(latestSnapshot);
   lastCloudSnapshot = latestSnapshot;
   lastSyncedRawProvidersStr = JSON.stringify(latestFormatted);
+  markCloudStatsReady(latestFormatted.length, latestCanonical.before);
   notifyProvidersUpdated('cloud-pull-canonical-after-upload');
   markSyncSuccess((statusPrefix || '已从云端同步有效 ') + latestFormatted.length + ' 条' +
     (latestCanonical.before !== latestFormatted.length ? '（云端原始 ' + latestCanonical.before + '）' : ''));
@@ -1140,6 +1150,7 @@ async function cloudSync(opts) {
         localStorage.setItem(LOCAL_DIRTY_KEY, '0');
         persistCloudSnapshot(remoteSnapshot);
         lastSyncedRawProvidersStr = JSON.stringify(formatted);
+        markCloudStatsReady(formatted.length, remoteCanonical.before);
         if (remoteSnapshot !== localSnapshotNow || formatted.length !== localProvidersNow.length) {
           notifyProvidersUpdated('cloud-pull-canonical');
         }

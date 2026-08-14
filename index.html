@@ -507,10 +507,10 @@ function goHome() {
   <script src="db.js"></script>
   <script src="site-config.js?v=20260526"></script>
   <script src="data-bootstrap.js?v=csv-20260526"></script>
-  <script src="cloud-sync.js?v=20260814-10"></script>
+  <script src="cloud-sync.js?v=20260814-12"></script>
   <script src="customer-pool-org.js?v=20260526-pool2"></script>
-  <script src="bbm-api.js?v=20260814-10"></script>
-  <script src="app.js?v=20260814-10"></script>
+  <script src="bbm-api.js?v=20260814-12"></script>
+  <script src="app.js?v=20260814-12"></script>
   <script>
     // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (function() {
@@ -519,6 +519,9 @@ function goHome() {
       var badge = document.getElementById('app-build-badge');
       if (badge && window.RULE_LIBRARY_BUILD) {
         badge.textContent = 'build ' + window.RULE_LIBRARY_BUILD;
+      }
+      if (window.RULE_LIBRARY_CONFIG && window.RULE_LIBRARY_CONFIG.multiUser && typeof cloudSync === 'function') {
+        window.__RULE_LIB_WAIT_CLOUD_STATS = true;
       }
 
       /** 先用本机缓存点亮页面；云端同步放到后台，避免 Supabase 慢时顶部一直「加载中」。 */
@@ -544,9 +547,18 @@ function goHome() {
 
       if (typeof cloudSync === 'function') {
         console.log('🚀 后台调用 cloudSync...');
+        window.__RULE_LIB_CLOUD_STATS_READY = false;
+        if (typeof updateSyncStatusBadge === 'function') {
+          updateSyncStatusBadge('syncing', '同步云端中...');
+        }
         Promise.resolve()
           .then(function() {
             return cloudSync({ silent: true });
+          })
+          .then(function() {
+            if (window.RULE_LIBRARY_CONFIG && window.RULE_LIBRARY_CONFIG.multiUser && !window.__RULE_LIB_CLOUD_STATS_READY) {
+              throw new Error('cloud_stats_not_ready');
+            }
           })
           .then(function() {
             if (typeof cleanupBlankPlaceholderProviders === 'function') {
@@ -565,14 +577,22 @@ function goHome() {
             if (typeof startCloudAutoSync === 'function') {
               startCloudAutoSync();
             }
+            window.__RULE_LIB_WAIT_CLOUD_STATS = false;
             if (typeof updateStats === 'function') {
               updateStats();
+            }
+            if (typeof updateSyncStatusBadge === 'function') {
+              updateSyncStatusBadge('success', '已同步');
             }
           })
           .catch(function(e) {
             console.warn('🚀 后台云同步未完成:', e);
+            window.__RULE_LIB_WAIT_CLOUD_STATS = true;
             if (typeof startCloudAutoSync === 'function') {
               startCloudAutoSync();
+            }
+            if (typeof updateSyncStatusBadge === 'function') {
+              updateSyncStatusBadge('error', '云端同步未完成');
             }
           });
       } else {
