@@ -294,6 +294,51 @@ function providerIdentityKey(p) {
   return [shop, name, brand, series].join('|');
 }
 
+function isCloudOtherInfoPlaceholder(value) {
+  var s = String(value || '').trim();
+  return !s || s === '/';
+}
+
+function isCloudGeneratedShareInfoLine(line) {
+  var s = String(line || '').trim();
+  if (!s) return false;
+  if (/^合作模式\s*[：:]\s*非独家合作\s*$/.test(s)) return true;
+  if (/^分成比例\s*[：:]\s*.+$/.test(s)) return true;
+  return false;
+}
+
+function splitCloudOtherInfo(value) {
+  var generated = [];
+  var manual = [];
+  String(value || '').split(/\r?\n/).forEach(function(line) {
+    var s = String(line || '').trim();
+    if (!s) return;
+    if (isCloudGeneratedShareInfoLine(s)) generated.push(s);
+    else if (s !== '/') manual.push(s);
+  });
+  return { generated: generated, manual: manual };
+}
+
+function mergeCloudOtherInfo(a, b) {
+  var left = splitCloudOtherInfo(a);
+  var right = splitCloudOtherInfo(b);
+  var out = [];
+  var seen = {};
+  var generated = left.generated.length ? left.generated : right.generated;
+
+  generated.concat(left.manual, right.manual).forEach(function(line) {
+    var key = normalizeCloudKeyText(line);
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    out.push(line);
+  });
+
+  if (out.length) return out.join('\n');
+  if (!isCloudOtherInfoPlaceholder(a)) return String(a || '').trim();
+  if (!isCloudOtherInfoPlaceholder(b)) return String(b || '').trim();
+  return isCloudOtherInfoPlaceholder(a) ? '/' : '';
+}
+
 function providerMergeScoreForCloud(p) {
   if (!p) return 0;
   var score = 0;
@@ -301,9 +346,10 @@ function providerMergeScoreForCloud(p) {
   ['shop', 'shopname', 'name', 'brand', 'series', 'bbmSeriesId', 'bbmOrgId'].forEach(function(field) {
     if (String((p && p[field]) || '').trim()) score += 1;
   });
-  ['album', 'naming', 'split', 'pricing', 'publishTime', 'publishtime', 'specialCase', 'specialcase', 'otherInfo', 'otherinfo'].forEach(function(field) {
+  ['album', 'naming', 'split', 'pricing', 'publishTime', 'publishtime', 'specialCase', 'specialcase'].forEach(function(field) {
     if (String((p && p[field]) || '').trim()) score += 3;
   });
+  if (!isCloudOtherInfoPlaceholder((p && (p.otherInfo || p.otherinfo)) || '')) score += 3;
   return score;
 }
 
@@ -329,9 +375,7 @@ function mergeLocalProviderForCloud(base, incoming) {
   if (!String(keep.specialCase || '').trim() && String((fill && fill.specialcase) || '').trim()) {
     keep.specialCase = fill.specialcase;
   }
-  if (!String(keep.otherInfo || '').trim() && String((fill && fill.otherinfo) || '').trim()) {
-    keep.otherInfo = fill.otherinfo;
-  }
+  keep.otherInfo = mergeCloudOtherInfo(keep.otherInfo || keep.otherinfo, (fill && (fill.otherInfo || fill.otherinfo)) || '');
   return keep;
 }
 

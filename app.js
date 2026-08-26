@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260814-14';
+var RULE_LIBRARY_BUILD = '20260814-15';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -47,6 +47,9 @@ var AI_RESULT_RENDER_LIMIT = 40;
 var showRulesDebounceTimer = null;
 /** 正在编辑规则卡片时锁定列表刷新，避免云同步/定时刷新把编辑页冲掉（表现为闪退） */
 var providerRuleEditLock = null;
+var SHARE_RATIO_API_URL = (window.RULE_LIBRARY_CONFIG && window.RULE_LIBRARY_CONFIG.shareRatioApiUrl) || '/api/share-ratio';
+var SHARE_INFO_COOPERATION_LINE = '合作模式：非独家合作';
+var shareRatioLookupCache = {};
 
 // ========================================
 // 数据存储（本地存储）
@@ -64,6 +67,9 @@ const DELETED_PROVIDERS_KEY = 'rule_library_deleted_providers';
 
 function providerHasMeaningfulRule(p) {
   if (!p) return false;
+  var manualOtherInfo = typeof stripGeneratedShareInfoFromOtherInfo === 'function'
+    ? stripGeneratedShareInfoFromOtherInfo(p.otherInfo)
+    : String(p.otherInfo || '').trim();
   return !!(
     String(p.album || '').trim() ||
     String(p.naming || '').trim() ||
@@ -71,7 +77,7 @@ function providerHasMeaningfulRule(p) {
     String(p.pricing || '').trim() ||
     String(p.publishTime || '').trim() ||
     String(p.specialCase || '').trim() ||
-    String(p.otherInfo || '').trim()
+    (!isOtherInfoPlaceholder(manualOtherInfo) && String(manualOtherInfo || '').trim())
   );
 }
 
@@ -126,12 +132,15 @@ function isPlaceholderRuleField(field, value) {
 /** 命名/拆分/定价等均未个性化录入（全空或仍为占位默认） */
 function isUnfilledRuleCard(p) {
   if (!p) return false;
+  var manualOtherInfo = typeof stripGeneratedShareInfoFromOtherInfo === 'function'
+    ? stripGeneratedShareInfoFromOtherInfo(p.otherInfo)
+    : String(p.otherInfo || '').trim();
   return isPlaceholderRuleField('naming', p.naming) &&
     isPlaceholderRuleField('split', p.split) &&
     isPlaceholderRuleField('pricing', p.pricing) &&
     isPlaceholderRuleField('publishTime', p.publishTime) &&
     isPlaceholderRuleField('specialCase', p.specialCase) &&
-    isPlaceholderRuleField('otherInfo', p.otherInfo);
+    isPlaceholderRuleField('otherInfo', manualOtherInfo);
 }
 
 /** 命名尚未录入（空或旧占位） */
@@ -323,6 +332,275 @@ function buildNewProviderRuleCard(shop, provider, brand, series, bbmSeriesId) {
   return card;
 }
 
+function normalizeClientShareRatio(value) {
+  if (value === undefined || value === null) {
+    return { shareRatio: '', sharePercent: null, isDefault70: false };
+  }
+  var raw = String(value || '').trim();
+  if (!raw) return { shareRatio: '', sharePercent: null, isDefault70: false };
+  var percent = null;
+  if (typeof value === 'number' && isFinite(value)) {
+    percent = Math.abs(value) <= 1 ? value * 100 : value;
+  } else {
+    var text = raw.replace(/％/g, '%').replace(/\s+/g, '');
+    var match = text.match(/-?\d+(?:\.\d+)?/);
+    if (match) {
+      var n = Number(match[0]);
+      if (isFinite(n)) percent = Math.abs(n) <= 1 ? n * 100 : n;
+    } else if (/三七|3\/7|七成|70%?/.test(text)) {
+      percent = 70;
+    } else if (/四六|4\/6|六成|60%?/.test(text)) {
+      percent = 60;
+    } else if (/五五|5\/5|五成|50%?/.test(text)) {
+      percent = 50;
+    } else if (/二八|2\/8|八成|80%?/.test(text)) {
+      percent = 80;
+    }
+  }
+  var shareRatio = raw;
+  if (percent !== null) {
+    var rounded = Math.round(percent * 100) / 100;
+    shareRatio = String(rounded).replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1') + '%';
+  }
+  if (percent !== null && (percent <= 0 || percent > 100)) {
+    shareRatio = '';
+    percent = null;
+  }
+  return {
+    shareRatio: shareRatio,
+    sharePercent: percent,
+    isDefault70: percent !== null && Math.abs(percent - 70) < 0.01
+  };
+}
+
+function isGeneratedShareInfoLine(line) {
+  var s = String(line || '').trim();
+  if (!s) return false;
+  if (/^合作模式\s*[：:]\s*非独家合作\s*$/.test(s)) return true;
+  if (/^分成比例\s*[：:]\s*.+$/.test(s)) return true;
+  return false;
+}
+
+function stripGeneratedShareInfoFromOtherInfo(value) {
+  return String(value || '')
+    .split(/\r?\n/)
+    .filter(function(line) { return !isGeneratedShareInfoLine(line); })
+    .join('\n')
+    .trim();
+}
+
+function isOtherInfoPlaceholder(value) {
+  var s = String(value || '').trim();
+  return !s || s === '/';
+}
+
+function extractShareInfoFromOtherInfo(value) {
+  var lines = String(value || '').split(/\r?\n/);
+  var ratioLine = lines.find(function(line) {
+    return /^分成比例\s*[：:]\s*.+$/.test(String(line || '').trim());
+  });
+  if (!ratioLine) return null;
+  var ratioValue = ratioLine.replace(/^分成比例\s*[：:]\s*/, '').trim();
+  var normalized = normalizeClientShareRatio(ratioValue);
+  if (!normalized.shareRatio || normalized.isDefault70) return null;
+  return {
+    cooperationMode: '非独家合作',
+    shareRatio: normalized.shareRatio,
+    sharePercent: normalized.sharePercent,
+    isDefault70: false
+  };
+}
+
+function composeOtherInfoWithShareInfo(otherInfo, shareInfo) {
+  var manual = stripGeneratedShareInfoFromOtherInfo(otherInfo);
+  if (!shareInfo || !shareInfo.shareRatio || shareInfo.isDefault70) {
+    return manual || (isOtherInfoPlaceholder(otherInfo) ? '/' : '');
+  }
+
+  var parts = [
+    SHARE_INFO_COOPERATION_LINE,
+    '分成比例：' + shareInfo.shareRatio
+  ];
+  if (!isOtherInfoPlaceholder(manual)) parts.push(manual);
+  return parts.join('\n');
+}
+
+function cleanOtherInfoForDisplay(otherInfo) {
+  var cleaned = stripGeneratedShareInfoFromOtherInfo(otherInfo);
+  if (cleaned) return cleaned;
+  return isOtherInfoPlaceholder(otherInfo) ? '/' : '';
+}
+
+function getProviderShareInfo(p) {
+  return extractShareInfoFromOtherInfo(p && p.otherInfo);
+}
+
+function buildShareInfoRowsHtml(p, classPrefix) {
+  var info = getProviderShareInfo(p);
+  if (!info || !info.shareRatio || info.isDefault70) return '';
+  if (classPrefix === 'ai') {
+    return '<div class="ai-result-row"><span class="ai-result-label">合作模式</span><span class="ai-result-value">' + escapeHtmlText(info.cooperationMode) + '</span></div>' +
+      '<div class="ai-result-row"><span class="ai-result-label">分成比例</span><span class="ai-result-value">' + escapeHtmlText(info.shareRatio) + '</span></div>';
+  }
+  return '<div class="rule-row"><span class="rule-label">合作模式：</span><span class="rule-value">' + escapeHtmlText(info.cooperationMode) + '</span></div>' +
+    '<div class="rule-row"><span class="rule-label">分成比例：</span><span class="rule-value">' + escapeHtmlText(info.shareRatio) + '</span></div>';
+}
+
+function applyShareResultToProvider(provider, result) {
+  if (!provider || !result || result.ok === false || !result.found || !result.shareRatio) {
+    return { changed: false, provider: provider };
+  }
+  var normalized = normalizeClientShareRatio(result.sharePercent != null ? result.sharePercent : result.shareRatio);
+  var shareInfo = {
+    cooperationMode: normalized.isDefault70 ? '' : '非独家合作',
+    shareRatio: normalized.shareRatio || String(result.shareRatio || '').trim(),
+    sharePercent: normalized.sharePercent,
+    isDefault70: !!normalized.isDefault70
+  };
+  var nextOtherInfo = composeOtherInfoWithShareInfo(provider.otherInfo || '', shareInfo);
+  if (String(provider.otherInfo || '') === nextOtherInfo) {
+    return { changed: false, provider: provider };
+  }
+  return {
+    changed: true,
+    provider: Object.assign({}, provider, { otherInfo: nextOtherInfo })
+  };
+}
+
+function shareRatioFetchWithTimeout(url, timeoutMs) {
+  timeoutMs = timeoutMs || 8000;
+  if (typeof AbortController === 'undefined') {
+    return fetch(url, { credentials: 'same-origin' });
+  }
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+  return fetch(url, { credentials: 'same-origin', signal: controller.signal })
+    .finally(function() { clearTimeout(timer); });
+}
+
+function waitForCustomerPoolMap(timeoutMs) {
+  if (!window.CustomerPoolOrg || typeof CustomerPoolOrg.loadMap !== 'function' || CustomerPoolOrg.isReady()) {
+    return Promise.resolve();
+  }
+  return Promise.race([
+    CustomerPoolOrg.loadMap(),
+    new Promise(function(resolve) { setTimeout(resolve, timeoutMs || 1200); })
+  ]).then(function() {});
+}
+
+async function buildShareRatioQuery(provider) {
+  provider = provider || {};
+  await waitForCustomerPoolMap(1200);
+  var shop = String(provider.shop || '').trim();
+  var shopname = String(provider.shopname || '').trim();
+  var providerName = String(provider.name || '').trim();
+  var query = {
+    shop: shop,
+    shopname: shopname,
+    provider: providerName
+  };
+
+  var hit = null;
+  if (window.CustomerPoolOrg && typeof CustomerPoolOrg.lookupOrgId === 'function') {
+    hit = CustomerPoolOrg.lookupOrgId(shop || shopname, providerName);
+    if (!hit && shopname && shopname !== shop) {
+      hit = CustomerPoolOrg.lookupOrgId(shopname, providerName);
+    }
+  }
+  if (hit) {
+    query.orgId = hit.orgId || '';
+    query.shopId = hit.shopId || '';
+    query.orgName = hit.matchedName || '';
+  }
+
+  var currentShop = (document.getElementById('shop-search-input') && document.getElementById('shop-search-input').value || '').trim();
+  var currentProvider = (document.getElementById('provider-search-input') && document.getElementById('provider-search-input').value || '').trim();
+  var sameCurrentContext = (!currentShop || rowShopMatchesSearch(provider, currentShop)) &&
+    (!currentProvider || isEntityMatched(providerName, currentProvider));
+  var orgInput = document.getElementById('org-id-input');
+  var typed = orgInput ? String(orgInput.value || '').trim() : '';
+  if (typed && sameCurrentContext) {
+    if (window.CustomerPoolOrg && typeof CustomerPoolOrg.resolveOrgIdForBbm === 'function') {
+      var resolved = CustomerPoolOrg.resolveOrgIdForBbm(typed);
+      if (resolved && resolved.orgId) {
+        query.orgId = resolved.orgId;
+        if (resolved.shopId) query.shopId = resolved.shopId;
+      } else {
+        query.orgId = typed;
+      }
+    } else {
+      query.orgId = typed;
+    }
+  }
+
+  return query;
+}
+
+function shareRatioCacheKeyFromQuery(query) {
+  query = query || {};
+  return [
+    query.orgId || '',
+    query.shopId || '',
+    query.providerId || '',
+    normalizeEntityKey(query.shop || ''),
+    normalizeEntityKey(query.shopname || ''),
+    normalizeEntityKey(query.provider || '')
+  ].join('|');
+}
+
+async function fetchShareRatioForProvider(provider, options) {
+  options = options || {};
+  if (!SHARE_RATIO_API_URL || typeof fetch !== 'function') return null;
+  var query = await buildShareRatioQuery(provider || {});
+  if (!query.orgId && !query.shopId && !query.shop && !query.shopname && !query.provider) return null;
+  var cacheKey = shareRatioCacheKeyFromQuery(query);
+  if (!options.force && shareRatioLookupCache[cacheKey]) return shareRatioLookupCache[cacheKey];
+
+  var params = new URLSearchParams();
+  Object.keys(query).forEach(function(key) {
+    if (query[key]) params.set(key, query[key]);
+  });
+  var url = SHARE_RATIO_API_URL + '?' + params.toString();
+  try {
+    var res = await shareRatioFetchWithTimeout(url, options.timeoutMs || 8000);
+    var data = await res.json();
+    if (!res.ok || !data || data.ok === false) {
+      throw new Error((data && data.error) || ('HTTP ' + res.status));
+    }
+    shareRatioLookupCache[cacheKey] = data;
+    return data;
+  } catch (err) {
+    if (!options.silent) {
+      console.warn('分成比例爬取失败:', err);
+    }
+    return null;
+  }
+}
+
+async function enrichShareInfoForProviderCards(providers, indexes, options) {
+  options = options || {};
+  if (!Array.isArray(providers) || !Array.isArray(indexes) || indexes.length === 0) {
+    return { changed: 0, checked: 0 };
+  }
+  var changed = 0;
+  var checked = 0;
+  for (var i = 0; i < indexes.length; i++) {
+    var idx = indexes[i];
+    if (idx < 0 || !providers[idx]) continue;
+    checked += 1;
+    var result = await fetchShareRatioForProvider(providers[idx], {
+      silent: true,
+      timeoutMs: options.timeoutMs || 8000
+    });
+    var applied = applyShareResultToProvider(providers[idx], result);
+    if (applied.changed) {
+      providers[idx] = applied.provider;
+      changed += 1;
+    }
+  }
+  return { changed: changed, checked: checked };
+}
+
 function getBbmSeriesListForBrand(brandName) {
   var orgId = getBbmOrgIdForCurrentShop();
   if (!orgId || !window.BbmBrandApi || typeof BbmBrandApi.getBbmSeriesForBrand !== 'function') return [];
@@ -487,15 +765,20 @@ async function ensureBbmSeriesRuleCardsForBrand(shopName, providerName, brandNam
     var created = 0;
     var renamed = syncResult.renamed || 0;
     var deduped = syncResult.deduped || 0;
+    var createdIndexes = [];
 
     seriesList.forEach(function(item) {
       var seriesName = item.name;
       if (seriesRuleExists(providers, shopName, providerName, brandName, seriesName, item.id)) return;
       providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, seriesName, item.id));
+      createdIndexes.push(providers.length - 1);
       created += 1;
     });
 
     if (created > 0 || syncResult.changed) {
+      if (createdIndexes.length) {
+        await enrichShareInfoForProviderCards(providers, createdIndexes, { silent: true, timeoutMs: 8000 });
+      }
       if (typeof persistProviders === 'function') {
         await persistProviders(providers, { awaitCloud: !!options.awaitCloud });
       } else {
@@ -1350,6 +1633,8 @@ function downloadExportBlob(filename, blob) {
 
 function formatRuleExportTextBlock(p, index) {
   var album = resolveAlbumRule(p);
+  var shareInfo = getProviderShareInfo(p);
+  var cleanedOtherInfo = cleanOtherInfoForDisplay(p && p.otherInfo);
   var lines = [
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '【' + index + '】' + [p.shop || p.shopname, p.name, p.brand, p.series].filter(Boolean).join(' · '),
@@ -1362,9 +1647,13 @@ function formatRuleExportTextBlock(p, index) {
     '定价：' + (p.pricing || '-'),
     '发布时间：' + (p.publishTime || '-'),
     '专辑：' + album,
-    '特例：' + (p.specialCase || '-'),
-    '其他信息：' + (p.otherInfo || '-')
+    '特例：' + (p.specialCase || '-')
   ];
+  if (shareInfo && shareInfo.shareRatio) {
+    lines.push('合作模式：' + shareInfo.cooperationMode);
+    lines.push('分成比例：' + shareInfo.shareRatio);
+  }
+  lines.push('其他信息：' + (cleanedOtherInfo || '-'));
   return lines.join('\n');
 }
 
@@ -1373,6 +1662,12 @@ function buildRulesExportWordHtml(list, scopeLabel) {
   var cards = list.map(function(p, i) {
     var title = escapeHtmlText([p.shop || p.shopname, p.name, p.brand, p.series].filter(Boolean).join(' · '));
     var album = escapeHtmlText(resolveAlbumRule(p)).replace(/\n/g, '<br/>');
+    var shareInfo = getProviderShareInfo(p);
+    var shareRows = shareInfo && shareInfo.shareRatio
+      ? '<tr><td class="lbl">合作模式</td><td>' + escapeHtmlText(shareInfo.cooperationMode) + '</td></tr>' +
+        '<tr><td class="lbl">分成比例</td><td>' + escapeHtmlText(shareInfo.shareRatio) + '</td></tr>'
+      : '';
+    var cleanedOtherInfo = cleanOtherInfoForDisplay(p && p.otherInfo);
     return (
       '<div class="rule-card">' +
         '<h2>【' + (i + 1) + '】' + title + '</h2>' +
@@ -1387,7 +1682,8 @@ function buildRulesExportWordHtml(list, scopeLabel) {
           '<tr><td class="lbl">发布时间</td><td>' + escapeHtmlText(p.publishTime || '-') + '</td></tr>' +
           '<tr><td class="lbl">专辑</td><td>' + album + '</td></tr>' +
           '<tr><td class="lbl">特例</td><td>' + escapeHtmlText(p.specialCase || '-') + '</td></tr>' +
-          '<tr><td class="lbl">其他信息</td><td>' + escapeHtmlText(p.otherInfo || '-') + '</td></tr>' +
+          shareRows +
+          '<tr><td class="lbl">其他信息</td><td>' + escapeHtmlText(cleanedOtherInfo || '-') + '</td></tr>' +
         '</table>' +
       '</div>'
     );
@@ -2648,7 +2944,8 @@ function aiRenderProviderResults(fullList) {
           '<div class="ai-result-row"><span class="ai-result-label">发布时间</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.publishTime)) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">专辑</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(resolveAlbumRule(rule))) + '</span></div>' +
           '<div class="ai-result-row"><span class="ai-result-label">特例</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.specialCase)) + '</span></div>' +
-          '<div class="ai-result-row"><span class="ai-result-label">其他信息</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(rule.otherInfo)) + '</span></div>' +
+          buildShareInfoRowsHtml(rule, 'ai') +
+          '<div class="ai-result-row"><span class="ai-result-label">其他信息</span><span class="ai-result-value">' + escapeHtmlText(formatAiFieldDisplay(cleanOtherInfoForDisplay(rule.otherInfo))) + '</span></div>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -2686,6 +2983,7 @@ async function autoEnsureSeriesRuleAndRefresh(shopName, providerName, brandName,
 
     if (!exists) {
       providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, seriesName));
+      await enrichShareInfoForProviderCards(providers, [providers.length - 1], { silent: true, timeoutMs: 8000 });
       if (typeof persistProviders === 'function') {
         await persistProviders(providers, { awaitCloud: true });
       } else {
@@ -2960,7 +3258,8 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
       html += '    <div class="rule-row"><span class="rule-label">发布时间：</span><span class="rule-value">' + escapeHtmlText(p.publishTime || '待录入') + '</span></div>';
       html += '    <div class="rule-row"><span class="rule-label">专辑：</span><span class="rule-value">' + escapeHtmlText(resolveAlbumRule(p)) + '</span></div>';
       html += '    <div class="rule-row"><span class="rule-label">特例：</span><span class="rule-value">' + escapeHtmlText(p.specialCase || '待录入') + '</span></div>';
-      html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><span class="rule-value">' + escapeHtmlText(p.otherInfo || '待录入') + '</span></div>';
+      html += buildShareInfoRowsHtml(p, 'rule');
+      html += '    <div class="rule-row"><span class="rule-label">其他信息：</span><span class="rule-value">' + escapeHtmlText(cleanOtherInfoForDisplay(p.otherInfo) || '待录入') + '</span></div>';
       html += '  </div>';
       html += '</div>';
     });
@@ -3483,7 +3782,7 @@ function editRuleByIndex(globalIndex, shopEncoded, providerEncoded, brandEncoded
   document.getElementById('edit-pricing').value = rule.pricing || '';
   document.getElementById('edit-publishTime').value = rule.publishTime || '';
   document.getElementById('edit-specialCase').value = rule.specialCase || '';
-  document.getElementById('edit-otherInfo').value = rule.otherInfo || '';
+  document.getElementById('edit-otherInfo').value = cleanOtherInfoForDisplay(rule.otherInfo);
 
   setProviderRuleEditLock({
     resolvedIndex: resolvedIndex,
@@ -3540,7 +3839,9 @@ async function saveRuleByIndex(globalIndex, targetShop, targetProvider, targetBr
     providersData[resolvedIndex].pricing = newPricing;
     providersData[resolvedIndex].publishTime = newPublishTime;
     providersData[resolvedIndex].specialCase = newSpecialCase;
-    providersData[resolvedIndex].otherInfo = newOtherInfo;
+    var currentShareInfo = getProviderShareInfo(row);
+    providersData[resolvedIndex].otherInfo = composeOtherInfoWithShareInfo(newOtherInfo, currentShareInfo);
+    await enrichShareInfoForProviderCards(providersData, [resolvedIndex], { silent: true, timeoutMs: 8000 });
     // 系列/品牌/提供者/店铺不在“编辑规则”里改动，避免上次规则带值导致联动串改
     
     console.log('💾 保存的数据:', providersData[resolvedIndex]);
@@ -4097,6 +4398,7 @@ async function saveProvider() {
     specialCase: specialCase || '',
     otherInfo: otherInfo || ''
   });
+  await enrichShareInfoForProviderCards(providers, [providers.length - 1], { silent: true, timeoutMs: 8000 });
   var syncResult = await persistProviders(providers, { awaitCloud: true });
   toastAfterProviderSync(syncResult);
   closeModal('modal-provider');
@@ -4151,6 +4453,7 @@ async function saveBrand(nameInput) {
   });
   if (!hasLinkedRecord) {
     providers.push(buildNewProviderRuleCard(shopName, providerName, name, ''));
+    await enrichShareInfoForProviderCards(providers, [providers.length - 1], { silent: true, timeoutMs: 8000 });
     var syncResult = await persistProviders(providers, { awaitCloud: true });
     toastAfterProviderSync(syncResult);
   }
@@ -4292,6 +4595,7 @@ async function saveSeries(brandIdInput, nameInput, brandNameInput, shopInput, pr
 
   if (!linked) {
     providers.push(buildNewProviderRuleCard(shopName, providerName, brandName, name));
+    await enrichShareInfoForProviderCards(providers, [providers.length - 1], { silent: true, timeoutMs: 8000 });
     var syncResult = await persistProviders(providers, { awaitCloud: true });
     toastAfterProviderSync(syncResult);
   }
@@ -4333,7 +4637,7 @@ function editProvider(index) {
   document.getElementById('new-provider-publishtime').value = provider.publishTime || '';
   document.getElementById('new-provider-special').value = provider.specialCase || '';
   var otherEditEl = document.getElementById('new-provider-otherinfo');
-  if (otherEditEl) otherEditEl.value = provider.otherInfo || '';
+  if (otherEditEl) otherEditEl.value = cleanOtherInfoForDisplay(provider.otherInfo);
   
   openModal('modal-provider');
   
@@ -4341,7 +4645,7 @@ function editProvider(index) {
   saveBtn.onclick = () => updateProvider();
 }
 
-function updateProvider() {
+async function updateProvider() {
   const shop = document.getElementById('new-provider-shop')?.value.trim();
   const shopname = document.getElementById('new-provider-shopname')?.value.trim();
   const name = document.getElementById('new-provider-name')?.value.trim();
@@ -4375,13 +4679,14 @@ function updateProvider() {
     pricing: pricing || '',
     publishTime: publishTime || '',
     specialCase: specialCase || '',
-    otherInfo: otherInfo || ''
+    otherInfo: composeOtherInfoWithShareInfo(otherInfo || '', getProviderShareInfo(prev))
   };
-  setData(STORAGE_KEYS.PROVIDERS, providers);
+  await enrichShareInfoForProviderCards(providers, [editingProviderIndex], { silent: true, timeoutMs: 8000 });
+  var syncResult = await persistProviders(providers, { awaitCloud: true });
   
   closeModal('modal-provider');
   loadProviders();
-  showToast('提供者更新成功');
+  toastAfterProviderSync(syncResult);
   
   const saveBtn = document.querySelector('#modal-provider .btn-save');
   saveBtn.onclick = saveProvider;
