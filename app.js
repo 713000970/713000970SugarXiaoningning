@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260814-15';
+var RULE_LIBRARY_BUILD = '20260826-01';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -50,6 +50,7 @@ var providerRuleEditLock = null;
 var SHARE_RATIO_API_URL = (window.RULE_LIBRARY_CONFIG && window.RULE_LIBRARY_CONFIG.shareRatioApiUrl) || '/api/share-ratio';
 var SHARE_INFO_COOPERATION_LINE = '合作模式：非独家合作';
 var shareRatioLookupCache = {};
+var shareInfoViewEnrichInflight = {};
 
 // ========================================
 // 数据存储（本地存储）
@@ -599,6 +600,64 @@ async function enrichShareInfoForProviderCards(providers, indexes, options) {
     }
   }
   return { changed: changed, checked: checked };
+}
+
+function providerNeedsShareInfoLookup(p) {
+  if (!p || getProviderShareInfo(p)) return false;
+  return !!String(p.shop || p.shopname || p.name || '').trim();
+}
+
+function shareInfoViewContextStillCurrent(brandName, shopName, providerName, seriesFilter) {
+  var currentProviderInput = (document.getElementById('provider-search-input')?.value || '').trim();
+  return normalizeText(currentEditingBrand) === normalizeText(brandName) &&
+    normalizeEntityKey(currentEditingShop) === normalizeEntityKey(shopName) &&
+    normalizeEntityKey(currentProviderInput) === normalizeEntityKey(providerName) &&
+    normalizeText(currentEditingSeries || '') === normalizeText(seriesFilter || '');
+}
+
+function maybeEnrichShareInfoForVisibleRuleCards(matchedItems, brandName, shopName, providerName, seriesFilter) {
+  if (!Array.isArray(matchedItems) || matchedItems.length === 0) return;
+  var indexes = [];
+  matchedItems.slice(0, 50).forEach(function(item) {
+    if (!item || item.index < 0 || !providerNeedsShareInfoLookup(item.data)) return;
+    indexes.push(item.index);
+  });
+  if (!indexes.length) return;
+
+  var key = [
+    normalizeText(brandName),
+    normalizeEntityKey(shopName),
+    normalizeEntityKey(providerName),
+    normalizeText(seriesFilter || ''),
+    indexes.join(',')
+  ].join('|');
+  if (shareInfoViewEnrichInflight[key]) return;
+  shareInfoViewEnrichInflight[key] = true;
+
+  (async function() {
+    try {
+      var latestProviders = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROVIDERS) || '[]');
+      var result = await enrichShareInfoForProviderCards(latestProviders, indexes, {
+        silent: true,
+        timeoutMs: 12000
+      });
+      if (!result || result.changed <= 0) return;
+
+      if (typeof persistProviders === 'function') {
+        await persistProviders(latestProviders, { awaitCloud: false });
+      } else {
+        setData(STORAGE_KEYS.PROVIDERS, latestProviders);
+      }
+
+      if (!isProviderRuleEditActive() && shareInfoViewContextStillCurrent(brandName, shopName, providerName, seriesFilter)) {
+        showRulesByBrandAndShop(brandName, shopName, seriesFilter, true);
+      }
+    } catch (err) {
+      console.warn('分成比例展示补全失败:', err);
+    } finally {
+      delete shareInfoViewEnrichInflight[key];
+    }
+  })();
 }
 
 function getBbmSeriesListForBrand(brandName) {
@@ -3207,6 +3266,7 @@ function showRulesByBrandAndShop(brandName, shopName, seriesFilter, forceRefresh
 
   var bbmSeriesNames = getBbmSeriesNamesForBrand(brandName);
   renderSeriesTags(matchedBeforeSeriesFilter, seriesFilter || '', undefined, bbmSeriesNames);
+  maybeEnrichShareInfoForVisibleRuleCards(matched, brandName, shopName, providerName, seriesFilter || '');
   if (matched.length === 0) {
     if (tryAutoEnsureSeriesRuleCard(shopName, providerName, brandName, seriesFilter, forceRefresh)) {
       return;
