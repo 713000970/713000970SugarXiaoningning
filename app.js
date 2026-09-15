@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260826-01';
+var RULE_LIBRARY_BUILD = '20260915-01';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -88,7 +88,11 @@ function buildDefaultAlbumRule(_bookTitle, providerName) {
   var book = 'XXXX（书籍名称）';
   var provider = String(providerName || '').trim() || 'XXXX（提供者名称）';
   return '1、专辑简介：' + book + '系列资料由' + provider + '提供，并授权学科网在互联网进行发布，侵权必究！\n' +
-    '2、专辑封面：若无教辅图书封面，则用智能平台生成，要求最下标必须写学科网书城 ' + ALBUM_COVER_BUILD_URL + '\n' +
+    '2、专辑封面：\n' +
+    '（1）有封面 → 直接使用\n' +
+    '（2）部分封面：生产反馈，运营征集\n' +
+    '（3）无封面 → 使用去年同期产品封面\n' +
+    '（4）去年无 → 智能平台生成，要求最下标必须写学科网书城 ' + ALBUM_COVER_BUILD_URL + '\n' +
     '3、其他：专辑"热点""推荐"等该栏标签不做任何勾选';
 }
 
@@ -5397,6 +5401,8 @@ function getAIRules() {
           title: '专辑封面',
           content: `
             <ul>
+              <li>有封面 → 直接使用</li>
+              <li>部分封面：生产反馈，运营征集</li>
               <li>无封面 → 使用去年同期产品封面</li>
               <li>去年无 → 智能平台生成，最下标须写：学科网书城</li>
             </ul>
