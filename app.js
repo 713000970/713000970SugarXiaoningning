@@ -2,8 +2,10 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260921-04';
+var RULE_LIBRARY_BUILD = '20260921-05';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
+var EMERGENCY_SUPABASE_URL = 'https://wsrbjgiscfxsyucsgzof.supabase.co';
+var EMERGENCY_SUPABASE_KEY = 'sb_publishable_EenxYjB0VmulAQRr24IyDw_mj1AxX38';
 
 function setBuildBadgeNow() {
   try {
@@ -75,6 +77,146 @@ function scheduleEmergencyZeroDataFallback() {
   }, 1200);
 }
 scheduleEmergencyZeroDataFallback();
+
+function emergencyFetchWithTimeout(url, options, timeoutMs) {
+  timeoutMs = timeoutMs || 18000;
+  if (typeof AbortController === 'undefined') return fetch(url, options || {});
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, timeoutMs);
+  options = Object.assign({}, options || {}, { signal: controller.signal });
+  return fetch(url, options).finally(function() { clearTimeout(timer); });
+}
+
+function parseEmergencyContentRange(header) {
+  var m = String(header || '').match(/(\d+)\s*-\s*(\d+)\s*\/\s*(\d+|\*)/);
+  if (!m || m[3] === '*') return null;
+  var total = parseInt(m[3], 10);
+  return Number.isFinite(total) ? total : null;
+}
+
+function emergencyCloudHeaders(extra) {
+  return Object.assign({
+    'apikey': EMERGENCY_SUPABASE_KEY,
+    'Authorization': 'Bearer ' + EMERGENCY_SUPABASE_KEY
+  }, extra || {});
+}
+
+function emergencyToLocalProvider(p) {
+  p = p || {};
+  return {
+    id: p.id,
+    shop: p.shop || '',
+    shopname: p.shopname || p.shop_name || '',
+    name: p.name || '',
+    brand: p.brand || '',
+    series: p.series || '',
+    album: p.album || '',
+    naming: p.naming || '',
+    split: p.split || '',
+    pricing: p.pricing || '',
+    publishTime: p.publishtime || p.publishTime || '',
+    specialCase: p.specialcase || p.specialCase || '',
+    otherInfo: p.otherinfo || p.otherInfo || ''
+  };
+}
+
+function emergencyPersistProvidersFromCloud(rows, total) {
+  var providers = (rows || []).map(emergencyToLocalProvider).filter(function(p) {
+    return String(p.name || p.shop || p.shopname || p.brand || p.series || '').trim();
+  });
+  if (providers.length < 500) return false;
+  var brandSeen = {};
+  var brands = [];
+  var shopSeen = {};
+  providers.forEach(function(p) {
+    var brand = String(p.brand || '').trim();
+    if (brand && !brandSeen[brand]) {
+      brandSeen[brand] = true;
+      brands.push(brand);
+    }
+    var shop = String(p.shop || p.shopname || p.name || '').trim();
+    if (shop) shopSeen[shop] = true;
+  });
+  brands.sort(function(a, b) { return a.localeCompare(b, 'zh-Hans-CN'); });
+  localStorage.setItem('rule_library_providers', JSON.stringify(providers));
+  localStorage.setItem('rule_library_brands', JSON.stringify(brands.map(function(name, i) {
+    return { id: String(i + 1), name: name };
+  })));
+  localStorage.setItem('rule_library_local_dirty', '0');
+  localStorage.setItem('rule_library_cloud_stats_cache', JSON.stringify({
+    effective: providers.length,
+    raw: total || providers.length,
+    brands: brands.length,
+    shops: Object.keys(shopSeen).length,
+    at: Date.now()
+  }));
+  window.__RULE_LIB_WAIT_CLOUD_STATS = false;
+  window.__RULE_LIB_CLOUD_STATS_READY = true;
+  window.__RULE_LIB_CLOUD_EFFECTIVE_COUNT = providers.length;
+  window.__RULE_LIB_CLOUD_RAW_COUNT = total || providers.length;
+  window.__RULE_LIB_CLOUD_BRAND_COUNT = brands.length;
+  window.__RULE_LIB_CLOUD_SHOP_COUNT = Object.keys(shopSeen).length;
+  if (typeof updateStats === 'function') updateStats();
+  if (typeof loadProviders === 'function') loadProviders();
+  if (typeof loadBrands === 'function') loadBrands();
+  var statusText = document.getElementById('sync-status-text');
+  if (statusText) statusText.textContent = '已从云端载入';
+  window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'emergency-cloud-bootstrap' } }));
+  return true;
+}
+
+function scheduleEmergencyCloudDataBootstrap() {
+  setTimeout(function() {
+    try {
+      var current = [];
+      try {
+        current = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+      } catch (e) {
+        current = [];
+      }
+      if (Array.isArray(current) && current.length >= 2500) return;
+      var countUrl = EMERGENCY_SUPABASE_URL + '/rest/v1/providers?select=id';
+      emergencyFetchWithTimeout(countUrl, {
+        headers: emergencyCloudHeaders({
+          'Range-Unit': 'items',
+          'Range': '0-0',
+          'Prefer': 'count=exact'
+        })
+      }, 10000).then(function(res) {
+        if (!res.ok) throw new Error('count HTTP ' + res.status);
+        var total = parseEmergencyContentRange(res.headers.get('content-range') || res.headers.get('Content-Range'));
+        return res.json().catch(function() { return []; }).then(function() { return total; });
+      }).then(function(total) {
+        if (!total || total < 500) throw new Error('invalid cloud count ' + total);
+        if (Array.isArray(current) && current.length >= total) return null;
+        var pageSize = 1000;
+        var starts = [];
+        for (var from = 0; from < total; from += pageSize) starts.push(from);
+        return Promise.all(starts.map(function(from) {
+          var to = Math.min(from + pageSize - 1, total - 1);
+          return emergencyFetchWithTimeout(EMERGENCY_SUPABASE_URL + '/rest/v1/providers?select=*', {
+            headers: emergencyCloudHeaders({
+              'Range-Unit': 'items',
+              'Range': from + '-' + to
+            })
+          }, 20000).then(function(res) {
+            if (!res.ok) throw new Error('page HTTP ' + res.status);
+            return res.json();
+          });
+        })).then(function(parts) {
+          var rows = [];
+          parts.forEach(function(part) { rows = rows.concat(Array.isArray(part) ? part : []); });
+          emergencyPersistProvidersFromCloud(rows, total);
+        });
+      }).catch(function(err) {
+        console.warn('emergency cloud bootstrap failed:', err);
+      });
+    } catch (err) {
+      console.warn('emergency cloud bootstrap setup failed:', err);
+    }
+  }, 2600);
+}
+scheduleEmergencyCloudDataBootstrap();
 
 function isMultiUserMode() {
   return !!(window.RULE_LIBRARY_CONFIG && window.RULE_LIBRARY_CONFIG.multiUser);
