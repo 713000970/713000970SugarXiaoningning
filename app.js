@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260920-01';
+var RULE_LIBRARY_BUILD = '20260921-01';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -3986,13 +3986,17 @@ async function deleteRuleByIndex(globalIndex) {
   var deletedProvider = (document.getElementById('provider-search-input')?.value || '').trim() || deletedRule.name || '';
   var deletedBrand = currentEditingBrand || deletedRule.brand || '';
   var deletedSeries = currentEditingSeries || deletedRule.series || '';
-  markSeriesRuleDeleted(deletedShop, deletedProvider, deletedBrand, deletedSeries);
-  if (deletedRule.shop && deletedRule.shop !== deletedShop) {
-    markSeriesRuleDeleted(deletedRule.shop, deletedRule.name, deletedRule.brand, deletedRule.series);
-  }
-  if (deletedRule.shopname && deletedRule.shopname !== deletedShop) {
-    markSeriesRuleDeleted(deletedRule.shopname, deletedRule.name, deletedRule.brand, deletedRule.series);
-  }
+  var deleteShops = [deletedShop, deletedRule.shop, deletedRule.shopname];
+  var deleteProviders = [deletedProvider, deletedRule.name];
+  var markedKeys = new Set();
+  deleteShops.forEach(function(shopName) {
+    deleteProviders.forEach(function(providerName) {
+      var key = seriesRuleDeleteKey(shopName, providerName, deletedBrand || deletedRule.brand, deletedSeries || deletedRule.series);
+      if (!key.replace(/\|/g, '') || markedKeys.has(key)) return;
+      markedKeys.add(key);
+      markSeriesRuleDeleted(shopName, providerName, deletedBrand || deletedRule.brand, deletedSeries || deletedRule.series);
+    });
+  });
 
   providersData.splice(globalIndex, 1);
   if (typeof persistProviders === 'function') {
