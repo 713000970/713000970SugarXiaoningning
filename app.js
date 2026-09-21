@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260921-05';
+var RULE_LIBRARY_BUILD = '20260921-06';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 var EMERGENCY_SUPABASE_URL = 'https://wsrbjgiscfxsyucsgzof.supabase.co';
 var EMERGENCY_SUPABASE_KEY = 'sb_publishable_EenxYjB0VmulAQRr24IyDw_mj1AxX38';
@@ -138,18 +138,34 @@ function emergencyPersistProvidersFromCloud(rows, total) {
     if (shop) shopSeen[shop] = true;
   });
   brands.sort(function(a, b) { return a.localeCompare(b, 'zh-Hans-CN'); });
-  localStorage.setItem('rule_library_providers', JSON.stringify(providers));
-  localStorage.setItem('rule_library_brands', JSON.stringify(brands.map(function(name, i) {
+  var brandRows = brands.map(function(name, i) {
     return { id: String(i + 1), name: name };
-  })));
-  localStorage.setItem('rule_library_local_dirty', '0');
-  localStorage.setItem('rule_library_cloud_stats_cache', JSON.stringify({
+  });
+  var statsCache = {
     effective: providers.length,
     raw: total || providers.length,
     brands: brands.length,
     shops: Object.keys(shopSeen).length,
     at: Date.now()
-  }));
+  };
+  try {
+    localStorage.removeItem('rule_library_cloud_snapshot');
+    localStorage.setItem('rule_library_providers', JSON.stringify(providers));
+    localStorage.setItem('rule_library_brands', JSON.stringify(brandRows));
+    localStorage.setItem('rule_library_local_dirty', '0');
+    localStorage.setItem('rule_library_cloud_stats_cache', JSON.stringify(statsCache));
+  } catch (storageErr) {
+    try {
+      localStorage.removeItem('rule_library_cloud_snapshot');
+      localStorage.removeItem('rule_library_cloud_stats_cache');
+      localStorage.setItem('rule_library_providers', JSON.stringify(providers));
+      localStorage.setItem('rule_library_brands', JSON.stringify(brandRows));
+      localStorage.setItem('rule_library_local_dirty', '0');
+    } catch (retryErr) {
+      console.warn('emergency cloud persist failed:', retryErr || storageErr);
+      return false;
+    }
+  }
   window.__RULE_LIB_WAIT_CLOUD_STATS = false;
   window.__RULE_LIB_CLOUD_STATS_READY = true;
   window.__RULE_LIB_CLOUD_EFFECTIVE_COUNT = providers.length;
@@ -164,6 +180,36 @@ function emergencyPersistProvidersFromCloud(rows, total) {
   window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'emergency-cloud-bootstrap' } }));
   return true;
 }
+
+function scheduleEmergencyServerCloudBootstrap() {
+  setTimeout(function() {
+    try {
+      var current = [];
+      try {
+        current = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+      } catch (e) {
+        current = [];
+      }
+      if (Array.isArray(current) && current.length >= 2500) return;
+      emergencyFetchWithTimeout('/api/providers-cloud?ts=' + Date.now(), { cache: 'no-store' }, 25000)
+        .then(function(res) {
+          if (!res.ok) throw new Error('server cloud HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function(data) {
+          if (!data || data.ok === false) throw new Error((data && data.error) || 'server cloud failed');
+          if (!Array.isArray(data.rows) || data.rows.length < 500) throw new Error('server cloud rows ' + (data.rows && data.rows.length));
+          emergencyPersistProvidersFromCloud(data.rows, data.total || data.count || data.rows.length);
+        })
+        .catch(function(err) {
+          console.warn('emergency server cloud bootstrap failed:', err);
+        });
+    } catch (err) {
+      console.warn('emergency server cloud bootstrap setup failed:', err);
+    }
+  }, 900);
+}
+scheduleEmergencyServerCloudBootstrap();
 
 function scheduleEmergencyCloudDataBootstrap() {
   setTimeout(function() {

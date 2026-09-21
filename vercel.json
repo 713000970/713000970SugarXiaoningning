@@ -6,6 +6,9 @@
     },
     "api/share-ratio.js": {
       "maxDuration": 30
+    },
+    "api/providers-cloud.js": {
+      "maxDuration": 30
     }
   }
 }
