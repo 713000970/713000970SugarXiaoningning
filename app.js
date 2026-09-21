@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260921-06';
+var RULE_LIBRARY_BUILD = '20260921-07';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 var EMERGENCY_SUPABASE_URL = 'https://wsrbjgiscfxsyucsgzof.supabase.co';
 var EMERGENCY_SUPABASE_KEY = 'sb_publishable_EenxYjB0VmulAQRr24IyDw_mj1AxX38';
@@ -181,6 +181,62 @@ function emergencyPersistProvidersFromCloud(rows, total) {
   return true;
 }
 
+function loadCloudProvidersViaServer(opts) {
+  opts = opts || {};
+  if (!opts.allowWhenDirty) {
+    try {
+      if (localStorage.getItem('rule_library_local_dirty') === '1') {
+        throw new Error('local dirty, skip server cloud pull');
+      }
+    } catch (dirtyErr) {
+      if (dirtyErr && dirtyErr.message === 'local dirty, skip server cloud pull') throw dirtyErr;
+    }
+  }
+  if (window.__RULE_LIB_SERVER_CLOUD_INFLIGHT && !opts.forceNewRequest) {
+    return window.__RULE_LIB_SERVER_CLOUD_INFLIGHT;
+  }
+  var silent = !!opts.silent;
+  if (!silent && typeof updateSyncStatusBadge === 'function') {
+    updateSyncStatusBadge('syncing', '正在从云端载入...');
+  }
+  window.__RULE_LIB_WAIT_CLOUD_STATS = true;
+  var promise = emergencyFetchWithTimeout('/api/providers-cloud?ts=' + Date.now(), { cache: 'no-store' }, opts.timeoutMs || 30000)
+    .then(function(res) {
+      if (!res.ok) throw new Error('server cloud HTTP ' + res.status);
+      return res.json();
+    })
+    .then(function(data) {
+      if (!data || data.ok === false) throw new Error((data && data.error) || 'server cloud failed');
+      if (!Array.isArray(data.rows) || data.rows.length < 500) {
+        throw new Error('server cloud rows ' + (data.rows && data.rows.length));
+      }
+      var total = data.total || data.count || data.rows.length;
+      if (!emergencyPersistProvidersFromCloud(data.rows, total)) {
+        throw new Error('server cloud persist failed');
+      }
+      window.__RULE_LIB_LAST_SERVER_CLOUD_LOAD = Date.now();
+      if (!silent && typeof updateSyncStatusBadge === 'function') {
+        updateSyncStatusBadge('success', '已从云端载入 ' + data.rows.length + ' 条');
+      }
+      return { ok: true, count: data.rows.length, total: total };
+    })
+    .catch(function(err) {
+      window.__RULE_LIB_WAIT_CLOUD_STATS = false;
+      if (typeof updateStats === 'function') updateStats();
+      if (!silent && typeof updateSyncStatusBadge === 'function') {
+        updateSyncStatusBadge('error', '云端载入失败，请点立即同步重试');
+      }
+      throw err;
+    })
+    .finally(function() {
+      window.__RULE_LIB_SERVER_CLOUD_INFLIGHT = null;
+    });
+  window.__RULE_LIB_SERVER_CLOUD_INFLIGHT = promise;
+  return promise;
+}
+
+window.loadCloudProvidersViaServer = loadCloudProvidersViaServer;
+
 function scheduleEmergencyServerCloudBootstrap() {
   setTimeout(function() {
     try {
@@ -191,16 +247,7 @@ function scheduleEmergencyServerCloudBootstrap() {
         current = [];
       }
       if (Array.isArray(current) && current.length >= 2500) return;
-      emergencyFetchWithTimeout('/api/providers-cloud?ts=' + Date.now(), { cache: 'no-store' }, 25000)
-        .then(function(res) {
-          if (!res.ok) throw new Error('server cloud HTTP ' + res.status);
-          return res.json();
-        })
-        .then(function(data) {
-          if (!data || data.ok === false) throw new Error((data && data.error) || 'server cloud failed');
-          if (!Array.isArray(data.rows) || data.rows.length < 500) throw new Error('server cloud rows ' + (data.rows && data.rows.length));
-          emergencyPersistProvidersFromCloud(data.rows, data.total || data.count || data.rows.length);
-        })
+      loadCloudProvidersViaServer({ silent: true, timeoutMs: 30000 })
         .catch(function(err) {
           console.warn('emergency server cloud bootstrap failed:', err);
         });
@@ -2683,6 +2730,22 @@ function updateStats() {
 
   if (typeof window !== 'undefined' && window.__RULE_LIB_WAIT_CLOUD_STATS) {
     var cachedCloudStats = getCloudStatsCacheForDisplay();
+    if (!cachedCloudStats) {
+      var localProvidersWhileWaiting = getData(STORAGE_KEYS.PROVIDERS);
+      if (Array.isArray(localProvidersWhileWaiting) && localProvidersWhileWaiting.length > 0) {
+        var localBrandsWhileWaiting = getData(STORAGE_KEYS.BRANDS);
+        var localShopSetWhileWaiting = new Set();
+        localProvidersWhileWaiting.forEach(function(p) {
+          if (!p) return;
+          var shop = String(p.shop || p.shopname || p.name || '').trim();
+          if (shop) localShopSetWhileWaiting.add(normalizeEntityKey(shop));
+        });
+        if (statProviders) statProviders.textContent = String(localProvidersWhileWaiting.length);
+        if (statBrands) statBrands.textContent = String(localBrandsWhileWaiting.length);
+        if (statShops) statShops.textContent = String(localShopSetWhileWaiting.size);
+        return;
+      }
+    }
     if (!cachedCloudStats) {
       if (statProviders) statProviders.textContent = '...';
       if (statBrands) statBrands.textContent = '...';

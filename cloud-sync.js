@@ -1889,6 +1889,23 @@ window.addEventListener('load', function() {
       if (typeof showToast === 'function') showToast('同步功能不可用');
       return;
     }
+    var localDirty = false;
+    try {
+      localDirty = localStorage.getItem(LOCAL_DIRTY_KEY) === '1';
+    } catch (e) { /* ignore */ }
+    if (!localDirty && typeof window.loadCloudProvidersViaServer === 'function') {
+      window.loadCloudProvidersViaServer({ forceNewRequest: true, timeoutMs: 30000 })
+        .then(function(result) {
+          if (typeof showToast === 'function') showToast('已从云端载入 ' + result.count + ' 条');
+          if (typeof startCloudAutoSync === 'function') startCloudAutoSync();
+        })
+        .catch(function(err) {
+          console.warn('🌥️ 后端云端载入失败，回退原同步:', err);
+          cloudSync({ quickCheck: true });
+          if (typeof showToast === 'function') showToast('已开始同步');
+        });
+      return;
+    }
     cloudSync({ quickCheck: true });
     if (typeof showToast === 'function') showToast('已开始同步');
   };
