@@ -47,7 +47,8 @@ window.ensureOfficialProvidersLoaded = async function(opts) {
 
   localStorage.setItem('rule_library_providers', JSON.stringify(providers));
   localStorage.setItem('rule_library_brands', JSON.stringify(buildBrandsFromProviders(providers)));
-  localStorage.setItem('rule_library_local_dirty', '1');
+  /** 仅当云端为空、需用 CSV 灌库时标 dirty；新电脑应先拉云端，勿默认 dirty */
+  localStorage.setItem('rule_library_local_dirty', opts.markDirty ? '1' : '0');
 
   console.log('[规则库] 已从 CSV 官方表载入本机 ' + providers.length + ' 条');
   return { source: 'csv', count: providers.length };

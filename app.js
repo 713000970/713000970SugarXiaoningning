@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260921-03';
+var RULE_LIBRARY_BUILD = '20260921-04';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function setBuildBadgeNow() {
@@ -12,6 +12,69 @@ function setBuildBadgeNow() {
   } catch (e) { /* ignore */ }
 }
 setBuildBadgeNow();
+
+function scheduleEmergencyZeroDataFallback() {
+  setTimeout(function() {
+    try {
+      var current = [];
+      try {
+        current = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+      } catch (e) {
+        current = [];
+      }
+      if (Array.isArray(current) && current.length >= 500) return;
+      if (typeof fetch !== 'function') return;
+      var baseUrl = window.OFFICIAL_PROVIDERS_URL || 'providers-from-csv.json?v=csv-20260526';
+      var url = baseUrl + (baseUrl.indexOf('?') === -1 ? '?' : '&') + 'fallback=' + Date.now();
+      fetch(url, { cache: 'no-store' })
+        .then(function(res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          return res.json();
+        })
+        .then(function(providers) {
+          if (!Array.isArray(providers) || providers.length < 500) return;
+          var brandSeen = {};
+          var brands = [];
+          var shopSeen = {};
+          providers.forEach(function(p) {
+            var brand = String((p && p.brand) || '').trim();
+            if (brand && !brandSeen[brand]) {
+              brandSeen[brand] = true;
+              brands.push(brand);
+            }
+            var shop = String((p && (p.shop || p.shopname || p.name)) || '').trim();
+            if (shop) shopSeen[shop] = true;
+          });
+          brands.sort(function(a, b) { return a.localeCompare(b, 'zh-Hans-CN'); });
+          localStorage.setItem('rule_library_providers', JSON.stringify(providers));
+          localStorage.setItem('rule_library_brands', JSON.stringify(brands.map(function(name, i) {
+            return { id: String(i + 1), name: name };
+          })));
+          localStorage.setItem('rule_library_local_dirty', '0');
+          window.__RULE_LIB_WAIT_CLOUD_STATS = false;
+          window.__RULE_LIB_CLOUD_STATS_READY = false;
+          var statProviders = document.getElementById('stat-providers');
+          var statBrands = document.getElementById('stat-brands');
+          var statShops = document.getElementById('stat-shops');
+          if (statProviders) statProviders.textContent = String(providers.length);
+          if (statBrands) statBrands.textContent = String(brands.length);
+          if (statShops) statShops.textContent = String(Object.keys(shopSeen).length);
+          var statusText = document.getElementById('sync-status-text');
+          if (statusText) statusText.textContent = '已载入本地数据';
+          if (typeof updateStats === 'function') updateStats();
+          if (typeof loadProviders === 'function') loadProviders();
+          if (typeof loadBrands === 'function') loadBrands();
+          window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'emergency-zero-fallback' } }));
+        })
+        .catch(function(err) {
+          console.warn('emergency zero-data fallback failed:', err);
+        });
+    } catch (err) {
+      console.warn('emergency zero-data fallback setup failed:', err);
+    }
+  }, 1200);
+}
+scheduleEmergencyZeroDataFallback();
 
 function isMultiUserMode() {
   return !!(window.RULE_LIBRARY_CONFIG && window.RULE_LIBRARY_CONFIG.multiUser);
