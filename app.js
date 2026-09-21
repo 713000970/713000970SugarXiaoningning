@@ -2,8 +2,16 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260921-02';
+var RULE_LIBRARY_BUILD = '20260921-03';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
+
+function setBuildBadgeNow() {
+  try {
+    var badge = document.getElementById('app-build-badge');
+    if (badge) badge.textContent = 'build ' + RULE_LIBRARY_BUILD;
+  } catch (e) { /* ignore */ }
+}
+setBuildBadgeNow();
 
 function isMultiUserMode() {
   return !!(window.RULE_LIBRARY_CONFIG && window.RULE_LIBRARY_CONFIG.multiUser);
@@ -1195,6 +1203,30 @@ function initCollapsibles() {
 }
 
 // 重置为官方数据（优先 CSV 表 providers-from-csv.json，约 2361 条）
+function scheduleZeroDataFallback() {
+  setTimeout(function() {
+    try {
+      var providers = JSON.parse(localStorage.getItem(STORAGE_KEYS.PROVIDERS) || '[]');
+      if (Array.isArray(providers) && providers.length >= 500) return;
+      if (typeof ensureOfficialProvidersLoaded !== 'function') return;
+      ensureOfficialProvidersLoaded({ minCount: 500, markDirty: false }).then(function(result) {
+        if (!result || result.count < 500) return;
+        window.__RULE_LIB_WAIT_CLOUD_STATS = false;
+        window.__RULE_LIB_CLOUD_STATS_READY = false;
+        if (typeof loadProviders === 'function') loadProviders();
+        if (typeof loadBrands === 'function') loadBrands();
+        if (typeof updateStats === 'function') updateStats();
+        window.dispatchEvent(new CustomEvent('providers-data-updated', { detail: { source: 'zero-data-fallback' } }));
+        if (typeof updateSyncStatusBadge === 'function') updateSyncStatusBadge('error', '云端较慢，已先载入本地数据');
+      }).catch(function(err) {
+        console.warn('本地官方表兜底失败:', err);
+      });
+    } catch (err) {
+      console.warn('检查本地 0 数据兜底失败:', err);
+    }
+  }, 2000);
+}
+
 function resetToPresetData() {
   if (isMultiUserMode() && !isSyncAdminMode()) {
     alert('多人协作模式下已禁用全库重置。请联系管理员。');
@@ -2045,6 +2077,8 @@ function cleanupBlankPlaceholderProviders() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  setBuildBadgeNow();
+  scheduleZeroDataFallback();
   initData();
   if (typeof cloudSync !== 'function') {
     cleanupBlankPlaceholderProviders();

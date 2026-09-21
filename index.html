@@ -509,10 +509,10 @@ function goHome() {
   <script src="db.js"></script>
   <script src="site-config.js?v=20260526"></script>
   <script src="data-bootstrap.js?v=csv-20260526"></script>
-  <script src="cloud-sync.js?v=20260921-02"></script>
+  <script src="cloud-sync.js?v=20260921-03"></script>
   <script src="customer-pool-org.js?v=20260526-pool2"></script>
-  <script src="bbm-api.js?v=20260921-02"></script>
-  <script src="app.js?v=20260921-02"></script>
+  <script src="bbm-api.js?v=20260921-03"></script>
+  <script src="app.js?v=20260921-03"></script>
   <script>
     // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (function() {
@@ -521,6 +521,8 @@ function goHome() {
       var badge = document.getElementById('app-build-badge');
       if (badge && window.RULE_LIBRARY_BUILD) {
         badge.textContent = 'build ' + window.RULE_LIBRARY_BUILD;
+      } else if (badge) {
+        badge.textContent = 'build 20260921-03';
       }
       if (window.RULE_LIBRARY_CONFIG && window.RULE_LIBRARY_CONFIG.multiUser && typeof cloudSync === 'function') {
         window.__RULE_LIB_WAIT_CLOUD_STATS = true;
