@@ -509,10 +509,10 @@ function goHome() {
   <script src="db.js"></script>
   <script src="site-config.js?v=20260526"></script>
   <script src="data-bootstrap.js?v=csv-20260526"></script>
-  <script src="cloud-sync.js?v=20260921-01"></script>
+  <script src="cloud-sync.js?v=20260921-02"></script>
   <script src="customer-pool-org.js?v=20260526-pool2"></script>
-  <script src="bbm-api.js?v=20260921-01"></script>
-  <script src="app.js?v=20260921-01"></script>
+  <script src="bbm-api.js?v=20260921-02"></script>
+  <script src="app.js?v=20260921-02"></script>
   <script>
     // 云同步须在 app.js 之后收尾：否则 updateStats 尚未定义，且易与 DOMContentLoaded 竞态导致首页数字偏小
     (function() {
@@ -589,6 +589,20 @@ function goHome() {
           .catch(function(e) {
             console.warn('🚀 后台云同步未完成:', e);
             window.__RULE_LIB_WAIT_CLOUD_STATS = true;
+            try {
+              var currentProviders = JSON.parse(localStorage.getItem('rule_library_providers') || '[]');
+              if ((!currentProviders || currentProviders.length < 500) && typeof ensureOfficialProvidersLoaded === 'function') {
+                ensureOfficialProvidersLoaded({ minCount: 500, markDirty: false }).then(function() {
+                  window.__RULE_LIB_WAIT_CLOUD_STATS = false;
+                  if (typeof updateStats === 'function') updateStats();
+                  if (typeof loadProviders === 'function') loadProviders();
+                }).catch(function(loadErr) {
+                  console.warn('🚀 本地官方表兜底也未完成:', loadErr);
+                });
+              }
+            } catch (fallbackErr) {
+              console.warn('🚀 检查本机兜底数据失败:', fallbackErr);
+            }
             if (typeof startCloudAutoSync === 'function') {
               startCloudAutoSync();
             }

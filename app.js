@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260921-01';
+var RULE_LIBRARY_BUILD = '20260921-02';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 
 function isMultiUserMode() {
@@ -2374,7 +2374,10 @@ window.addEventListener('cloud-sync-status', function(evt) {
 function getCloudStatsCacheForDisplay() {
   try {
     var cached = JSON.parse(localStorage.getItem('rule_library_cloud_stats_cache') || 'null');
-    if (cached && typeof cached.effective === 'number') return cached;
+    if (!cached || typeof cached.effective !== 'number') return null;
+    if (cached.effective <= 0) return null;
+    if (cached.at && Date.now() - Number(cached.at) > 24 * 60 * 60 * 1000) return null;
+    return cached;
   } catch (e) { /* ignore */ }
   return null;
 }
@@ -2395,6 +2398,12 @@ function updateStats() {
 
   if (typeof window !== 'undefined' && window.__RULE_LIB_WAIT_CLOUD_STATS) {
     var cachedCloudStats = getCloudStatsCacheForDisplay();
+    if (!cachedCloudStats) {
+      if (statProviders) statProviders.textContent = '...';
+      if (statBrands) statBrands.textContent = '...';
+      if (statShops) statShops.textContent = '...';
+      return;
+    }
     if (cachedCloudStats) {
       if (statProviders) statProviders.textContent = String(cachedCloudStats.effective);
       if (statBrands) statBrands.textContent = String(cachedCloudStats.brands || 0);

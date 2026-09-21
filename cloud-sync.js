@@ -331,6 +331,8 @@ function getSeriesRuleDeleteKeysForCloud(p) {
 }
 
 function isDeletedSeriesProviderForCloud(p, deletedSetOpt) {
+  /** Cloud sync must not trust browser-local deletion markers as shared truth. */
+  return false;
   var deletedSet = deletedSetOpt || getDeletedSeriesRuleSetForCloud();
   if (!deletedSet || !deletedSet.size) return false;
   var keys = getSeriesRuleDeleteKeysForCloud(p);
@@ -576,25 +578,12 @@ async function deleteCloudProviderIds(ids) {
 }
 
 async function deleteCloudRowsMarkedBySeriesTombstone(remoteRowsOpt) {
-  var deletedSet = getDeletedSeriesRuleSetForCloud();
-  if (!deletedSet || !deletedSet.size) return { deleted: 0 };
-  var remoteRows = Array.isArray(remoteRowsOpt) ? remoteRowsOpt : await fetchCloudProviders();
-  var ids = [];
-  var seen = new Set();
-  (remoteRows || []).forEach(function(row) {
-    if (!isDeletedSeriesProviderForCloud(row, deletedSet)) return;
-    var id = row && row.id;
-    if (!isPositiveIntId(id)) return;
-    id = Number(id);
-    if (seen.has(id)) return;
-    seen.add(id);
-    ids.push(id);
-  });
-  if (!ids.length) return { deleted: 0 };
-  emitSyncStatus('syncing', '正在清理云端已删除规则 ' + ids.length + ' 条…');
-  await deleteCloudProviderIds(ids);
-  cloudPullCooldownUntil = Date.now() + 30000;
-  return { deleted: ids.length };
+  /**
+   * Stopgap: client tombstones must not delete shared cloud rows directly.
+   * A stale or over-broad browser-local tombstone can otherwise hide or remove
+   * valid shared data for everyone. Keep tombstones as local UI hints only.
+   */
+  return { deleted: 0, skipped: true };
 }
 
 async function compactCloudDuplicateProviders(remoteRows) {
