@@ -2,7 +2,7 @@
  * 教辅店铺个性化生产规则库 - 应用脚本
  * 构建号需与 index.html 中 app.js?v= 保持一致，便于确认浏览器未缓存旧脚本。
  */
-var RULE_LIBRARY_BUILD = '20260921-07';
+var RULE_LIBRARY_BUILD = '20260921-08';
 window.RULE_LIBRARY_BUILD = RULE_LIBRARY_BUILD;
 var EMERGENCY_SUPABASE_URL = 'https://wsrbjgiscfxsyucsgzof.supabase.co';
 var EMERGENCY_SUPABASE_KEY = 'sb_publishable_EenxYjB0VmulAQRr24IyDw_mj1AxX38';
@@ -371,7 +371,7 @@ const APP_LOCAL_DIRTY_KEY = 'rule_library_local_dirty';
 const DELETED_BRANDS_KEY = 'rule_library_deleted_brands';
 const DELETED_SHOPS_KEY = 'rule_library_deleted_shops';
 const DELETED_PROVIDERS_KEY = 'rule_library_deleted_providers';
-const DELETED_SERIES_RULES_KEY = 'rule_library_deleted_series_rules';
+const APP_DELETED_SERIES_RULES_KEY = 'rule_library_deleted_series_rules';
 
 function providerHasMeaningfulRule(p) {
   if (!p) return false;
@@ -1724,12 +1724,12 @@ function seriesRuleDeleteKey(shop, provider, brand, seriesName) {
 }
 
 function getDeletedSeriesRuleSet() {
-  var arr = JSON.parse(localStorage.getItem(DELETED_SERIES_RULES_KEY) || '[]');
+  var arr = JSON.parse(localStorage.getItem(APP_DELETED_SERIES_RULES_KEY) || '[]');
   return new Set((arr || []).map(function(key) { return String(key || '').trim(); }).filter(Boolean));
 }
 
 function saveDeletedSeriesRuleSet(setObj) {
-  localStorage.setItem(DELETED_SERIES_RULES_KEY, JSON.stringify(Array.from(setObj || [])));
+  localStorage.setItem(APP_DELETED_SERIES_RULES_KEY, JSON.stringify(Array.from(setObj || [])));
 }
 
 function markSeriesRuleDeleted(shop, provider, brand, seriesName) {
